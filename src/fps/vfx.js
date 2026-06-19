@@ -113,6 +113,19 @@ export class VFX {
     this._flash(point, 0.8, 0xffe0a0);
   }
 
+  // big explosion: fireball flashes + lots of embers + rolling smoke
+  explosion(point) {
+    for (let i = 0; i < 4; i++) {
+      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5));
+      this._flash(p, 2.2 + Math.random(), i % 2 ? 0xffd27a : 0xff9a3c);
+    }
+    this._embers(point, 0xffb24a, 34, 10);
+    for (let i = 0; i < 5; i++) {
+      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2));
+      this._dustPuff(p, 0x2a2520, 1.8 + Math.random());
+    }
+  }
+
   // enemy hit (crimson)
   hitPuff(point) {
     this._flash(point, 0.5, 0xff6a52);

@@ -155,6 +155,7 @@ export class HUD {
     this.ammoEl.classList.toggle("low", !reloading && ammo <= 6);
   }
   setHostiles(n) { this.hostiles.textContent = n; }
+  setObjective(html) { const o = this.root.querySelector("#objective .obj"); if (o) o.innerHTML = html; }
 
   showLoading() {
     this._overlay(`<div class="sub">Preparing deployment</div><h1 class="mil-title">Loading<span class="hz">…</span></h1>`);

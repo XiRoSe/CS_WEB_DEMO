@@ -33,6 +33,8 @@ export class Audio {
       step2: "/audio/step2.wav",
       step3: "/audio/step3.wav",
       step4: "/audio/step4.wav",
+      explosion: "/audio/explosion.wav",
+      heli_fire: "/audio/heli_fire.wav",
     };
     for (const [name, url] of Object.entries(clips)) {
       try {
@@ -119,6 +121,22 @@ export class Audio {
     if (this.playBuf("step" + n, 0.4, 0.92 + Math.random() * 0.16)) return;
     this._noiseBurst(0.05, 300, 1, 0.07);
   }
+  explosion() {
+    if (this.playBuf("explosion", 0.85, 0.9 + Math.random() * 0.1)) return;
+    this._noiseBurst(0.6, 400, 0.6, 0.7);
+    this._tone(60, 0.6, "sawtooth", 0.4, 30);
+  }
+  heliShot() {
+    if (this.playBuf("heli_fire", 0.4, 0.95 + Math.random() * 0.1)) return;
+    this._noiseBurst(0.08, 1800, 1, 0.2);
+  }
+  startRotor() {
+    if (this._rotor || !this.ctx) return;
+    const chop = () => { this._tone(58, 0.07, "triangle", 0.13); this._noiseBurst(0.05, 220, 1, 0.06); };
+    chop();
+    this._rotor = setInterval(chop, 95);
+  }
+  stopRotor() { if (this._rotor) { clearInterval(this._rotor); this._rotor = null; } }
   win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this._tone(f, 0.18, "square", 0.22), i * 130)); }
   lose() { [330, 262, 196, 131].forEach((f, i) => setTimeout(() => this._tone(f, 0.25, "sawtooth", 0.22), i * 160)); }
 }

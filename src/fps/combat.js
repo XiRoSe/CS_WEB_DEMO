@@ -21,6 +21,7 @@ export class Combat {
     this._origin = new THREE.Vector3();
     this._far = new THREE.Vector3();
     this._targets = [];
+    this.extraHittables = []; // hitboxes outside the enemy list (e.g. helicopter)
   }
 
   get enemiesLeft() {
@@ -45,18 +46,27 @@ export class Combat {
     this._targets.length = 0;
     for (const m of this.level.solidMeshes) this._targets.push(m);
     for (const e of this.enemies) if (!e.dead) this._targets.push(e.hitbox);
+    for (const ht of this.extraHittables) this._targets.push(ht); // e.g. helicopter
     const hits = this.raycaster.intersectObjects(this._targets, true);
 
     const muzzle = this.weapon.muzzleWorld; // reused vector, copied immediately by tracer
     if (hits.length) {
       const h = hits[0];
-      let obj = h.object, enemy = null;
-      while (obj) { if (obj.userData && obj.userData.enemy) { enemy = obj.userData.enemy; break; } obj = obj.parent; }
+      let obj = h.object, enemy = null, heli = null;
+      while (obj) {
+        if (obj.userData && obj.userData.enemy) { enemy = obj.userData.enemy; break; }
+        if (obj.userData && obj.userData.heli) { heli = obj.userData.heli; break; }
+        obj = obj.parent;
+      }
       this.vfx.tracer(muzzle, h.point);
       if (enemy && !enemy.dead) {
         enemy.takeDamage(this.weapon.damage);
         this.vfx.hitPuff(h.point);
         this.hooks.onHitmarker?.(enemy.dead);
+      } else if (heli && !heli.dead) {
+        heli.takeDamage(this.weapon.damage);
+        this.vfx.hitPuff(h.point);
+        this.hooks.onHitmarker?.(heli.dead);
       } else {
         this._far.copy(this._dir).multiplyScalar(-1); // approx surface normal = back toward shooter
         this.vfx.impact(h.point, this._far);

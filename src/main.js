@@ -10,6 +10,7 @@ import { Weapon } from "./fps/weapon.js";
 import { VFX } from "./fps/vfx.js";
 import { Combat } from "./fps/combat.js";
 import { TouchControls } from "./fps/touch.js";
+import { Helicopter } from "./fps/helicopter.js";
 import { preloadEnemies } from "./fps/enemy.js";
 import { COLORS } from "./util/builders.js";
 
@@ -36,6 +37,11 @@ class Game {
     this.vfx.setCamera(this.camera);
     this.touch = new TouchControls(this.input);
     this.isTouch = this.touch.enabled;
+    this.heli = null;
+    this._heliDelay = 7 + Math.random() * 8; // gunship arrives 7-15s into the fight
+    this._playTime = 0;
+    this._heliSpawned = false;
+    this._heliKilled = false;
 
     this.health = 100;
     this.shotsFired = 0;
@@ -104,12 +110,14 @@ class Game {
     const acc = this.shotsFired ? Math.round((this.shotsHit / this.shotsFired) * 100) : 0;
     this.hud.setCombatVisible(false);
     this.controller.unlock();
+    this.audio.stopRotor();
     this.hud.showWin({ kills: this.combat.killCount, total: this.combat.totalEnemies, acc });
     this.audio.win();
     this.voice.win();
   }
   _lose() {
     this.state = "lose";
+    this.audio.stopRotor();
     this.hud.setCombatVisible(false);
     this.controller.unlock();
     this.hud.showLose();
@@ -146,15 +154,47 @@ class Game {
     this._sinceHit = (this._sinceHit || 0) + dt;
     if (this._sinceHit > 3 && this.health < 100) this.health = Math.min(100, this.health + 22 * dt);
 
+    // helicopter boss — arrives a few seconds into the fight
+    this._playTime += dt;
+    if (!this._heliSpawned && this._playTime >= this._heliDelay) {
+      this._heliSpawned = true;
+      this.heli = new Helicopter(this.scene, this.level);
+      this.combat.extraHittables.push(this.heli.hitbox);
+      this.audio.startRotor();
+      this.hud.killFeed("⚠ ENEMY GUNSHIP INBOUND");
+    }
+    if (this.heli) {
+      this.heli.update(dt, t, this.camera.position, {
+        vfx: this.vfx, audio: this.audio, onPlayerHit: (d) => this._onPlayerHit(d),
+      });
+      if (this.heli.dead && !this._heliKilled) { this._heliKilled = true; this.hud.killFeed("GUNSHIP DESTROYED"); this.voice.enemyDown(); }
+      if (this.heli.removable) {
+        this.scene.remove(this.heli.group);
+        const i = this.combat.extraHittables.indexOf(this.heli.hitbox);
+        if (i >= 0) this.combat.extraHittables.splice(i, 1);
+        this.heli = null;
+      }
+    }
+
+    const heliAlive = this.heli && !this.heli.dead;
+    const cleared = this.combat.enemiesLeft === 0 && !heliAlive;
+
     // HUD sync
     this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, 100);
-    this.hud.setHostiles(this.combat.enemiesLeft);
+    this.hud.setHostiles(this.combat.enemiesLeft + (heliAlive ? 1 : 0));
+    if (cleared !== this._cleared) {
+      this._cleared = cleared;
+      this.hud.setObjective(cleared ? 'All hostiles down — reach the <span class="arrow">FLAG ▲</span>'
+        : 'Eliminate all hostiles');
+    }
 
-    // win check — reach the extraction pad
-    const e = this.level.exfil;
-    const dx = this.camera.position.x - e.x, dz = this.camera.position.z - e.z;
-    if (dx * dx + dz * dz < e.r * e.r) this._win();
+    // win check — reach the extraction flag, but ONLY once everything is dead
+    if (cleared) {
+      const e = this.level.exfil;
+      const dx = this.camera.position.x - e.x, dz = this.camera.position.z - e.z;
+      if (dx * dx + dz * dz < e.r * e.r) this._win();
+    }
   }
 }
 
