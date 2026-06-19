@@ -193,9 +193,9 @@ class Game {
 
     this.combat.update(dt, t, this.camera.position);
 
-    // health regen (CoD-style): heal once you've been out of fire for a moment
-    this._sinceHit = (this._sinceHit || 0) + dt;
-    if (this._sinceHit > 3 && this.health < 100) this.health = Math.min(100, this.health + 22 * dt);
+    // health regen: +1 HP every 2 seconds, automatically
+    this._healT = (this._healT || 0) + dt;
+    if (this._healT >= 2) { this._healT -= 2; if (this.health < 100) this.health = Math.min(100, this.health + 1); }
 
     // helicopter boss — arrives a few seconds into the fight
     this._playTime += dt;
