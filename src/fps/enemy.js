@@ -112,6 +112,7 @@ export class Enemy {
       this._gunFix = { p: [3.5, 4, 11.5], r: [-0.2, -0.4, -2.8], s: 102 }; // barrel points forward + upright in the hand
       // temps for aiming the barrel at the player (world -> hand-local)
       this._gpos = new THREE.Vector3();
+      this._lhpos = new THREE.Vector3();
       this._m4 = new THREE.Matrix4();
       this._wq = new THREE.Quaternion();
       this._hq = new THREE.Quaternion();
@@ -165,15 +166,14 @@ export class Enemy {
     return !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z);
   }
 
-  // raise BOTH arms into a forward rifle aim. The gun stays rigid in the right hand and follows it,
-  // so hand + gun always point the same way (no mismatch). pitch tilts the aim toward the player.
-  _aimArm(pitch) {
-    const b = this.bones; if (!b.rArm) return;
-    const p = Math.max(-0.5, Math.min(0.5, pitch || 0));
-    b.rArm.rotation.set(1.15 + p, 0.0, 0.32);
-    if (b.rFore) b.rFore.rotation.set(0, 0, -0.5);
-    if (b.lArm) b.lArm.rotation.set(1.3, -0.1, 0.5);   // left hand comes up toward the foregrip
-    if (b.lFore) b.lFore.rotation.set(0, 0.35, 1.2);
+  // Shooting aim: raise the right arm to the shoulder + left hand forward, and orient the rifle so
+  // the barrel points forward (precomputed for THIS arm pose). The rifle is rigid in the hand, so
+  // hand + gun point the SAME way (at the player, since the body faces them) — no mismatch.
+  _aimArm() {
+    const b = this.bones; if (!b.rArm || !this._rifle) return;
+    b.rArm.rotation.set(1.05, 0.0, 0.45);  if (b.rFore) b.rFore.rotation.set(0, 0, -1.15);
+    b.lArm.rotation.set(1.25, -0.2, 0.5);  if (b.lFore) b.lFore.rotation.set(0, 0.25, 1.35); // left hand up (two-handed)
+    this._rifle.rotation.set(-1.1, 0.1, -1.4); // barrel forward for this raised hand
   }
 
   _applyGun() {
@@ -223,11 +223,15 @@ export class Enemy {
     const engaged = this.alertT > 0;
     this._applyGun();   // rifle held in the right hand via the natural animation (clean, reliable)
 
-    // the rifle already points forward (at the player, since the body faces them); just fire on cadence
+    // ~1s before firing, raise into the shooting aim (hand + rifle come up on target together)
+    this._aimHold = Math.max(0, (this._aimHold || 0) - dt);
+    let aiming = this._aimHold > 0;
     if (see) {
       this.fireCd -= dt;
-      if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); }
+      if (this.fireCd <= 1.0) aiming = true;
+      if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); this._aimHold = 0.6; aiming = true; }
     }
+    if (aiming) this._aimArm();
 
     // watchtower guard: never moves — just tracks the player and fires from the post
     if (this.baseY > 0) {
