@@ -83,6 +83,7 @@ export class Enemy {
       else if (o.name === "mixamorigLeftArm") this.bones.lArm = o;
       else if (o.name === "mixamorigLeftForeArm") this.bones.lFore = o;
       else if (o.name === "mixamorigRightHand") this.bones.rHand = o;
+      else if (o.name === "mixamorigLeftHand") this.bones.lHand = o;
     });
 
     // proper rifle — parented to the RIGHT HAND bone so it's truly part of the soldier
@@ -147,12 +148,14 @@ export class Enemy {
   // sit the rifle in the right hand each frame (so it follows duck/jump/pose),
   // barrel along the group's +Z so it points at whatever the soldier faces (the player)
   _placeRifle() {
-    if (!this._rifle || !this.bones.rHand) return;
-    this.bones.rHand.updateWorldMatrix(true, false);
-    this.bones.rHand.getWorldPosition(this._handWP);
+    const hand = this.bones.lHand || this.bones.rHand;
+    if (!this._rifle || !hand) return;
+    hand.updateWorldMatrix(true, false);
+    hand.getWorldPosition(this._handWP);
     this.group.worldToLocal(this._handWP);
-    this._rifle.position.set(this._handWP.x + 0.02, this._handWP.y - 0.02, this._handWP.z + 0.2);
-    this._rifle.rotation.set(this._aimPitch || 0, 0, 0); // pitch barrel up/down toward the player
+    // held at the left hand, tucked close to the body ("Die Hard" carry), still aimed at the player
+    this._rifle.position.set(this._handWP.x + 0.02, this._handWP.y + 0.06, this._handWP.z + 0.06);
+    this._rifle.rotation.set(this._aimPitch || 0, 0, 0);
   }
 
   // force the arms into a rifle-hold pose (the soldier clips have no aiming animation)
@@ -212,7 +215,7 @@ export class Enemy {
     if (this.baseY > 0) {
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
       this._play("Idle");
-      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 0.5 + Math.random() * 0.4; this._fire(playerPos, ctx); } }
+      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); } }
       this.group.position.set(this.pos.x, this.baseY, this.pos.z);
       this.group.rotation.y = this.yaw;
       return;
@@ -223,18 +226,14 @@ export class Enemy {
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
       this.peekTimer -= dt;
       if (this.peeking) {
-        // popped out: advance to the peek spot beside cover, fire bursts while visible
         movingNow = !this._moveToward(this.peekPos.x, this.peekPos.z, dt);
-        if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 0.45; this._fire(playerPos, ctx); } }
         if (this.peekTimer <= 0) { this.peeking = false; this.peekTimer = 1.5 + Math.random() * 1.6; }
       } else {
-        // hidden: pull back behind cover (occluded by the box), hold fire
         movingNow = !this._moveToward(this.coverPos.x, this.coverPos.z, dt);
-        if (this.peekTimer <= 0) {
-          this.peeking = true; this.peekTimer = 0.9 + Math.random() * 0.7; this.fireCd = 0.25;
-          this._computePeek(playerPos);
-        }
+        if (this.peekTimer <= 0) { this.peeking = true; this.peekTimer = 0.9 + Math.random() * 0.7; this._computePeek(playerPos); }
       }
+      // fire on a random 2-6s cadence whenever the player is visible
+      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); } }
       this._play(movingNow ? "Walk" : "Idle");
     } else {
       const t = this.patrol[this.wp];

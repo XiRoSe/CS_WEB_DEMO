@@ -36,6 +36,19 @@ class Game {
     this.weapon = new Weapon(this.camera, this.audio);
     this.vfx = new VFX(this.scene);
     this.vfx.setCamera(this.camera);
+
+    // player laser sight: thin red beam from the muzzle + a glowing dot where it points
+    this._laserRay = new THREE.Raycaster();
+    this._laserDir = new THREE.Vector3();
+    this._laserHit = new THREE.Vector3();
+    this._laserTargets = [];
+    const lgeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
+    this.laserLine = new THREE.Line(lgeo, new THREE.LineBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.laserLine.frustumCulled = false; this.laserLine.visible = false;
+    this.scene.add(this.laserLine);
+    this.laserDot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.laserDot.frustumCulled = false; this.laserDot.visible = false;
+    this.scene.add(this.laserDot);
     this.touch = new TouchControls(this.input);
     this.heli = null;
     this._heliDelay = 7 + Math.random() * 8; // gunship arrives 7-15s into the fight
@@ -125,15 +138,38 @@ class Game {
     this.voice.lose();
   }
 
+  _updateLaser() {
+    if (!this.combat) return;
+    const dir = this._laserDir; this.camera.getWorldDirection(dir);
+    this._laserRay.set(this.camera.position, dir);
+    this._laserRay.far = 90;
+    const tg = this._laserTargets; tg.length = 0;
+    for (const m of this.level.solidMeshes) tg.push(m);
+    for (const e of this.combat.enemies) if (!e.dead) tg.push(e.hitbox);
+    if (this.heli && !this.heli.dead) tg.push(this.heli.hitbox);
+    const hits = this._laserRay.intersectObjects(tg, true);
+    if (hits.length) this._laserHit.copy(hits[0].point);
+    else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
+    const muzzle = this.weapon.muzzleWorld;
+    const p = this.laserLine.geometry.attributes.position;
+    p.setXYZ(0, muzzle.x, muzzle.y, muzzle.z);
+    p.setXYZ(1, this._laserHit.x, this._laserHit.y, this._laserHit.z);
+    p.needsUpdate = true;
+    this.laserDot.position.copy(this._laserHit);
+    this.laserLine.visible = true; this.laserDot.visible = true;
+  }
+
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
     this.level.update(t); // wave the objective flag
+    this.laserLine.visible = false; this.laserDot.visible = false; // re-shown each frame during play
     if (this.state !== "play") { this.input.drainPresses(); return; }
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
 
     this.controller.update(dt, this.input);
     this.weapon.update(dt, this.controller.moving);
+    this._updateLaser();
 
     // fire (auto) — mouse or touch FIRE button
     if ((this.input.mouseDown || this.input.touch.fire) && this.weapon.canFire(t)) {
