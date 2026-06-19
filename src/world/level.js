@@ -8,14 +8,16 @@ export class Level {
     this.colliders = []; // AABB {minX,maxX,minZ,maxZ} in the XZ plane
     this.solidMeshes = []; // occluders for bullet raycasts (walls, crates, etc.)
     this.enemySpawns = []; // { x, z, patrol: [{x,z}...] }
+    this.spots = []; // perimeter floodlights (for the slow sweep)
     this.playerSpawn = new THREE.Vector3(0, 0, 16);
     this.exfil = { x: 0, z: -16, r: 3.0 };
     this.bounds = { minX: -16.4, maxX: 16.4, minZ: -19.4, maxZ: 18.4 };
     this._build();
   }
 
-  _collide(x, z, w, d) {
-    this.colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+  _collide(x, z, w, d, top = 3.4) {
+    // `top` = height you can stand on (low props are mountable, tall walls aren't)
+    this.colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top });
   }
 
   _wall(x, z, w, d, h = 3.4, color = COLORS.concrete) {
@@ -25,7 +27,7 @@ export class Level {
     const m = box(w, h, d, color, { mat });
     m.position.set(x, h / 2, z);
     this.scene.add(m);
-    this._collide(x, z, w, d);
+    this._collide(x, z, w, d, h);
     this.solidMeshes.push(m);
     // dark cap along the top for a finished, defined edge
     const cap = box(w + 0.1, 0.25, d + 0.1, COLORS.metalDark, { roughness: 0.8 });
@@ -40,7 +42,7 @@ export class Level {
       c.position.set(cx, cy + s / 2, cz);
       c.rotation.y = (Math.random() - 0.5) * 0.2;
       this.scene.add(c);
-      this._collide(cx, cz, s, s);
+      this._collide(cx, cz, s, s, cy + s); // top = mountable surface height
       this.solidMeshes.push(c);
     };
     if (conf === "single") place(x, z, 1.1);
@@ -54,7 +56,7 @@ export class Level {
       const bx = x + (i % 2) * 0.85 - 0.4, bz = z + Math.floor(i / 2) * 0.85 - 0.2;
       b.position.set(bx, 0.55, bz);
       this.scene.add(b);
-      this._collide(bx, bz, 0.8, 0.8);
+      this._collide(bx, bz, 0.8, 0.8, 1.1);
     }
   }
 
@@ -63,9 +65,9 @@ export class Level {
     s.position.set(x, 0, z);
     s.rotation.y = rot;
     this.scene.add(s);
-    // collider aligned to rotation (axis-aligned approx)
-    if (Math.abs(rot) < 0.4) this._collide(x, z, len, 0.6);
-    else this._collide(x, z, 0.6, len);
+    // collider aligned to rotation (axis-aligned approx); ~0.9m tall (mountable)
+    if (Math.abs(rot) < 0.4) this._collide(x, z, len, 0.6, 0.9);
+    else this._collide(x, z, 0.6, len, 0.9);
   }
 
   _build() {
@@ -151,13 +153,99 @@ export class Level {
     this.enemySpawns.push({ x: 7, z: -12, patrol: [{ x: 10, z: -10 }, { x: 4, z: -13 }, { x: 8, z: -16 }] });
     this.enemySpawns.push({ x: 0, z: -17, patrol: [{ x: -3, z: -17 }, { x: 3, z: -17 }] });
 
-    // a couple of watchtowers (visual height + landmark)
+    // a couple of watchtowers (visual height + landmark) with a guard posted on each
     this._tower(-15, -17);
     this._tower(15, 12);
+    this.enemySpawns.push({ x: -15, z: -17, y: 4, patrol: [{ x: -15, z: -17 }] }); // watchtower sniper
+    this.enemySpawns.push({ x: 15, z: 12, y: 4, patrol: [{ x: 15, z: 12 }] });
+
+    // ---- perimeter floodlights (searchlight beams into the compound) ----
+    this._floodlight(-16, 16, 5.2, -4, 8);
+    this._floodlight(16, -18, 5.2, 4, -10);
+    this._floodlight(-15, -17, 6.2, 0, -8, true);  // watchtower searchlight (sweeps)
+    this._floodlight(15, 12, 6.2, 2, 4, true);     // watchtower searchlight (sweeps)
+
+    // ---- perimeter utility poles + sagging wires ----
+    const poles = [
+      [-16, 17], [-16, 4], [-16, -10], [-16, -18],
+      [16, 17], [16, 4], [16, -10], [16, -18],
+    ];
+    const tops = poles.map((p) => this._utilityPole(p[0], p[1]));
+    for (let i = 0; i < 4 - 1; i++) { this._wire(tops[i], tops[i + 1]); this._wire(tops[i + 4], tops[i + 5]); }
   }
 
-  // wave the objective flag
+  _utilityPole(x, z) {
+    const h = 5.4;
+    const pole = cyl(0.12, 0.16, h, COLORS.woodDark, 8, { roughness: 0.9 });
+    pole.position.set(x, h / 2, z); this.scene.add(pole);
+    const arm = box(1.8, 0.14, 0.14, COLORS.woodDark, { flat: true });
+    arm.position.set(x, h - 0.5, z); this.scene.add(arm);
+    // small insulators
+    for (const dx of [-0.7, 0, 0.7]) {
+      const ins = cyl(0.05, 0.05, 0.18, COLORS.metal, 6); ins.position.set(x + dx, h - 0.35, z); this.scene.add(ins);
+    }
+    this._collide(x, z, 0.4, 0.4); // thin pole, full blocker
+    return new THREE.Vector3(x, h - 0.32, z);
+  }
+
+  _wire(a, b) {
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    mid.y -= Math.min(0.9, a.distanceTo(b) * 0.12); // catenary sag
+    const curve = new THREE.CatmullRomCurve3([a, mid, b]);
+    const geo = new THREE.TubeGeometry(curve, 12, 0.025, 4, false);
+    const wire = new THREE.Mesh(geo, mat(0x0c0d0f, { roughness: 0.8 }));
+    this.scene.add(wire);
+  }
+
+  _floodlight(x, z, h, aimX, aimZ, sweep = false) {
+    // pole + lamp housing
+    const pole = cyl(0.1, 0.14, h, COLORS.metalDark, 8, { metalness: 0.4 });
+    pole.position.set(x, h / 2, z); this.scene.add(pole);
+    this._collide(x, z, 0.4, 0.4);
+    const fix = new THREE.Vector3(x, h, z);
+    const tgt = new THREE.Vector3(aimX, 0.2, aimZ);
+    const dir = tgt.clone().sub(fix);
+    const len = dir.length();
+    const head = box(0.5, 0.32, 0.42, COLORS.metalDark, { metalness: 0.5, roughness: 0.5 });
+    head.position.copy(fix); head.lookAt(tgt); this.scene.add(head);
+    // glowing lens
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.24), new THREE.MeshBasicMaterial({ color: 0xfff3d0 }));
+    lens.position.copy(fix).addScaledVector(dir.clone().normalize(), 0.24); lens.lookAt(tgt); this.scene.add(lens);
+    // the actual light (no shadows -> cheap)
+    const angle = 0.36;
+    const light = new THREE.SpotLight(0xfff2cc, 7.5, 48, angle, 0.5, 1.1);
+    light.position.copy(fix);
+    light.target.position.copy(tgt);
+    light.castShadow = false;
+    this.scene.add(light, light.target);
+    // visible volumetric beam cone (apex at lamp, widening to the ground)
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(Math.tan(angle) * len * 0.85, len, 18, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xfff2cc, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    cone.position.copy(fix).addScaledVector(dir.clone().normalize(), len / 2);
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize().negate());
+    this.scene.add(cone);
+    this.spots.push({ light, cone, fix, baseDir: dir.clone().normalize(), len, sweep, phase: this.spots.length * 1.3 });
+  }
+
+  // slow prison/base searchlight swing for the tower lights
+  _sweepSpots(t) {
+    const up = this._upY || (this._upY = new THREE.Vector3(0, 1, 0));
+    for (const s of this.spots) {
+      if (!s.sweep) continue;
+      const ang = Math.sin(t * 0.5 + s.phase) * 0.7; // ±0.7 rad swing
+      const dir = s.baseDir.clone().applyAxisAngle(up, ang);
+      s.light.target.position.copy(s.fix).addScaledVector(dir, s.len);
+      s.light.target.updateMatrixWorld();
+      s.cone.position.copy(s.fix).addScaledVector(dir, s.len / 2);
+      s.cone.quaternion.setFromUnitVectors(up, dir.clone().negate());
+    }
+  }
+
+  // wave the objective flag + swing the tower searchlights
   update(t) {
+    this._sweepSpots(t);
     if (!this.flag) return;
     const cloth = this.flag.userData.cloth;
     const base = this.flag.userData.base;

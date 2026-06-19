@@ -25,6 +25,7 @@ export class Enemy {
   constructor(scene, spawn, level) {
     this.scene = scene;
     this.level = level;
+    this.baseY = spawn.y || 0; // raised for watchtower posts
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.patrol = spawn.patrol || [{ x: spawn.x, z: spawn.z }];
     this.wp = 0;
@@ -44,7 +45,7 @@ export class Enemy {
     this.peekPos = this.pos.clone();
     this._toP = new THREE.Vector3();
     // occasional jump/duck dodge
-    this.dodgeCd = 5 + Math.random() * 5;
+    this.dodgeCd = 2 + Math.random() * 2.5;
     this.dodging = null;
     this.dodgeT = 0;
     this.dodgeDur = 0.5;
@@ -72,17 +73,30 @@ export class Enemy {
     this._current = null;
     this._play(this.actions.Walk ? "Walk" : Object.keys(this.actions)[0]);
 
-    // rifle held forward at chest height (parented to the group — reliable size)
+    // proper rifle, shouldered in an aim pose (parented to the group — reliable size/orientation)
     const rifle = new THREE.Group();
-    const body = box(0.08, 0.1, 0.66, COLORS.metalDark, { metalness: 0.5, roughness: 0.5 });
-    rifle.add(body);
-    const grip = box(0.07, 0.16, 0.08, COLORS.oliveDark, { flat: true }); grip.position.set(0, -0.12, 0.06); rifle.add(grip);
+    const body = box(0.07, 0.12, 0.8, COLORS.metalDark, { metalness: 0.5, roughness: 0.5 }); rifle.add(body);
+    const barrel = box(0.04, 0.04, 0.34, 0x15171a, { metalness: 0.6, roughness: 0.4 }); barrel.position.set(0, 0.0, 0.52); rifle.add(barrel);
+    const stock = box(0.06, 0.11, 0.22, COLORS.oliveDark, { flat: true }); stock.position.set(0, -0.02, -0.46); rifle.add(stock);
+    const mag = box(0.05, 0.2, 0.1, 0x202225, { flat: true }); mag.position.set(0, -0.16, 0.04); mag.rotation.x = 0.25; rifle.add(mag);
+    const grip = box(0.05, 0.13, 0.07, 0x202225, { flat: true }); grip.position.set(0, -0.12, -0.12); grip.rotation.x = -0.2; rifle.add(grip);
+    const sight = box(0.03, 0.05, 0.06, 0x15171a, { flat: true }); sight.position.set(0, 0.09, 0.0); rifle.add(sight);
     this._gunTip = new THREE.Object3D();
-    this._gunTip.position.set(0, 0, 0.4);
+    this._gunTip.position.set(0, 0, 0.7);
     rifle.add(this._gunTip);
-    rifle.position.set(0.22, 1.12, 0.32);
+    rifle.position.set(0.16, 1.36, 0.34); // shoulder height, slightly right, pointing +Z (toward target)
     this.group.add(rifle);
     this._rifle = rifle;
+
+    // cache arm bones so we can pose them into a rifle hold each frame (model has no aim clip)
+    this.bones = {};
+    this.model.traverse((o) => {
+      if (!o.isBone) return;
+      if (o.name === "mixamorigRightArm") this.bones.rArm = o;
+      else if (o.name === "mixamorigRightForeArm") this.bones.rFore = o;
+      else if (o.name === "mixamorigLeftArm") this.bones.lArm = o;
+      else if (o.name === "mixamorigLeftForeArm") this.bones.lFore = o;
+    });
 
 
     // invisible but raycastable hitbox
@@ -124,6 +138,19 @@ export class Enemy {
     return !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z);
   }
 
+  // force the arms into a rifle-hold pose (the soldier clips have no aiming animation)
+  _poseArms() {
+    const b = this.bones; if (!b.rArm) return;
+    const P = (typeof window !== "undefined" && window.__armPose) || {
+      rArm: [0.95, 0.15, -0.15], rFore: [0.1, -0.55, -1.15],
+      lArm: [0.85, -0.3, 0.35], lFore: [0.1, 0.55, 1.25],
+    };
+    b.rArm.rotation.set(P.rArm[0], P.rArm[1], P.rArm[2]);
+    if (b.rFore) b.rFore.rotation.set(P.rFore[0], P.rFore[1], P.rFore[2]);
+    b.lArm.rotation.set(P.lArm[0], P.lArm[1], P.lArm[2]);
+    if (b.lFore) b.lFore.rotation.set(P.lFore[0], P.lFore[1], P.lFore[2]);
+  }
+
   _blocked(x, z) {
     const r = 0.4;
     for (const c of this.level.colliders) {
@@ -147,12 +174,13 @@ export class Enemy {
       this.deathT += dt;
       const p = Math.min(this.deathT / 0.7, 1);
       this.group.rotation.x = -p * Math.PI * 0.48;
-      this.group.position.y = -p * 0.5;
+      this.group.position.y = this.baseY * (1 - p) - p * 0.5; // tumble down (off a tower if raised)
       if (this.deathT > 2.2) this.removable = true;
       return;
     }
 
     this.mixer.update(dt);
+    this._poseArms(); // override the idle/walk arm motion with a rifle hold
 
     const see = this.canSee(playerPos);
     if (see) this.alertT = 5; else this.alertT -= dt;
@@ -183,7 +211,7 @@ export class Enemy {
       this._play("Walk");
     }
 
-    this.group.position.set(this.pos.x, 0, this.pos.z);
+    this.group.position.set(this.pos.x, this.baseY, this.pos.z);
     this.group.rotation.y = this.yaw;
 
     // occasional jump/duck dodge while engaged (infrequent)
@@ -194,15 +222,15 @@ export class Enemy {
         this.dodging = Math.random() < 0.5 ? "jump" : "duck";
         this.dodgeDur = this.dodging === "jump" ? 0.55 : 0.5;
         this.dodgeT = this.dodgeDur;
-        this.dodgeCd = 5 + Math.random() * 6;
+        this.dodgeCd = 2 + Math.random() * 2.5;
       }
     }
     if (this.dodging) {
       this.dodgeT -= dt;
       const s = Math.sin((1 - Math.max(0, this.dodgeT) / this.dodgeDur) * Math.PI);
-      if (this.dodging === "jump") this.group.position.y = s * 0.7;
+      if (this.dodging === "jump") this.group.position.y = this.baseY + s * 0.7;
       else this.model.position.y = -s * 0.5;
-      if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = 0; this.model.position.y = 0; }
+      if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = this.baseY; this.model.position.y = 0; }
     }
   }
 

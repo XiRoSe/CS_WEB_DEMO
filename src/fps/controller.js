@@ -24,9 +24,11 @@ export class Controller {
     this.crouchEye = 1.05;
     this.crouching = false;
     this.vy = 0;
-    this.jumpY = 0;
-    this.jumpStrength = 6.0;
-    this.gravity = 22;
+    this.feetY = 0;          // absolute height of the player's feet (0 = ground)
+    this.jumpStrength = 7.6; // tuned so you can hop onto ~1.1m crates
+    this.gravity = 21;
+    this.stepHeight = 0.4;   // anything taller than feet+step blocks; shorter is mountable
+    this.onGround = true;
     this._jumpWas = false;
 
     camera.rotation.order = "YXZ";
@@ -59,13 +61,27 @@ export class Controller {
   unlock() { document.exitPointerLock?.(); }
 
   _blocked(x, z) {
-    const r = this.radius;
-    for (const c of this.level.colliders) {
-      if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) return true;
-    }
     const b = this.level.bounds;
     if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return true;
+    const r = this.radius, clear = this.feetY + this.stepHeight;
+    for (const c of this.level.colliders) {
+      if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) {
+        if ((c.top ?? 3.4) > clear) return true; // taller than we can step/stand onto -> wall
+      }
+    }
     return false;
+  }
+
+  // highest surface directly beneath (x,z) we can stand on (0 = ground)
+  _groundUnder(x, z) {
+    let g = 0;
+    for (const c of this.level.colliders) {
+      if (x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ) {
+        const top = c.top ?? 3.4;
+        if (top > g) g = top;
+      }
+    }
+    return g;
   }
 
   update(dt, input) {
@@ -114,7 +130,7 @@ export class Controller {
       this.camera.position.x = x;
       this.camera.position.z = z;
 
-      if (this.jumpY <= 0.001) {
+      if (this.onGround) {
         this.bob += dt * (speed * 1.4);
         this._stepT += dt;
         const interval = input.isDown("shift") ? 0.32 : 0.45;
@@ -124,16 +140,19 @@ export class Controller {
       this.bob += dt * 2;
     }
 
-    // jump (Space) — only from the ground, not while crouching
+    // jump (Space) — only when standing on something (ground or a platform), not crouching
     const jp = input.isDown(" ");
-    if (jp && !this._jumpWas && this.jumpY <= 0.001 && !this.crouching) this.vy = this.jumpStrength;
+    if (jp && !this._jumpWas && this.onGround && !this.crouching) { this.vy = this.jumpStrength; this.onGround = false; }
     this._jumpWas = jp;
-    this.jumpY += this.vy * dt;
-    this.vy -= this.gravity * dt;
-    if (this.jumpY < 0) { this.jumpY = 0; this.vy = 0; }
 
-    const airborne = this.jumpY > 0.001;
-    const bobAmt = (this.moving && !airborne) ? Math.sin(this.bob) * 0.045 : Math.sin(this.bob) * 0.012;
-    this.camera.position.y = this.eyeCur + this.jumpY + bobAmt;
+    // vertical physics against the surface beneath us (lets you land on crates/platforms)
+    this.feetY += this.vy * dt;
+    this.vy -= this.gravity * dt;
+    const groundY = this._groundUnder(this.camera.position.x, this.camera.position.z);
+    if (this.feetY <= groundY) { this.feetY = groundY; this.vy = 0; this.onGround = true; }
+    else this.onGround = false;
+
+    const bobAmt = (this.moving && this.onGround) ? Math.sin(this.bob) * 0.045 : Math.sin(this.bob) * 0.012;
+    this.camera.position.y = this.feetY + this.eyeCur + bobAmt;
   }
 }

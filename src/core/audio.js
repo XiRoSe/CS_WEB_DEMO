@@ -132,11 +132,22 @@ export class Audio {
   }
   startRotor() {
     if (this._rotor || !this.ctx) return;
-    const chop = () => { this._tone(58, 0.07, "triangle", 0.13); this._noiseBurst(0.05, 220, 1, 0.06); };
+    // continuous turbine whine under the blade chop
+    this._turbine = this.ctx.createOscillator();
+    this._turbineG = this.ctx.createGain();
+    this._turbine.type = "sawtooth"; this._turbine.frequency.value = 300;
+    this._turbineG.gain.value = 0.05;
+    this._turbine.connect(this._turbineG); this._turbineG.connect(this.master);
+    this._turbine.start();
+    // punchy rotor blade chop (~12/sec)
+    const chop = () => { this._tone(46, 0.08, "square", 0.2); this._noiseBurst(0.06, 170, 1.2, 0.13); };
     chop();
-    this._rotor = setInterval(chop, 95);
+    this._rotor = setInterval(chop, 80);
   }
-  stopRotor() { if (this._rotor) { clearInterval(this._rotor); this._rotor = null; } }
+  stopRotor() {
+    if (this._rotor) { clearInterval(this._rotor); this._rotor = null; }
+    if (this._turbine) { try { this._turbine.stop(); } catch (e) { /* already stopped */ } this._turbine.disconnect(); this._turbine = null; }
+  }
   win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this._tone(f, 0.18, "square", 0.22), i * 130)); }
   lose() { [330, 262, 196, 131].forEach((f, i) => setTimeout(() => this._tone(f, 0.25, "sawtooth", 0.22), i * 160)); }
 }

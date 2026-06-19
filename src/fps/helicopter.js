@@ -1,5 +1,15 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { COLORS, box, cyl, mat } from "../util/builders.js";
+
+let HELI_TPL = null; // loaded glTF scene template
+export async function preloadHeli() {
+  try {
+    const gltf = await new GLTFLoader().loadAsync("/models/heli.glb");
+    gltf.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    HELI_TPL = gltf.scene;
+  } catch (e) { /* fall back to procedural build */ }
+}
 
 // Attack helicopter boss: descends from the sky, hovers and strafes while firing,
 // can be shot down, then explodes and crashes.
@@ -29,6 +39,50 @@ export class Helicopter {
   }
 
   _build() {
+    if (HELI_TPL) this._buildModel();
+    else this._buildProcedural();
+  }
+
+  _buildModel() {
+    const m = HELI_TPL.clone(true);
+    // auto-scale to ~6.5m and center at the group origin
+    const bbox = new THREE.Box3().setFromObject(m);
+    const size = bbox.getSize(new THREE.Vector3());
+    const center = bbox.getCenter(new THREE.Vector3());
+    const s = 6.5 / Math.max(size.x, size.y, size.z);
+    m.scale.setScalar(s);
+    m.position.set(-center.x * s, -center.y * s, -center.z * s);
+    m.rotation.y = Math.PI; // face the player side (tweakable)
+    this.group.add(m);
+    this.model = m;
+
+    const sx = size.x * s, sy = size.y * s, sz = size.z * s;
+    // spinning rotor blur disc on top
+    this.mainRotor = new THREE.Group();
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(Math.max(sx, sz) * 0.62, 28),
+      new THREE.MeshBasicMaterial({ color: 0x15171a, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+    );
+    disc.rotation.x = -Math.PI / 2;
+    for (let i = 0; i < 2; i++) { const b = box(0.12, 0.04, Math.max(sx, sz) * 1.15, 0x202225, { roughness: 0.7 }); b.rotation.y = i * Math.PI / 2; this.mainRotor.add(b); }
+    this.mainRotor.add(disc);
+    this.mainRotor.position.y = sy * 0.5 + 0.1;
+    this.group.add(this.mainRotor);
+    this.tailRotor = null; this.beacon = null;
+
+    // gun under the nose
+    this._gunTip = new THREE.Object3D(); this._gunTip.position.set(0, -sy * 0.3, sz * 0.5); this.group.add(this._gunTip);
+
+    // invisible hitbox sized to the model
+    this.hitbox = new THREE.Mesh(
+      new THREE.BoxGeometry(sx * 1.1, sy * 1.3, sz * 1.1),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
+    );
+    this.hitbox.userData.heli = this;
+    this.group.add(this.hitbox);
+  }
+
+  _buildProcedural() {
     const dark = COLORS.metalDark, olive = COLORS.oliveDark, metal = COLORS.metal;
     // fuselage
     const body = box(1.7, 1.5, 3.6, olive, { metalness: 0.4, roughness: 0.6 });
@@ -109,8 +163,8 @@ export class Helicopter {
   update(dt, t, playerPos, ctx) {
     // rotor spin (slows after death)
     const spin = this.dead ? 4 : 26;
-    this.mainRotor.rotation.y += spin * dt;
-    this.tailRotor.rotation.x += spin * 1.6 * dt;
+    if (this.mainRotor) this.mainRotor.rotation.y += spin * dt;
+    if (this.tailRotor) this.tailRotor.rotation.x += spin * 1.6 * dt;
     // blinking belly beacon
     if (this.beacon) this.beacon.material.emissiveIntensity = Math.sin(t * 9) > 0 ? 1.8 : 0.12;
 

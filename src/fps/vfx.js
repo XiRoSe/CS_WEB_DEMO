@@ -25,12 +25,12 @@ export class VFX {
 
     const quad = new THREE.PlaneGeometry(1, 1);
     // additive embers (sparks)
-    this.embers = this._pool(70, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.embers = this._pool(110, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.embers.forEach((e) => (e.vel = new THREE.Vector3()));
     // additive flashes
-    this.flashes = this._pool(14, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.flashes = this._pool(30, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     // alpha dust puffs
-    this.dust = this._pool(20, quad, () => new THREE.MeshBasicMaterial({ map: this._smoke, transparent: true, depthWrite: false }));
+    this.dust = this._pool(36, quad, () => new THREE.MeshBasicMaterial({ map: this._smoke, transparent: true, depthWrite: false }));
     // lingering decals
     this.decals = this._pool(40, quad, () => new THREE.MeshBasicMaterial({ map: this._hole, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
     // thin additive tracers
@@ -41,7 +41,7 @@ export class VFX {
     this.rings = this._pool(4, ring, () => new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     // flying debris chunks
     const chunk = new THREE.BoxGeometry(0.22, 0.22, 0.22);
-    this.debris = this._pool(18, chunk, () => new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.9 }));
+    this.debris = this._pool(26, chunk, () => new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.9 }));
     this.debris.forEach((d) => { d.vel = new THREE.Vector3(); d.spin = new THREE.Vector3(); });
   }
 
@@ -120,27 +120,34 @@ export class VFX {
     this._flash(point, 0.8, 0xffe0a0);
   }
 
-  // big "wow" explosion: fireball + shockwave ring + flying debris + smoke
+  // huge "wow" explosion: a big rolling fireball (sustained), shockwave, debris, smoke column
   explosion(point) {
-    for (let i = 0; i < 5; i++) {
-      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2));
-      this._flash(p, 2.6 + Math.random() * 1.5, i % 2 ? 0xffd27a : 0xff8a30);
-    }
-    this._embers(point, 0xffb24a, 42, 12);
-    for (let i = 0; i < 6; i++) {
-      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, Math.random() * 1.5, (Math.random() - 0.5) * 2.5));
-      this._dustPuff(p, 0x2a2520, 2.0 + Math.random() * 1.2);
-    }
+    this._fireball(point, 1.0);
+    // sustained fire — staggered secondary bursts spreading out + rising
+    setTimeout(() => this._fireball(point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 1 + Math.random() * 2, (Math.random() - 0.5) * 3)), 0.85), 80);
+    setTimeout(() => this._fireball(point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 2 + Math.random() * 2.5, (Math.random() - 0.5) * 4)), 0.7), 190);
     this._shockwave(point);
-    this._spawnDebris(point, 12);
+    this._spawnDebris(point, 22);
+  }
+
+  _fireball(point, scale) {
+    for (let i = 0; i < 8; i++) {
+      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.2, (Math.random() - 0.3) * 3.2, (Math.random() - 0.5) * 3.2));
+      this._flash(p, (3.6 + Math.random() * 2.6) * scale, i % 2 ? 0xffce6e : 0xff6a14);
+    }
+    this._embers(point, 0xffa838, 32, 15);
+    for (let i = 0; i < 5; i++) {
+      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.5, Math.random() * 2.5, (Math.random() - 0.5) * 3.5));
+      this._dustPuff(p, 0x231e1a, (2.8 + Math.random() * 1.8) * scale);
+    }
   }
 
   _shockwave(point) {
     const r = this._next(this.rings);
     r.mesh.position.copy(point);
     r.mesh.scale.setScalar(0.5);
-    r.mesh.visible = true; r.mesh.material.opacity = 0.9;
-    r.life = r.max = 0.45; r.grow = 22;
+    r.mesh.visible = true; r.mesh.material.opacity = 0.95;
+    r.life = r.max = 0.55; r.grow = 34;
   }
   _spawnDebris(point, n) {
     for (let i = 0; i < n; i++) {

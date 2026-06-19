@@ -44,3 +44,8 @@ npm start          # serves dist/ on $PORT (default 8080)
 
 Three.js (PointerLockControls, GLTFLoader, SkeletonUtils), procedural geometry &
 textures, Web Audio. Single-page; no backend.
+
+## Credits
+
+- Helicopter model: "Helicopter" from [realkotob/lost-and-found](https://github.com/realkotob/lost-and-found) (MIT).
+- Soldier model & CS audio: see in-repo sources.

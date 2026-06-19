@@ -12,6 +12,7 @@ import { Combat } from "./fps/combat.js";
 import { TouchControls } from "./fps/touch.js";
 import { Helicopter } from "./fps/helicopter.js";
 import { preloadEnemies } from "./fps/enemy.js";
+import { preloadHeli } from "./fps/helicopter.js";
 import { COLORS } from "./util/builders.js";
 
 class Game {
@@ -64,7 +65,7 @@ class Game {
 
   async _boot() {
     this.hud.showLoading();
-    await preloadEnemies(); // load the rigged soldier model before spawning
+    await Promise.all([preloadEnemies(), preloadHeli()]); // load soldier + helicopter models
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
       onKill: (count, left) => { this.hud.killFeed("HOSTILE DOWN"); this.hud.setHostiles(left); this.voice.enemyDown(); },
