@@ -232,11 +232,7 @@ export class Helicopter {
     const ground = this._hB.set(lamp.x + Math.sin(yaw) * ahead, 0.1, lamp.z + Math.cos(yaw) * ahead);
     this.headLight.position.copy(lamp);
     this.headLight.target.position.copy(ground); this.headLight.target.updateMatrixWorld();
-    const dir = ground.clone().sub(lamp); let len = dir.length() || 1; dir.normalize();
-    // clip the visible beam at the first wall/crate so it doesn't pass through geometry
-    this._hRay.set(lamp, dir); this._hRay.far = len;
-    const hit = this.level && this.level.solidMeshes ? this._hRay.intersectObjects(this.level.solidMeshes, true)[0] : null;
-    if (hit) len = hit.distance;
+    const dir = ground.clone().sub(lamp); let len = (dir.length() || 1) * 1.2; dir.normalize(); // run past the ground (soft, no cutoff)
     this.headBeam.position.copy(lamp).addScaledVector(dir, len / 2);
     this.headBeam.quaternion.setFromUnitVectors(this._hUp, dir.clone().negate());
     this.headBeam.scale.set(1.5, len, 1.5);

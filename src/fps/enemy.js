@@ -84,6 +84,12 @@ export class Enemy {
       else if (o.name === "mixamorigLeftForeArm") this.bones.lFore = o;
       else if (o.name === "mixamorigRightHand") this.bones.rHand = o;
       else if (o.name === "mixamorigLeftHand") this.bones.lHand = o;
+      else if (o.name === "mixamorigSpine") this.bones.spine = o;
+      else if (o.name === "mixamorigSpine1") this.bones.spine1 = o;
+      else if (o.name === "mixamorigLeftUpLeg") this.bones.lUpLeg = o;
+      else if (o.name === "mixamorigRightUpLeg") this.bones.rUpLeg = o;
+      else if (o.name === "mixamorigLeftLeg") this.bones.lLeg = o;
+      else if (o.name === "mixamorigRightLeg") this.bones.rLeg = o;
     });
 
     // proper rifle — parented to the RIGHT HAND bone so it's truly part of the soldier
@@ -103,7 +109,7 @@ export class Enemy {
     // parent to the right-hand bone so the soldier's own animation holds the rifle naturally.
     // (hand bone lives in a ~0.01 scaled space, so the rifle is scaled back up ~100x.)
     if (this.bones.rHand) {
-      this._gunFix = { p: [3.5, 4, 11.5], r: [-0.55, 0.1, Math.PI], s: 102 }; // PI roll = sight up (not upside down)
+      this._gunFix = { p: [3.5, 4, 11.5], r: [-0.2, -0.4, -2.8], s: 102 }; // barrel points forward + upright in the hand
       // temps for aiming the barrel at the player (world -> hand-local)
       this._gpos = new THREE.Vector3();
       this._m4 = new THREE.Matrix4();
@@ -159,18 +165,15 @@ export class Enemy {
     return !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z);
   }
 
-  // set the rifle's transform within the hand bone (tunable live via window.__gunFix)
-  // two-handed rifle hold: right hand on the grip (tucked to the body), left hand forward/under the barrel
-  _poseHold() {
+  // raise BOTH arms into a forward rifle aim. The gun stays rigid in the right hand and follows it,
+  // so hand + gun always point the same way (no mismatch). pitch tilts the aim toward the player.
+  _aimArm(pitch) {
     const b = this.bones; if (!b.rArm) return;
-    const P = (typeof window !== "undefined" && window.__pose) || {
-      rArm: [1.0, 0.0, 0.35], rFore: [0.0, 0.0, -1.3],
-      lArm: [1.05, 0.35, -0.35], lFore: [0.0, -0.5, -1.45],
-    };
-    b.rArm.rotation.set(P.rArm[0], P.rArm[1], P.rArm[2]);
-    if (b.rFore) b.rFore.rotation.set(P.rFore[0], P.rFore[1], P.rFore[2]);
-    b.lArm.rotation.set(P.lArm[0], P.lArm[1], P.lArm[2]);
-    if (b.lFore) b.lFore.rotation.set(P.lFore[0], P.lFore[1], P.lFore[2]);
+    const p = Math.max(-0.5, Math.min(0.5, pitch || 0));
+    b.rArm.rotation.set(1.15 + p, 0.0, 0.32);
+    if (b.rFore) b.rFore.rotation.set(0, 0, -0.5);
+    if (b.lArm) b.lArm.rotation.set(1.3, -0.1, 0.5);   // left hand comes up toward the foregrip
+    if (b.lFore) b.lFore.rotation.set(0, 0.35, 1.2);
   }
 
   _applyGun() {
@@ -220,11 +223,16 @@ export class Enemy {
     const engaged = this.alertT > 0;
     this._applyGun();   // rifle held in the right hand via the natural animation (clean, reliable)
 
+    // the rifle already points forward (at the player, since the body faces them); just fire on cadence
+    if (see) {
+      this.fireCd -= dt;
+      if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); }
+    }
+
     // watchtower guard: never moves — just tracks the player and fires from the post
     if (this.baseY > 0) {
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
       this._play("Idle");
-      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); } }
       this.group.position.set(this.pos.x, this.baseY, this.pos.z);
       this.group.rotation.y = this.yaw;
       return;
@@ -241,8 +249,6 @@ export class Enemy {
         movingNow = !this._moveToward(this.coverPos.x, this.coverPos.z, dt);
         if (this.peekTimer <= 0) { this.peeking = true; this.peekTimer = 0.9 + Math.random() * 0.7; this._computePeek(playerPos); }
       }
-      // fire on a random 2-6s cadence whenever the player is visible
-      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); } }
       this._play(movingNow ? "Walk" : "Idle");
     } else {
       const t = this.patrol[this.wp];
@@ -255,12 +261,11 @@ export class Enemy {
     this.group.rotation.y = this.yaw;
 
     // occasional jump/duck dodge while engaged (infrequent)
-    this.model.position.y = 0;
     if (engaged && !this.dodging) {
       this.dodgeCd -= dt;
       if (this.dodgeCd <= 0) {
         this.dodging = Math.random() < 0.5 ? "jump" : "duck";
-        this.dodgeDur = this.dodging === "jump" ? 0.55 : 0.5;
+        this.dodgeDur = this.dodging === "jump" ? 0.55 : 0.6;
         this.dodgeT = this.dodgeDur;
         this.dodgeCd = 2 + Math.random() * 2.5;
       }
@@ -268,9 +273,16 @@ export class Enemy {
     if (this.dodging) {
       this.dodgeT -= dt;
       const s = Math.sin((1 - Math.max(0, this.dodgeT) / this.dodgeDur) * Math.PI);
-      if (this.dodging === "jump") this.group.position.y = this.baseY + s * 0.7;
-      else this.model.position.y = -s * 0.5;
-      if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = this.baseY; this.model.position.y = 0; }
+      if (this.dodging === "jump") {
+        this.group.position.y = this.baseY + s * 0.7; // hop up
+      } else {
+        // duck = hunch the torso forward + soften the knees (feet stay planted, no sinking/squashing)
+        if (this.bones.spine) this.bones.spine.rotation.x += s * 0.6;
+        if (this.bones.spine1) this.bones.spine1.rotation.x += s * 0.4;
+        if (this.bones.lUpLeg) this.bones.lUpLeg.rotation.x += s * 0.3;
+        if (this.bones.rUpLeg) this.bones.rUpLeg.rotation.x += s * 0.3;
+      }
+      if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = this.baseY; }
     }
   }
 

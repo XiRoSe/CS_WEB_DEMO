@@ -229,20 +229,17 @@ export class Level {
     this.spots.push({ light, cone, fix, baseDir: dir.clone().normalize(), maxLen: len, angle, sweep, phase: this.spots.length * 1.3 });
   }
 
-  // aim the spotlights (tower ones sweep) and CLIP each visible beam at the first wall it hits
+  // aim the spotlights (tower ones sweep); beams run well past the ground and just pass softly
+  // through walls via their additive alpha (no hard cutoff)
   _updateSpots(t) {
     const up = this._upY || (this._upY = new THREE.Vector3(0, 1, 0));
-    const ray = this._spotRay || (this._spotRay = new THREE.Raycaster());
     const tmp = this._spotDir || (this._spotDir = new THREE.Vector3());
     for (const s of this.spots) {
       tmp.copy(s.baseDir);
       if (s.sweep) tmp.applyAxisAngle(up, Math.sin(t * 0.5 + s.phase) * 0.7); // ±0.7 rad swing
       s.light.target.position.copy(s.fix).addScaledVector(tmp, s.maxLen);
       s.light.target.updateMatrixWorld();
-      // clip the volumetric cone to the nearest solid surface so it doesn't pass through walls
-      ray.set(s.fix, tmp); ray.far = s.maxLen;
-      const hit = ray.intersectObjects(this.solidMeshes, true)[0];
-      const len = hit ? hit.distance : s.maxLen;
+      const len = s.maxLen * 3.2; // long beam that runs well past the ground (no cutoff look)
       const r = Math.tan(s.angle) * len * 0.9;
       s.cone.position.copy(s.fix).addScaledVector(tmp, len / 2);
       s.cone.quaternion.setFromUnitVectors(up, tmp.clone().negate());
