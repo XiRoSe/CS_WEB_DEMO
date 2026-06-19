@@ -130,6 +130,7 @@ class Game {
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
     this.level.update(t); // wave the objective flag
     if (this.state !== "play") { this.input.drainPresses(); return; }
+    if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
 
     this.controller.update(dt, this.input);
     this.weapon.update(dt, this.controller.moving);

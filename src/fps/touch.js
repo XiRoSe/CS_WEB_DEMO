@@ -3,26 +3,36 @@
 const CSS = `
 #touch { position:absolute; inset:0; z-index:20; pointer-events:none; display:none; touch-action:none; }
 #touch.on { display:block; pointer-events:auto; }
-#touch .joy { position:absolute; bottom:46px; width:224px; height:224px; border-radius:50%;
+#touch .joy { position:absolute; bottom:24px; width:170px; height:170px; border-radius:50%;
   border:3px solid rgba(216,224,200,.28); background:rgba(20,26,18,.16); }
-#touch .joy.left { left:40px; }
-#touch .joy.right { right:40px; }
-#touch .knob { position:absolute; left:64px; top:64px; width:96px; height:96px; border-radius:50%;
+#touch .joy.left { left:24px; }
+#touch .joy.right { right:24px; }
+#touch .knob { position:absolute; left:50px; top:50px; width:70px; height:70px; border-radius:50%;
   background:rgba(216,224,200,.32); border:3px solid rgba(255,255,255,.32); }
-#touch .jlabel { position:absolute; bottom:-26px; width:100%; text-align:center; color:rgba(216,224,200,.45);
-  font-family:"Saira Condensed",sans-serif; font-weight:700; font-size:13px; letter-spacing:.16em; }
+#touch .jlabel { position:absolute; bottom:-22px; width:100%; text-align:center; color:rgba(216,224,200,.45);
+  font-family:"Saira Condensed",sans-serif; font-weight:700; font-size:12px; letter-spacing:.16em; }
 #touch .tbtn { position:absolute; pointer-events:auto; border:3px solid rgba(216,224,200,.38);
   background:rgba(18,22,16,.34); color:rgba(232,236,216,.85); font-family:"Saira Condensed",sans-serif; font-weight:700;
-  letter-spacing:.05em; border-radius:18px; display:flex; align-items:center; justify-content:center;
-  user-select:none; -webkit-user-select:none; font-size:23px; }
+  letter-spacing:.05em; border-radius:16px; display:flex; align-items:center; justify-content:center;
+  user-select:none; -webkit-user-select:none; font-size:18px; }
 #touch .tbtn:active { background:rgba(224,163,46,.55); color:#12160e; }
-#touch .fire { left:50%; transform:translateX(-50%); bottom:54px; width:132px; height:132px; border-radius:50%; font-size:26px; }
-#touch .jump { left:50%; transform:translateX(-188px); bottom:92px; width:96px; height:96px; border-radius:50%; }
-#touch .duck { left:50%; transform:translateX(92px); bottom:92px; width:96px; height:96px; border-radius:50%; }
-#touch .reload { left:50%; transform:translateX(-62px); bottom:206px; width:124px; height:74px; }
-/* mobile: push stats to the top, keep the bottom clear for the controls */
-body.mobile #health { top:120px; bottom:auto; left:18px; }
-body.mobile #ammo { top:74px; bottom:auto; right:18px; }
+#touch .fire { left:50%; transform:translateX(-50%); bottom:30px; width:104px; height:104px; border-radius:50%; font-size:21px; }
+#touch .jump { left:50%; transform:translateX(-130px); bottom:60px; width:78px; height:78px; border-radius:50%; }
+#touch .duck { left:50%; transform:translateX(52px); bottom:60px; width:78px; height:78px; border-radius:50%; }
+#touch .reload { left:50%; transform:translateX(-49px); bottom:150px; width:98px; height:58px; }
+/* mobile: stats up top-left (HP above the rounds counter), bottom clear for controls */
+body.mobile #health { top:116px; bottom:auto; left:14px; right:auto; transform:scale(.9); transform-origin:top left; }
+body.mobile #ammo { top:182px; bottom:auto; left:14px; right:auto; text-align:left; transform:scale(.9); transform-origin:top left; }
+/* rotate-to-landscape gate (portrait phones) */
+#rotate { position:absolute; inset:0; z-index:60; display:none; flex-direction:column; align-items:center;
+  justify-content:center; gap:18px; background:#0a0e08; color:#d8e0c8; text-align:center; pointer-events:auto;
+  font-family:"Saira Condensed",sans-serif; }
+#rotate .ico { font-size:64px; animation:rot 2s ease-in-out infinite; }
+#rotate h2 { font-size:30px; font-weight:700; letter-spacing:.16em; margin:0; }
+#rotate p { font-size:16px; color:#8d9a7e; letter-spacing:.1em; }
+@keyframes rot { 0%,100%{ transform:rotate(0) } 50%{ transform:rotate(90deg) } }
+body.portrait #rotate { display:flex; }
+body.portrait #touch.on { display:none; }
 `;
 
 export class TouchControls {
@@ -48,10 +58,24 @@ export class TouchControls {
     this.lookJoy = root.querySelector(".joy.right");
     this.lookKnob = this.lookJoy.querySelector(".knob");
 
-    this.C = 64;   // knob center offset ((224-96)/2)
-    this.R = 88;   // drag radius
+    this.C = 50;   // knob center offset ((170-70)/2)
+    this.R = 66;   // drag radius
     this.moveId = null; this.moveBase = { x: 0, y: 0 };
     this.lookId = null; this.lookBase = { x: 0, y: 0 };
+
+    // rotate-to-landscape gate
+    const rot = document.createElement("div");
+    rot.id = "rotate";
+    rot.innerHTML = `<div class="ico">⟳</div><h2>ROTATE YOUR DEVICE</h2><p>Landscape mode required to play</p>`;
+    document.getElementById("ui").appendChild(rot);
+    this._checkOrientation = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      document.body.classList.toggle("portrait", portrait);
+      this.input.touch.suspended = portrait; // main pauses gameplay while portrait
+    };
+    window.addEventListener("resize", this._checkOrientation);
+    window.addEventListener("orientationchange", this._checkOrientation);
+    this._checkOrientation();
 
     this._bindButtons(root);
     this._bindSticks(root);
