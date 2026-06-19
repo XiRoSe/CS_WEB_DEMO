@@ -266,6 +266,8 @@ export class Level {
   segmentBlocked(ax, az, bx, bz) {
     const dx = bx - ax, dz = bz - az;
     for (const c of this.colliders) {
+      // ignore a collider the shooter is standing inside (e.g. a tower guard on its own tower)
+      if (ax >= c.minX && ax <= c.maxX && az >= c.minZ && az <= c.maxZ) continue;
       let t0 = 0, t1 = 1;
       const p = [-dx, dx, -dz, dz];
       const q = [ax - c.minX, c.maxX - ax, az - c.minZ, c.maxZ - az];
@@ -318,9 +320,12 @@ export class Level {
     platform.position.y = 4;
     g.add(platform);
     const rail = box(2.4, 0.8, 0.1, COLORS.metalDark, { flat: true }); rail.position.set(0, 4.5, -1.15);
-    const roof = box(2.8, 0.25, 2.8, COLORS.olive, { flat: true }); roof.position.y = 5.6;
-    const post = cyl(0.08, 0.08, 1.4, legC, 6); post.position.y = 5;
-    g.add(rail, roof, post);
+    const roof = box(2.8, 0.25, 2.8, COLORS.olive, { flat: true }); roof.position.y = 6.5; // raised so a standing guard fits
+    // corner posts holding the roof up
+    for (const sx of [-1.0, 1.0]) for (const sz of [-1.0, 1.0]) {
+      const post = cyl(0.07, 0.07, 2.3, legC, 6); post.position.set(sx, 5.25, sz); g.add(post);
+    }
+    g.add(rail, roof);
     g.position.set(x, 0, z);
     this.scene.add(g);
     this._collide(x, z, 2.0, 2.0);

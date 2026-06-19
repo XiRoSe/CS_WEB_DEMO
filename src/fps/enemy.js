@@ -73,7 +73,20 @@ export class Enemy {
     this._current = null;
     this._play(this.actions.Walk ? "Walk" : Object.keys(this.actions)[0]);
 
-    // proper rifle, shouldered in an aim pose (parented to the group — reliable size/orientation)
+    // cache arm + right-hand bones so the rifle can be parented to the hand and the
+    // arms posed into an aim each frame (the soldier clips carry no weapon/aim)
+    this.bones = {};
+    this.model.traverse((o) => {
+      if (!o.isBone) return;
+      if (o.name === "mixamorigRightArm") this.bones.rArm = o;
+      else if (o.name === "mixamorigRightForeArm") this.bones.rFore = o;
+      else if (o.name === "mixamorigLeftArm") this.bones.lArm = o;
+      else if (o.name === "mixamorigLeftForeArm") this.bones.lFore = o;
+      else if (o.name === "mixamorigRightHand") this.bones.rHand = o;
+    });
+
+    // proper rifle — parented to the RIGHT HAND bone so it's truly part of the soldier
+    // (follows duck, jump, and the arm pose; muzzle stays correct).
     const rifle = new THREE.Group();
     const body = box(0.07, 0.12, 0.8, COLORS.metalDark, { metalness: 0.5, roughness: 0.5 }); rifle.add(body);
     const barrel = box(0.04, 0.04, 0.34, 0x15171a, { metalness: 0.6, roughness: 0.4 }); barrel.position.set(0, 0.0, 0.52); rifle.add(barrel);
@@ -82,21 +95,12 @@ export class Enemy {
     const grip = box(0.05, 0.13, 0.07, 0x202225, { flat: true }); grip.position.set(0, -0.12, -0.12); grip.rotation.x = -0.2; rifle.add(grip);
     const sight = box(0.03, 0.05, 0.06, 0x15171a, { flat: true }); sight.position.set(0, 0.09, 0.0); rifle.add(sight);
     this._gunTip = new THREE.Object3D();
-    this._gunTip.position.set(0, 0, 0.7);
+    this._gunTip.position.set(0, 0, 0.62);
     rifle.add(this._gunTip);
-    rifle.position.set(0.16, 1.36, 0.34); // shoulder height, slightly right, pointing +Z (toward target)
+    rifle.position.set(0.16, 1.34, 0.34); // initial; re-placed at the hand each frame
     this.group.add(rifle);
     this._rifle = rifle;
-
-    // cache arm bones so we can pose them into a rifle hold each frame (model has no aim clip)
-    this.bones = {};
-    this.model.traverse((o) => {
-      if (!o.isBone) return;
-      if (o.name === "mixamorigRightArm") this.bones.rArm = o;
-      else if (o.name === "mixamorigRightForeArm") this.bones.rFore = o;
-      else if (o.name === "mixamorigLeftArm") this.bones.lArm = o;
-      else if (o.name === "mixamorigLeftForeArm") this.bones.lFore = o;
-    });
+    this._handWP = new THREE.Vector3();
 
 
     // invisible but raycastable hitbox
@@ -134,8 +138,21 @@ export class Enemy {
 
   canSee(playerPos) {
     const d = Math.hypot(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+    // elevated watchtower guards look down OVER all the cover (everything is shorter than them)
+    if (this.baseY > 0) return d < 50;
     if (d > 26) return false;
     return !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z);
+  }
+
+  // sit the rifle in the right hand each frame (so it follows duck/jump/pose),
+  // barrel along the group's +Z so it points at whatever the soldier faces (the player)
+  _placeRifle() {
+    if (!this._rifle || !this.bones.rHand) return;
+    this.bones.rHand.updateWorldMatrix(true, false);
+    this.bones.rHand.getWorldPosition(this._handWP);
+    this.group.worldToLocal(this._handWP);
+    this._rifle.position.set(this._handWP.x + 0.02, this._handWP.y - 0.02, this._handWP.z + 0.2);
+    this._rifle.rotation.set(this._aimPitch || 0, 0, 0); // pitch barrel up/down toward the player
   }
 
   // force the arms into a rifle-hold pose (the soldier clips have no aiming animation)
@@ -179,12 +196,27 @@ export class Enemy {
       return;
     }
 
+    // pitch the aim up/down toward the player (so tower guards shoot down at you)
+    const dxz = Math.hypot(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+    this._aimPitch = Math.max(-1.2, Math.min(1.2, Math.atan2((this.baseY + 1.3) - playerPos.y, Math.max(0.6, dxz))));
+
     this.mixer.update(dt);
-    this._poseArms(); // override the idle/walk arm motion with a rifle hold
+    this._poseArms();   // override the idle/walk arm motion with a rifle hold
+    this._placeRifle(); // keep the rifle in the hand, aimed where the soldier faces
 
     const see = this.canSee(playerPos);
     if (see) this.alertT = 5; else this.alertT -= dt;
     const engaged = this.alertT > 0;
+
+    // watchtower guard: never moves — just tracks the player and fires from the post
+    if (this.baseY > 0) {
+      this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+      this._play("Idle");
+      if (see) { this.fireCd -= dt; if (this.fireCd <= 0) { this.fireCd = 0.5 + Math.random() * 0.4; this._fire(playerPos, ctx); } }
+      this.group.position.set(this.pos.x, this.baseY, this.pos.z);
+      this.group.rotation.y = this.yaw;
+      return;
+    }
 
     let movingNow = false;
     if (engaged) {
