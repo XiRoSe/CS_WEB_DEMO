@@ -109,10 +109,11 @@ export class Enemy {
     // parent to the right-hand bone so the soldier's own animation holds the rifle naturally.
     // (hand bone lives in a ~0.01 scaled space, so the rifle is scaled back up ~100x.)
     if (this.bones.rHand) {
-      this._gunFix = { p: [3.5, 4, 11.5], r: [-0.2, -0.4, -2.8], s: 102 }; // barrel points forward + upright in the hand
+      this._gunFix = { p: [2.7, 6.3, 14.4], r: [-1.0, -0.2, -2.6], s: 102 }; // low-ready carry: grip seated, gun along the arm (no float)
       // temps for aiming the barrel at the player (world -> hand-local)
       this._gpos = new THREE.Vector3();
       this._lhpos = new THREE.Vector3();
+      this._fwdZ = new THREE.Vector3(0, 0, 1);
       this._m4 = new THREE.Matrix4();
       this._wq = new THREE.Quaternion();
       this._hq = new THREE.Quaternion();
@@ -169,11 +170,13 @@ export class Enemy {
   // Shooting aim: raise the right arm to the shoulder + left hand forward, and orient the rifle so
   // the barrel points forward (precomputed for THIS arm pose). The rifle is rigid in the hand, so
   // hand + gun point the SAME way (at the player, since the body faces them) — no mismatch.
+  // Shooting aim: raise the right arm to the shoulder (+ left hand up), rifle barrel forward on target.
   _aimArm() {
     const b = this.bones; if (!b.rArm || !this._rifle) return;
     b.rArm.rotation.set(1.05, 0.0, 0.45);  if (b.rFore) b.rFore.rotation.set(0, 0, -1.15);
-    b.lArm.rotation.set(1.25, -0.2, 0.5);  if (b.lFore) b.lFore.rotation.set(0, 0.25, 1.35); // left hand up (two-handed)
-    this._rifle.rotation.set(-1.1, 0.1, -1.4); // barrel forward for this raised hand
+    b.lArm.rotation.set(1.25, -0.2, 0.5);  if (b.lFore) b.lFore.rotation.set(0, 0.25, 1.35);
+    this._rifle.position.set(3.5, 4, 11.5);     // aim gun offset
+    this._rifle.rotation.set(-1.1, 0.1, -1.4);  // barrel forward for this raised hand
   }
 
   _applyGun() {
@@ -280,11 +283,15 @@ export class Enemy {
       if (this.dodging === "jump") {
         this.group.position.y = this.baseY + s * 0.7; // hop up
       } else {
-        // duck = hunch the torso forward + soften the knees (feet stay planted, no sinking/squashing)
-        if (this.bones.spine) this.bones.spine.rotation.x += s * 0.6;
-        if (this.bones.spine1) this.bones.spine1.rotation.x += s * 0.4;
-        if (this.bones.lUpLeg) this.bones.lUpLeg.rotation.x += s * 0.3;
-        if (this.bones.rUpLeg) this.bones.rUpLeg.rotation.x += s * 0.3;
+        // duck = real crouch: bend knees (thighs forward, shins back) + drop the hips/butt + hunch
+        const b = this.bones;
+        if (b.lUpLeg) b.lUpLeg.rotation.x += s * 0.7;
+        if (b.rUpLeg) b.rUpLeg.rotation.x += s * 0.7;
+        if (b.lLeg) b.lLeg.rotation.x -= s * 0.9;
+        if (b.rLeg) b.rLeg.rotation.x -= s * 0.9;
+        if (b.spine) b.spine.rotation.x += s * 0.5;
+        if (b.spine1) b.spine1.rotation.x += s * 0.3;
+        this.group.position.y = this.baseY - s * 0.35; // hips/butt drop
       }
       if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = this.baseY; }
     }
