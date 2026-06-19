@@ -141,8 +141,8 @@ class Game {
 
   _updateLaser() {
     if (!this.combat) return;
-    // aim point = straight down the camera (crosshair); beam is drawn FROM the muzzle, so its
-    // origin rides the gun and the beam visibly tilts as the gun dips/sways during reload.
+    if (this.weapon.reloading) { this.laserBeam.visible = false; return; } // no laser mid-reload
+    // aim point = straight down the camera (crosshair)
     const dir = this._laserDir; this.camera.getWorldDirection(dir);
     this._laserRay.set(this.camera.position, dir);
     this._laserRay.far = 90;
@@ -153,7 +153,8 @@ class Game {
     const hits = this._laserRay.intersectObjects(tg, true);
     if (hits.length) this._laserHit.copy(hits[0].point);
     else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
-    const origin = this._laserOrigin.copy(this.weapon.muzzleWorld);
+    // start the beam right at the muzzle's front edge (nudged forward so it doesn't sit inside the gun)
+    const origin = this._laserOrigin.copy(this.weapon.muzzleWorld).addScaledVector(dir, 0.12);
     const len = origin.distanceTo(this._laserHit);
     const beamDir = this._laserHit.clone().sub(origin).normalize();
     this.laserBeam.position.copy(origin);
