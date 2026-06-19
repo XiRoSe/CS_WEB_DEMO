@@ -41,6 +41,8 @@ class Game {
     this._laserRay = new THREE.Raycaster();
     this._laserDir = new THREE.Vector3();
     this._laserHit = new THREE.Vector3();
+    this._laserOrigin = new THREE.Vector3();
+    this._laserQ = new THREE.Quaternion();
     this._laserTargets = [];
     this._laserUp = new THREE.Vector3(0, 1, 0);
     const beamGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 6, 1, true);
@@ -139,8 +141,12 @@ class Game {
 
   _updateLaser() {
     if (!this.combat) return;
-    const dir = this._laserDir; this.camera.getWorldDirection(dir);
-    this._laserRay.set(this.camera.position, dir);
+    // direction = the GUN BARREL's forward (its local -Z), so the laser is bolted to the gun
+    // and follows it through reload dips/tilts and sway — not the camera.
+    this.weapon.muzzle.getWorldQuaternion(this._laserQ);
+    const dir = this._laserDir.set(0, 0, -1).applyQuaternion(this._laserQ).normalize();
+    const origin = this._laserOrigin.copy(this.weapon.muzzleWorld);
+    this._laserRay.set(origin, dir);
     this._laserRay.far = 90;
     const tg = this._laserTargets; tg.length = 0;
     for (const m of this.level.solidMeshes) tg.push(m);
@@ -148,12 +154,9 @@ class Game {
     if (this.heli && !this.heli.dead) tg.push(this.heli.hitbox);
     const hits = this._laserRay.intersectObjects(tg, true);
     if (hits.length) this._laserHit.copy(hits[0].point);
-    else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
-    // emit from just past the barrel tip so the beam comes out of the gun's edge, not over it
-    const origin = this.weapon.muzzleWorld.clone().addScaledVector(dir, 0.25);
-    const beamDir = this._laserHit.clone().sub(origin);
-    const len = beamDir.length();
-    beamDir.normalize();
+    else this._laserHit.copy(origin).addScaledVector(dir, 80);
+    const len = origin.distanceTo(this._laserHit);
+    const beamDir = this._laserHit.clone().sub(origin).normalize();
     this.laserBeam.position.copy(origin);
     this.laserBeam.quaternion.setFromUnitVectors(this._laserUp, beamDir);
     this.laserBeam.scale.set(1, len, 1);
@@ -208,6 +211,7 @@ class Game {
       if (this.heli.dead && !this._heliKilled) { this._heliKilled = true; this.hud.killFeed("GUNSHIP DESTROYED"); this.voice.enemyDown(); }
       if (this.heli.removable) {
         this.scene.remove(this.heli.group);
+        if (this.heli.headLight) this.scene.remove(this.heli.headLight, this.heli.headLight.target, this.heli.headBeam);
         const i = this.combat.extraHittables.indexOf(this.heli.hitbox);
         if (i >= 0) this.combat.extraHittables.splice(i, 1);
         this.heli = null;
