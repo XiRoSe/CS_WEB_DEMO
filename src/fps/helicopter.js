@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { COLORS, box, cyl, mat } from "../util/builders.js";
+import { COLORS, box, cyl, mat, noOutline } from "../util/builders.js";
 
 let HELI_TPL = null; // (kept for future glTF use; we build the gunship procedurally for control)
 export async function preloadHeli() { /* using a procedural attack gunship — nothing to load */ }
@@ -131,7 +131,7 @@ export class Helicopter {
     this.scene.add(this.headLight, this.headLight.target);
     this.headBeam = new THREE.Mesh(
       new THREE.ConeGeometry(1, 1, 22, 1, true),
-      new THREE.MeshBasicMaterial({ color: 0xfff4d2, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+      noOutline(new THREE.MeshBasicMaterial({ color: 0xfff4d2, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }))
     );
     this.headBeam.frustumCulled = false; this.scene.add(this.headBeam);
     this._hA = new THREE.Vector3(); this._hB = new THREE.Vector3(); this._hUp = new THREE.Vector3(0, 1, 0);
@@ -140,7 +140,7 @@ export class Helicopter {
     // gun muzzle origin
     this._gunTip = new THREE.Object3D(); this._gunTip.position.set(0, -0.62, 3.0); this.group.add(this._gunTip);
     // hitbox (spans stub wings)
-    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.4, 8), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.4, 8), noOutline(new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
     this.hitbox.userData.heli = this;
     this.group.add(this.hitbox);
   }

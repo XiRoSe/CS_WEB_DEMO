@@ -224,6 +224,7 @@ export class Level {
       new THREE.ConeGeometry(1, 1, 18, 1, true),
       new THREE.MeshBasicMaterial({ color: 0xfff2cc, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
     );
+    cone.material.userData.outlineParameters = { visible: false };
     cone.frustumCulled = false;
     this.scene.add(cone);
     this.spots.push({ light, cone, fix, baseDir: dir.clone().normalize(), maxLen: len, angle, sweep, phase: this.spots.length * 1.3 });

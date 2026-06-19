@@ -1,5 +1,8 @@
 import * as THREE from "three";
 
+// Tag a material so the cel-shade OutlineEffect skips it (invisible hitboxes, additive VFX/beams).
+export function noOutline(m) { m.userData.outlineParameters = { visible: false }; return m; }
+
 // ---------------------------------------------------------------------------
 // "Clear the Compound" — military art kit. Desaturated, daylight, cohesive.
 // Hard-edged geometry on purpose: crates/walls/buildings read as intentional.

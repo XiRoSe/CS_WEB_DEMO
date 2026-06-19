@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { OutlineEffect } from "three/addons/effects/OutlineEffect.js";
 import { COLORS } from "../util/builders.js";
 
 // Lightweight renderer: direct render (no post), PBR via image-based lighting.
@@ -14,6 +15,9 @@ export class Engine {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     container.appendChild(this.renderer.domElement);
+
+    // comic/anime "XIII" look: bold black ink outlines around everything (cel-shaded edges)
+    this.outline = new OutlineEffect(this.renderer, { defaultThickness: 0.0042, defaultColor: [0, 0, 0], defaultAlpha: 0.9 });
 
     this.clock = new THREE.Clock();
     window.addEventListener("resize", () => this.resize());
@@ -109,7 +113,7 @@ export class Engine {
       const dt = Math.min(this.clock.getDelta(), 0.05);
       const t = this.clock.elapsedTime;
       if (onFrame) onFrame(dt, t);
-      if (this.active) this.renderer.render(this.active.scene, this.active.camera);
+      if (this.active) this.outline.render(this.active.scene, this.active.camera);
     };
     loop();
   }

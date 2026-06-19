@@ -48,6 +48,7 @@ class Game {
     const beamGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 6, 1, true);
     beamGeo.translate(0, 0.5, 0); // base at origin, extends +Y so we can scale length directly
     this.laserBeam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xff1a1a, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.laserBeam.material.userData.outlineParameters = { visible: false };
     this.laserBeam.frustumCulled = false; this.laserBeam.visible = false;
     this.scene.add(this.laserBeam);
     this.touch = new TouchControls(this.input);

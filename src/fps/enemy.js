@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as skeletonClone } from "three/addons/utils/SkeletonUtils.js";
-import { COLORS, box } from "../util/builders.js";
+import { COLORS, box, noOutline } from "../util/builders.js";
 
 // --- load the rigged soldier once, share across all enemies ---
 let _asset = null;        // { scene, animations, scale }
@@ -129,7 +129,7 @@ export class Enemy {
     // invisible but raycastable hitbox
     this.hitbox = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.42, 1.1, 4, 8),
-      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
+      noOutline(new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }))
     );
     this.hitbox.position.y = 1.0;
     this.hitbox.userData.enemy = this;

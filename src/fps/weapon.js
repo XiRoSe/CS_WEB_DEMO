@@ -76,6 +76,7 @@ export class Weapon {
     this.muzzle.position.set(0, 0.02, -0.8);
     this.group.add(this.muzzle);
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, depthWrite: false });
+    flashMat.userData.outlineParameters = { visible: false }; // no ink outline on the muzzle flash
     this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), flashMat);
     this.flash.visible = false;
     this.muzzle.add(this.flash);

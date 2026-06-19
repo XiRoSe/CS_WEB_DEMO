@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { noOutline } from "../util/builders.js";
 
 // Pooled combat VFX — soft textured sprites (no flat squares), additive glow for
 // sparks/flash, alpha dust puffs, lingering decals. No per-shot allocs, no lights.
@@ -25,20 +26,20 @@ export class VFX {
 
     const quad = new THREE.PlaneGeometry(1, 1);
     // additive embers (sparks)
-    this.embers = this._pool(110, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.embers = this._pool(110, quad, () => noOutline(new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     this.embers.forEach((e) => (e.vel = new THREE.Vector3()));
     // additive flashes
-    this.flashes = this._pool(30, quad, () => new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.flashes = this._pool(30, quad, () => noOutline(new THREE.MeshBasicMaterial({ map: this._glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     // alpha dust puffs
-    this.dust = this._pool(36, quad, () => new THREE.MeshBasicMaterial({ map: this._smoke, transparent: true, depthWrite: false }));
+    this.dust = this._pool(36, quad, () => noOutline(new THREE.MeshBasicMaterial({ map: this._smoke, transparent: true, depthWrite: false })));
     // lingering decals
-    this.decals = this._pool(40, quad, () => new THREE.MeshBasicMaterial({ map: this._hole, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    this.decals = this._pool(40, quad, () => noOutline(new THREE.MeshBasicMaterial({ map: this._hole, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })));
     // thin additive tracers
     const tg = new THREE.CylinderGeometry(0.01, 0.01, 1, 4); tg.translate(0, 0.5, 0);
-    this.tracers = this._pool(20, tg, () => new THREE.MeshBasicMaterial({ color: 0xfff0bf, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.tracers = this._pool(20, tg, () => noOutline(new THREE.MeshBasicMaterial({ color: 0xfff0bf, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     // expanding shockwave rings (billboarded)
     const ring = new THREE.RingGeometry(0.55, 0.72, 28);
-    this.rings = this._pool(4, ring, () => new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    this.rings = this._pool(4, ring, () => noOutline(new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
     // flying debris chunks
     const chunk = new THREE.BoxGeometry(0.22, 0.22, 0.22);
     this.debris = this._pool(26, chunk, () => new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.9 }));
