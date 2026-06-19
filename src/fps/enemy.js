@@ -84,14 +84,6 @@ export class Enemy {
     this.group.add(rifle);
     this._rifle = rifle;
 
-    // muzzle flash on the gun tip
-    this._flash = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.4, 0.4),
-      new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
-    );
-    this._flash.visible = false;
-    this._gunTip.add(this._flash);
-    this._flashT = 0;
 
     // invisible but raycastable hitbox
     this.hitbox = new THREE.Mesh(
@@ -124,7 +116,6 @@ export class Enemy {
     this.deathT = 0;
     this.hitbox.userData.enemy = null;
     this.hitbox.visible = false;
-    if (this._flash) this._flash.visible = false;
   }
 
   canSee(playerPos) {
@@ -213,8 +204,6 @@ export class Enemy {
       else this.model.position.y = -s * 0.5;
       if (this.dodgeT <= 0) { this.dodging = null; this.group.position.y = 0; this.model.position.y = 0; }
     }
-
-    if (this._flashT > 0) { this._flashT -= dt; if (this._flashT <= 0) this._flash.visible = false; }
   }
 
   // choose a peek position lateral to cover that has line of sight to the player
@@ -231,12 +220,9 @@ export class Enemy {
   }
 
   _fire(playerPos, ctx) {
-    this._flash.visible = true;
-    this._flash.rotation.z = Math.random() * Math.PI;
-    this._flash.scale.setScalar(0.8 + Math.random() * 0.5);
-    this._flashT = 0.06;
     ctx.audio?.enemyShot?.();
     this._gunTip.getWorldPosition(this._muzzleWorld);
+    ctx.vfx.muzzle(this._muzzleWorld); // soft glowing flash (no more white square)
     ctx._tmp = ctx._tmp || new THREE.Vector3();
     ctx._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z);
     ctx.vfx.tracer(this._muzzleWorld, ctx._tmp);

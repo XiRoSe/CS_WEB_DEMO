@@ -108,6 +108,11 @@ export class VFX {
     this._dustPuff(point, 0xb9b3a4, 0.35);
     if (normal) this._decal(point, normal);
   }
+  // simple soft glowing muzzle flash, billboarded toward the camera
+  muzzle(point) {
+    this._flash(point, 0.8, 0xffe0a0);
+  }
+
   // enemy hit (crimson)
   hitPuff(point) {
     this._flash(point, 0.5, 0xff6a52);
