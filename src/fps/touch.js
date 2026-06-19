@@ -38,12 +38,18 @@ body.portrait #touch.on { display:none; }
 export class TouchControls {
   constructor(input) {
     this.input = input;
-    // Touch device = has a coarse pointer AND NO fine pointer (no mouse/trackpad).
-    // (pointer:coarse) / ontouchstart are both true on many desktops, so we exclude
-    // anything that has a fine pointer available — i.e. only real phones/tablets qualify.
-    const mm = window.matchMedia;
-    this.enabled = !!(mm && mm("(any-pointer: coarse)").matches && !mm("(any-pointer: fine)").matches);
-    if (!this.enabled) return;
+    this.enabled = false;     // true ONLY after a real finger touch (never on desktop)
+    this._activated = false;
+    // The ONLY thing that exists on desktop: a dormant listener. A mouse/keyboard
+    // never fires touchstart, so this never activates and nothing is built.
+    window.addEventListener("touchstart", () => this._activate(), { passive: true });
+  }
+
+  // Build the touch UI lazily, only once a real touch happens (i.e. on a phone/tablet).
+  _activate() {
+    if (this._activated) return;
+    this._activated = true;
+    this.enabled = true;
     document.body.classList.add("mobile");
 
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
@@ -67,7 +73,6 @@ export class TouchControls {
     this.moveId = null; this.moveBase = { x: 0, y: 0 };
     this.lookId = null; this.lookBase = { x: 0, y: 0 };
 
-    // rotate-to-landscape gate
     const rot = document.createElement("div");
     rot.id = "rotate";
     rot.innerHTML = `<div class="ico">⟳</div><h2>ROTATE YOUR DEVICE</h2><p>Landscape mode required to play</p>`;
@@ -75,7 +80,7 @@ export class TouchControls {
     this._checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
       document.body.classList.toggle("portrait", portrait);
-      this.input.touch.suspended = portrait; // main pauses gameplay while portrait
+      this.input.touch.suspended = this.enabled && portrait;
     };
     window.addEventListener("resize", this._checkOrientation);
     window.addEventListener("orientationchange", this._checkOrientation);
@@ -83,14 +88,18 @@ export class TouchControls {
 
     this._bindButtons(root);
     this._bindSticks(root);
+
+    // if the game is already underway, show immediately
+    if (this._showWhenReady) this.show();
   }
 
   show() {
-    if (!this.enabled) return;
+    this._showWhenReady = true;
+    if (!this.enabled || !this.root) return; // desktop: never built, nothing to show
     this.root.classList.add("on");
     this._center(this.moveKnob); this._center(this.lookKnob);
   }
-  hide() { if (this.enabled) this.root.classList.remove("on"); }
+  hide() { this._showWhenReady = false; if (this.root) this.root.classList.remove("on"); }
   _center(k) { k.style.left = this.C + "px"; k.style.top = this.C + "px"; }
 
   _bindButtons(root) {

@@ -36,7 +36,6 @@ class Game {
     this.vfx = new VFX(this.scene);
     this.vfx.setCamera(this.camera);
     this.touch = new TouchControls(this.input);
-    this.isTouch = this.touch.enabled;
     this.heli = null;
     this._heliDelay = 7 + Math.random() * 8; // gunship arrives 7-15s into the fight
     this._playTime = 0;
@@ -76,13 +75,13 @@ class Game {
     this.hud.showStart(() => this._deploy());
   }
 
-  // Desktop deploys via pointer lock; mobile starts directly (no pointer lock).
+  // Mobile (a finger tapped Deploy -> touch active) starts directly; desktop uses pointer lock.
   _deploy() {
-    if (this.isTouch) this._startPlay();
+    if (this.touch.enabled) this._startPlay();
     else this.controller.lock();
   }
   _resume() {
-    if (this.isTouch) this._startPlay();
+    if (this.touch.enabled) this._startPlay();
     else this.controller.lock();
   }
   _startPlay() {
