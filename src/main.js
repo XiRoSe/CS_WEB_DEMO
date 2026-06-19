@@ -37,18 +37,17 @@ class Game {
     this.vfx = new VFX(this.scene);
     this.vfx.setCamera(this.camera);
 
-    // player laser sight: thin red beam from the muzzle + a glowing dot where it points
+    // player laser sight: a soft glowing red beam from the muzzle to whatever it hits
     this._laserRay = new THREE.Raycaster();
     this._laserDir = new THREE.Vector3();
     this._laserHit = new THREE.Vector3();
     this._laserTargets = [];
-    const lgeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
-    this.laserLine = new THREE.Line(lgeo, new THREE.LineBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.laserLine.frustumCulled = false; this.laserLine.visible = false;
-    this.scene.add(this.laserLine);
-    this.laserDot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.laserDot.frustumCulled = false; this.laserDot.visible = false;
-    this.scene.add(this.laserDot);
+    this._laserUp = new THREE.Vector3(0, 1, 0);
+    const beamGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 6, 1, true);
+    beamGeo.translate(0, 0.5, 0); // base at origin, extends +Y so we can scale length directly
+    this.laserBeam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xff1a1a, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.laserBeam.frustumCulled = false; this.laserBeam.visible = false;
+    this.scene.add(this.laserBeam);
     this.touch = new TouchControls(this.input);
     this.heli = null;
     this._heliDelay = 7 + Math.random() * 8; // gunship arrives 7-15s into the fight
@@ -150,20 +149,22 @@ class Game {
     const hits = this._laserRay.intersectObjects(tg, true);
     if (hits.length) this._laserHit.copy(hits[0].point);
     else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
-    const muzzle = this.weapon.muzzleWorld;
-    const p = this.laserLine.geometry.attributes.position;
-    p.setXYZ(0, muzzle.x, muzzle.y, muzzle.z);
-    p.setXYZ(1, this._laserHit.x, this._laserHit.y, this._laserHit.z);
-    p.needsUpdate = true;
-    this.laserDot.position.copy(this._laserHit);
-    this.laserLine.visible = true; this.laserDot.visible = true;
+    // emit from just past the barrel tip so the beam comes out of the gun's edge, not over it
+    const origin = this.weapon.muzzleWorld.clone().addScaledVector(dir, 0.25);
+    const beamDir = this._laserHit.clone().sub(origin);
+    const len = beamDir.length();
+    beamDir.normalize();
+    this.laserBeam.position.copy(origin);
+    this.laserBeam.quaternion.setFromUnitVectors(this._laserUp, beamDir);
+    this.laserBeam.scale.set(1, len, 1);
+    this.laserBeam.visible = true;
   }
 
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
     this.level.update(t); // wave the objective flag
-    this.laserLine.visible = false; this.laserDot.visible = false; // re-shown each frame during play
+    this.laserBeam.visible = false; // re-shown each frame during play
     if (this.state !== "play") { this.input.drainPresses(); return; }
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
 
