@@ -153,8 +153,10 @@ class Game {
     const hits = this._laserRay.intersectObjects(tg, true);
     if (hits.length) this._laserHit.copy(hits[0].point);
     else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
-    // start the beam right at the muzzle's front edge (nudged forward so it doesn't sit inside the gun)
-    const origin = this._laserOrigin.copy(this.weapon.muzzleWorld).addScaledVector(dir, 0.12);
+    // start the beam at the visible barrel tip — a point IN FRONT of the camera (the real muzzle
+    // node is flipped behind the camera by the viewmodel's 180° rotation, so we don't use it here)
+    const origin = this._laserOrigin.set(0.16, -0.14, -1.25);
+    this.camera.localToWorld(origin);
     const len = origin.distanceTo(this._laserHit);
     const beamDir = this._laserHit.clone().sub(origin).normalize();
     this.laserBeam.position.copy(origin);

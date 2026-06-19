@@ -213,7 +213,8 @@ export class Level {
     lens.position.copy(fix).addScaledVector(dir.clone().normalize(), 0.24); lens.lookAt(tgt); this.scene.add(lens);
     // the actual light (no shadows -> cheap)
     const angle = 0.36;
-    const light = new THREE.SpotLight(0xfff2cc, 7.5, 48, angle, 0.5, 1.1);
+    // strong + low decay so the beam clearly lights the wall/floor it hits (not just a faint cone)
+    const light = new THREE.SpotLight(0xfff2cc, 40, 70, angle, 0.45, 1.0);
     light.position.copy(fix);
     light.target.position.copy(tgt);
     light.castShadow = false;

@@ -127,7 +127,7 @@ export class Helicopter {
     // The lamp rides the heli; the light + beam live in the scene and are recomputed each frame.
     this._headLocal = new THREE.Vector3(0, -0.4, 2.6); // nose lamp position (group-local)
     const lens = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff7dc })); lens.position.copy(this._headLocal); this.group.add(lens);
-    this.headLight = new THREE.SpotLight(0xfff4d2, 9, 120, 0.5, 0.55, 0.85); this.headLight.castShadow = false;
+    this.headLight = new THREE.SpotLight(0xfff4d2, 55, 140, 0.5, 0.5, 1.0); this.headLight.castShadow = false;
     this.scene.add(this.headLight, this.headLight.target);
     this.headBeam = new THREE.Mesh(
       new THREE.ConeGeometry(1, 1, 22, 1, true),
