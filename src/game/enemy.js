@@ -186,6 +186,30 @@ export class Enemy {
     return d < 0.3;
   }
 
+  // move toward a target, but if we jam against an obstacle, detour sideways to get around it
+  _advance(tx, tz, dt, speed = this.speed) {
+    if (this._detourT > 0) {
+      this._detourT -= dt;
+      let dx = tx - this.pos.x, dz = tz - this.pos.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+      const sx = -dz * this._detourSide, sz = dx * this._detourSide; // perpendicular skirt
+      const step = speed * dt;
+      const nx = this.pos.x + sx * step, nz = this.pos.z + sz * step;
+      let moved = false;
+      if (!this._blocked(nx, this.pos.z)) { this.pos.x = nx; moved = true; }
+      if (!this._blocked(this.pos.x, nz)) { this.pos.z = nz; moved = true; }
+      if (!moved) this._detourSide = -this._detourSide; // dead end -> try the other way
+      return false;
+    }
+    const px = this.pos.x, pz = this.pos.z;
+    const reached = this._moveToward(tx, tz, dt, speed);
+    const moved = Math.hypot(this.pos.x - px, this.pos.z - pz);
+    if (!reached && moved < speed * dt * 0.35) {
+      this._stuckT = (this._stuckT || 0) + dt;
+      if (this._stuckT > 0.25) { this._detourT = 0.45 + Math.random() * 0.35; this._detourSide = this._detourSide || (Math.random() < 0.5 ? 1 : -1); this._stuckT = 0; }
+    } else { this._stuckT = 0; }
+    return reached;
+  }
+
   update(dt, playerPos, ctx) {
     if (this.dead) {
       this.deathT += dt;
@@ -254,15 +278,15 @@ export class Enemy {
       if (this.cover) {
         this.peekTimer -= dt;
         if (this.peeking) {
-          movingNow = !this._moveToward(this.peekPos.x, this.peekPos.z, dt, runSp);
+          movingNow = !this._advance(this.peekPos.x, this.peekPos.z, dt, runSp);
           // stay exposed until the burst finishes, then duck back behind cover
           if (this.peekTimer <= 0 && this.burstLeft === 0) { this.peeking = false; this.peekTimer = 1.4 + Math.random() * 1.6; }
         } else {
-          movingNow = !this._moveToward(this.coverPos.x, this.coverPos.z, dt, runSp);
+          movingNow = !this._advance(this.coverPos.x, this.coverPos.z, dt, runSp);
           if (this.peekTimer <= 0) { this.peeking = true; this.peekTimer = 1.0 + Math.random() * 0.8; this._computePeek(playerPos); }
         }
       } else if (dist > 6) {
-        movingNow = !this._moveToward(playerPos.x, playerPos.z, dt, runSp); // no cover -> advance
+        movingNow = !this._advance(playerPos.x, playerPos.z, dt, runSp); // no cover -> advance
       }
       this._play(movingNow ? (this.actions.Run ? "Run" : "Walk") : "Idle");
     } else {

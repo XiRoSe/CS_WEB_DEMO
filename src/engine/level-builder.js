@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "./builders.js";
 import { makeVehicle } from "./vehicles.js";
+import { makeAmmo } from "./pickups.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,
@@ -27,14 +28,15 @@ export class LevelBuilder {
     this.colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top });
   }
 
-  // ground + vast surrounding desert + scattered bushes/rocks + dirt patches
-  desertFloor(size = 80, patchN = 10, patchSpread = 30) {
+  // ground + vast surrounding desert + scattered bushes/rocks + dirt patches.
+  // `surround` is the size of the far desert plane (so the player can roam well past the base).
+  desertFloor(size = 80, patchN = 10, patchSpread = 30, surround = 600) {
     const groundMat = mat(COLORS.sand, { roughness: 1 });
     groundMat.map = groundTexture();
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), groundMat);
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; this.scene.add(ground);
 
-    const desert = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(COLORS.sand, { roughness: 1 }));
+    const desert = new THREE.Mesh(new THREE.PlaneGeometry(surround, surround), mat(COLORS.sand, { roughness: 1 }));
     desert.rotation.x = -Math.PI / 2; desert.position.y = -0.05; desert.receiveShadow = true; this.scene.add(desert);
 
     this.scatterDesert(size * 0.45, size * 2.2);
@@ -117,6 +119,15 @@ export class LevelBuilder {
   }
 
   bollard(x, z) { const b = makeBollard(); b.position.set(x, 0, z); this.scene.add(b); }
+
+  // an ammo magazine pickup (hovers + spins); collected on proximity for +rounds reserve
+  ammo(x, z, rounds = 30) {
+    const g = makeAmmo();
+    g.position.set(x, 0.5, z);
+    this.scene.add(g);
+    if (!this.pickups) this.pickups = [];
+    this.pickups.push({ x, z, r: 1.8, rounds, mesh: g, taken: false });
+  }
 
   // objective: extraction pad + waving flag at (x,z); also records the win circle
   objective(x, z, r = 3.0) {
@@ -302,6 +313,11 @@ export class LevelBuilder {
   update(t) {
     this._updateSpots(t);
     if (this._bombLed) this._bombLed.visible = Math.sin(t * 6) > -0.3; // blinking charge indicator
+    if (this.pickups) for (const p of this.pickups) {
+      if (p.taken) continue;
+      p.mesh.rotation.y = t * 1.6;
+      p.mesh.position.y = 0.55 + Math.sin(t * 2.2) * 0.12; // hover bob
+    }
     if (!this.flag) return;
     const cloth = this.flag.userData.cloth, base = this.flag.userData.base, W = this.flag.userData.flagW;
     const pos = cloth.geometry.attributes.position;

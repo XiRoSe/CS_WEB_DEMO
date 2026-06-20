@@ -17,6 +17,7 @@ import { Intro } from "./game/intro.js";
 import { preloadEnemies } from "./game/enemy.js";
 import { preloadOperator } from "./game/operator.js";
 import { preloadVehicles } from "./engine/vehicles.js";
+import { preloadPickups } from "./engine/pickups.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
 
@@ -101,7 +102,7 @@ class Game {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
     // load models progressively (async, off the main thread) with a progress readout
-    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles()];
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups()];
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);
@@ -322,6 +323,20 @@ class Game {
     if (presses.includes("r")) this.weapon.reload();
 
     this.combat.update(dt, t, this.camera.position);
+
+    // ammo pickups — grab a magazine by walking over it (+rounds to reserve)
+    if (this.level.pickups) {
+      for (const p of this.level.pickups) {
+        if (p.taken) continue;
+        const dx = this.camera.position.x - p.x, dz = this.camera.position.z - p.z;
+        if (dx * dx + dz * dz < p.r * p.r) {
+          p.taken = true; p.mesh.visible = false;
+          this.weapon.reserve += p.rounds;
+          this.audio.playBuf?.("clipin", 0.6);
+          this.hud.notify(`+${p.rounds} ROUNDS · MAGAZINE`);
+        }
+      }
+    }
 
     // health regen: restore a little HP on a fixed interval
     const hp = this.cfg.player;

@@ -230,6 +230,13 @@ export class HUD {
     this.feed.appendChild(d);
     setTimeout(() => d.remove(), 3000);
   }
+  // positive notification (e.g. ammo pickup) — green accent, no ✖
+  notify(text) {
+    const d = document.createElement("div"); d.className = "k"; d.textContent = "✚ " + text;
+    d.style.borderRightColor = "var(--ok)";
+    this.feed.appendChild(d);
+    setTimeout(() => d.remove(), 2500);
+  }
   damageFlash() { this._dmgT = 0.5; this._shake = Math.max(this._shake, 6); }
   bloom() { this._bloom = Math.min(this._bloom + 4, 14); this._shake = Math.max(this._shake, 2.5); }
 

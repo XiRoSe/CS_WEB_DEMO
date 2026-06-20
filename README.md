@@ -50,6 +50,7 @@ textures, Web Audio. Single-page; no backend.
 - Attack helicopter & intro insertion helicopter: built procedurally (no external model).
 - Player operator (SWAT): from the CC0 "Ultimate Modular Men" low-poly character pack.
 - Vehicles (truck/flatbed/SUV/van): from Kenney's CC0 Car Kit (tinted military).
+- Ammo magazine pickup: from a CC0 "Low Poly Weapons Pack".
 - Helicopter rotor loop: from [w84death/the-complex-project](https://github.com/w84death/the-complex-project) (MIT).
 - "Enemy spotted" radio callout: Counter-Strike radio sound.
 - Soldier model & CS audio: see in-repo sources.

@@ -15,9 +15,11 @@ export const desertBase = {
     // insert in the open desert ~19m beyond the front gate (z=57) so the gate guards
     // (sight range ~26m) don't spot the drop — the player infiltrates on foot
     b.spawnAt(0, 76);
-    b.setBounds({ minX: -38.5, maxX: 38.5, minZ: -65.5, maxZ: 80 });
+    // wide-open desert: ~1km of roam in every direction beyond the base (no tight box)
+    b.setBounds({ minX: -1040, maxX: 1040, minZ: -1070, maxZ: 1080 });
 
-    b.desertFloor(190, 18, 100);
+    b.desertFloor(190, 18, 100, 2800);  // big far-desert plane so there's no void out to ~1km
+    b.scatterDesert(150, 760, 240, 190); // extra bushes/rocks across the wider desert
     b.road(6, 150, 0, 6); // main road from the desert approach to the rear
 
     // ---- perimeter wall (gate gap at the front) ----
@@ -86,6 +88,13 @@ export const desertBase = {
     b.floodlight(30, 46, 6.4, 0, 30, true, 170);
     b.floodlight(-32, -10, 6.4, 0, -10, true, 170);
     b.floodlight(32, -10, 6.4, 0, -10, true, 170);
+
+    // ---- ammo resupply: 5 magazines (+30 rounds each) along the route ----
+    b.ammo(-9, 46);   // at the checkpoint
+    b.ammo(-30, 20);  // motor pool
+    b.ammo(26, 22);   // storage building
+    b.ammo(8, -6);    // central HQ
+    b.ammo(-12, -52); // near the bomb
 
     // ---- perimeter dressing ----
     b.fence(-38, 57, -38, -65); b.fence(38, 57, 38, -65);
