@@ -11,11 +11,13 @@ export const desertBase = {
   },
 
   build(b) {
-    b.spawnAt(0, 54);
-    b.setBounds({ minX: -38.5, maxX: 38.5, minZ: -65.5, maxZ: 57.5 });
+    // insert in the open desert ~19m beyond the front gate (z=57) so the gate guards
+    // (sight range ~26m) don't spot the drop — the player infiltrates on foot
+    b.spawnAt(0, 76);
+    b.setBounds({ minX: -38.5, maxX: 38.5, minZ: -65.5, maxZ: 80 });
 
-    b.desertFloor(170, 16, 90);
-    b.road(6, 120, 0, -4); // main road from the gate to the rear
+    b.desertFloor(190, 18, 100);
+    b.road(6, 150, 0, 6); // main road from the desert approach to the rear
 
     // ---- perimeter wall (gate gap at the front) ----
     b.wall(-21.5, 57, 37, 1, 3.6, COLORS.concrete);  // front-left
@@ -27,7 +29,7 @@ export const desertBase = {
 
     // ============ APPROACH / CHECKPOINT (z 40..54) ============
     b.sandbags(-6, 46, 6, 0); b.sandbags(6, 46, 6, 0);
-    b.vehicle(-15, 49, 0.25, "jeep");
+    b.vehicle(-15, 49, 0.25, "suv");
     b.tower(-30, 46); b.tower(30, 46);
     b.enemy({ x: -30, z: 46, y: 4, patrol: [{ x: -30, z: 46 }] });
     b.enemy({ x: 30, z: 46, y: 4, patrol: [{ x: 30, z: 46 }] });
@@ -35,7 +37,7 @@ export const desertBase = {
     b.enemy({ x: 9, z: 42, patrol: [{ x: 12, z: 44 }, { x: 5, z: 40 }] });
 
     // ============ MOTOR POOL (left, z 8..34) ============
-    b.vehicle(-27, 28, 0.3, "truck"); b.vehicle(-31, 15, -0.15, "truck"); b.vehicle(-19, 22, 1.4, "jeep");
+    b.vehicle(-27, 28, 0.3, "truck"); b.vehicle(-31, 15, -0.15, "flatbed"); b.vehicle(-19, 22, 1.4, "van");
     b.fuelTanks(-35, 32, 2);
     b.crateStack(-20, 31, "stack"); b.barrels(-14, 12, 4);
     b.enemy({ x: -26, z: 20, patrol: [{ x: -30, z: 24 }, { x: -20, z: 16 }, { x: -27, z: 28 }] });

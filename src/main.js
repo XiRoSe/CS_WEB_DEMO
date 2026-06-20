@@ -16,6 +16,7 @@ import { Helicopter, preloadHeli } from "./game/helicopter.js";
 import { Intro } from "./game/intro.js";
 import { preloadEnemies } from "./game/enemy.js";
 import { preloadOperator } from "./game/operator.js";
+import { preloadVehicles } from "./engine/vehicles.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
 
@@ -39,8 +40,7 @@ class Game {
     this.engine.setupNight(this.scene);
     this.engine.addLights(this.scene);
 
-    this.level = new LevelBuilder(this.scene);
-    this.levelDef.build(this.level);
+    this.level = new LevelBuilder(this.scene); // built in _boot, once assets are loaded
     this.controller = new Controller(this.camera, this.engine.renderer.domElement, this.level);
     this.controller.onStep = () => this.audio.step();
     this.weapon = new Weapon(this.camera, this.audio);
@@ -91,7 +91,10 @@ class Game {
   async _boot() {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
-    await Promise.all([preloadEnemies(), preloadHeli(), preloadOperator()]); // soldier enemies + helicopter + player operator
+    await Promise.all([preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles()]); // models: enemies, heli, player, vehicles
+    // build the level now that all prop models are loaded, then seat the camera at the spawn
+    this.levelDef.build(this.level);
+    this.camera.position.set(this.level.playerSpawn.x, this.controller.eye, this.level.playerSpawn.z);
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
       onKill: (count, left) => { this.hud.killFeed(this.cfg.messages.hostileDown); this.hud.setHostiles(left); this.voice.enemyDown(); },

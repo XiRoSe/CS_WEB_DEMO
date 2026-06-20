@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag } from "./builders.js";
+import { makeVehicle } from "./vehicles.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,
@@ -183,18 +184,15 @@ export class LevelBuilder {
     roof.position.set(x, h + 0.05, z); this.scene.add(roof);
   }
 
-  // a military vehicle (truck with canopy, or open jeep) — tall cover that blocks ground line-of-sight
+  // a real low-poly military vehicle model (truck/flatbed/suv/van) — tall cover that blocks
+  // ground line-of-sight. The model faces -Z by default; `rot` turns it.
   vehicle(x, z, rot = 0, type = "truck") {
-    const g = new THREE.Group();
-    const c = COLORS.oliveDark;
-    const chassis = box(2.0, 0.9, 4.2, c, { metalness: 0.3, roughness: 0.7 }); chassis.position.y = 0.9; g.add(chassis);
-    const cab = box(1.9, 1.0, 1.4, c, { metalness: 0.3 }); cab.position.set(0, 1.7, 1.2); g.add(cab);
-    const glass = box(1.7, 0.55, 0.1, 0x223038, { metalness: 0.6, roughness: 0.2 }); glass.position.set(0, 1.95, 1.92); g.add(glass);
-    if (type === "truck") { const bed = box(2.0, 1.3, 2.4, COLORS.olive, { flat: true }); bed.position.set(0, 1.95, -1.0); g.add(bed); }
-    const wheel = () => { const w = cyl(0.45, 0.45, 0.35, 0x15171a, 10, { roughness: 0.9 }); w.rotation.z = Math.PI / 2; return w; };
-    for (const wx of [-0.95, 0.95]) for (const wz of [-1.4, 1.4]) { const w = wheel(); w.position.set(wx, 0.45, wz); g.add(w); }
-    g.position.set(x, 0, z); g.rotation.y = rot; this.scene.add(g); this.solidMeshes.push(g);
-    if (Math.abs(Math.cos(rot)) > 0.5) this.collide(x, z, 2.2, 4.4, 2.0); else this.collide(x, z, 4.4, 2.2, 2.0);
+    const g = makeVehicle(type);
+    g.position.set(x, 0, z); g.rotation.y = rot;
+    this.scene.add(g); this.solidMeshes.push(g);
+    // collider aligned to the long axis (≈4.5m long, ≈2.2m wide)
+    if (Math.abs(Math.cos(rot)) > 0.5) this.collide(x, z, 2.4, 4.6, 2.0);
+    else this.collide(x, z, 4.6, 2.4, 2.0);
   }
 
   // a run of large horizontal fuel tanks on stands (industrial cover), lined up along +X
