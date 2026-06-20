@@ -20,6 +20,33 @@ export class Level {
     this.colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, top });
   }
 
+  // low-poly desert dressing scattered in a ring around the compound (decorative, outside the play area)
+  _scatterDesert() {
+    const bushCols = [0x4a5436, 0x3d4a2c, 0x55603f];
+    const rockCols = [0x6b6457, 0x595347, 0x746b5c];
+    const ring = (rMin, rMax) => { const a = Math.random() * Math.PI * 2, r = rMin + Math.random() * (rMax - rMin); return [Math.cos(a) * r, Math.sin(a) * r]; };
+    const bush = (x, z, s) => {
+      const g = new THREE.Group();
+      const m = mat(bushCols[Math.floor(Math.random() * 3)], { roughness: 1, flat: true });
+      const n = 2 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) {
+        const r = (0.35 + Math.random() * 0.5) * s;
+        const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), m);
+        blob.position.set((Math.random() - 0.5) * 0.7 * s, r * 0.55, (Math.random() - 0.5) * 0.7 * s);
+        blob.scale.y = 0.65; blob.castShadow = true; g.add(blob);
+      }
+      g.position.set(x, 0, z); g.rotation.y = Math.random() * 6.28; this.scene.add(g);
+    };
+    const rock = (x, z, s) => {
+      const r = new THREE.Mesh(new THREE.DodecahedronGeometry((0.45 + Math.random() * 0.9) * s, 0), mat(rockCols[Math.floor(Math.random() * 3)], { roughness: 1, flat: true }));
+      r.position.set(x, 0.12 * s, z);
+      r.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+      r.scale.y = 0.6 + Math.random() * 0.4; r.castShadow = true; r.receiveShadow = true; this.scene.add(r);
+    };
+    for (let i = 0; i < 70; i++) { const [x, z] = ring(36, 170); bush(x, z, 0.8 + Math.random() * 1.4); }
+    for (let i = 0; i < 55; i++) { const [x, z] = ring(34, 175); rock(x, z, 0.7 + Math.random() * 1.6); }
+  }
+
   _wall(x, z, w, d, h = 3.4, color = COLORS.concrete) {
     // tile the concrete ~ every 3.4 units so texel density is consistent
     const span = Math.max(w, d);
@@ -79,6 +106,15 @@ export class Level {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
+    // vast surrounding desert so the world doesn't end at the play area (and reads under the fly-in)
+    const desert = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(COLORS.sand, { roughness: 1 }));
+    desert.rotation.x = -Math.PI / 2; desert.position.y = -0.05;
+    desert.receiveShadow = true;
+    this.scene.add(desert);
+
+    // scatter low-poly desert bushes + rocks around the compound for an authentic look
+    this._scatterDesert();
+
     // subtle dirt patches for variation
     for (let i = 0; i < 10; i++) {
       const r = 2 + Math.random() * 4;
@@ -133,6 +169,9 @@ export class Level {
     this.enemySpawns.push({ x: 5, z: 4, patrol: [{ x: 9, z: 5 }, { x: 2, z: 2 }, { x: 6, z: -2 }] });
     this.enemySpawns.push({ x: -3, z: -1, patrol: [{ x: -6, z: 2 }, { x: 0, z: -3 }, { x: -2, z: 4 }] });
     this.enemySpawns.push({ x: 11, z: -3, patrol: [{ x: 13, z: -1 }, { x: 9, z: -4 }] });
+    // two extra patrols across the middle of the perimeter
+    this.enemySpawns.push({ x: -12, z: -3, patrol: [{ x: -13, z: 0 }, { x: -11, z: -4 }, { x: -13, z: -3 }] });
+    this.enemySpawns.push({ x: 2, z: 0, patrol: [{ x: 4, z: 2 }, { x: 0, z: -1 }, { x: 3, z: 1 }] });
 
     // ================= ZONE C: EXFIL (z -19..-6) =================
     const pad = makeExfilPad();
@@ -268,9 +307,11 @@ export class Level {
   }
 
   // 2D segment-vs-AABB occlusion test for enemy line-of-sight
-  segmentBlocked(ax, az, bx, bz) {
+  segmentBlocked(ax, az, bx, bz, minTop = 0) {
     const dx = bx - ax, dz = bz - az;
     for (const c of this.colliders) {
+      // only tall structures block when minTop is set (so elevated guards see over low cover)
+      if (c.top < minTop) continue;
       // ignore a collider the shooter is standing inside (e.g. a tower guard on its own tower)
       if (ax >= c.minX && ax <= c.maxX && az >= c.minZ && az <= c.maxZ) continue;
       let t0 = 0, t1 = 1;

@@ -6,6 +6,7 @@ export class Voice {
       kill: this._mk("/audio/enemydown.wav", 0.9),
       win: this._mk("/audio/ctwin.wav", 0.95),
       lose: this._mk("/audio/fallback.wav", 0.9),
+      spotted: this._mk("/audio/enemy_spotted.wav", 1.0),
     };
     this._busyUntil = 0;
   }
@@ -24,6 +25,7 @@ export class Voice {
     try { a.currentTime = 0; a.play().catch(() => {}); } catch (e) {}
   }
   deploy() { this._play("deploy", 1.2); }
+  enemySpotted() { this._play("spotted", 0); }
   enemyDown() { this._play("kill", 0.9); }
   win() { this._play("win", 0); }
   lose() { this._play("lose", 0); }

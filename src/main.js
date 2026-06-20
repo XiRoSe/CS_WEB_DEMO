@@ -11,8 +11,10 @@ import { VFX } from "./fps/vfx.js";
 import { Combat } from "./fps/combat.js";
 import { TouchControls } from "./fps/touch.js";
 import { Helicopter } from "./fps/helicopter.js";
+import { Intro } from "./fps/intro.js";
 import { preloadEnemies } from "./fps/enemy.js";
 import { preloadHeli } from "./fps/helicopter.js";
+import { preloadOperator } from "./fps/operator.js";
 import { COLORS } from "./util/builders.js";
 
 class Game {
@@ -69,7 +71,7 @@ class Game {
     this.state = "loading";
 
     // pointer-lock driven state transitions (desktop)
-    this.controller.onLock = () => this._startPlay();
+    this.controller.onLock = () => { if (!this._introDone) this._beginIntro(); else this._startPlay(); };
     this.controller.onUnlock = () => {
       if (this.state === "play") { this.state = "pause"; this.touch.hide(); this.hud.showPause(() => this._resume()); }
     };
@@ -80,7 +82,8 @@ class Game {
 
   async _boot() {
     this.hud.showLoading();
-    await Promise.all([preloadEnemies(), preloadHeli()]); // load soldier + helicopter models
+    this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
+    await Promise.all([preloadEnemies(), preloadHeli(), preloadOperator()]); // soldier enemies + helicopter + player operator
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
       onKill: (count, left) => { this.hud.killFeed("HOSTILE DOWN"); this.hud.setHostiles(left); this.voice.enemyDown(); },
@@ -93,8 +96,37 @@ class Game {
 
   // Mobile (a finger tapped Deploy -> touch active) starts directly; desktop uses pointer lock.
   _deploy() {
-    if (this.touch.enabled) this._startPlay();
-    else this.controller.lock();
+    this.audio.resume();
+    if (this.touch.enabled) this._beginIntro();
+    else this.controller.lock(); // onLock -> _beginIntro
+  }
+
+  // Fast-rope insertion cinematic, then hand control to the player.
+  _beginIntro() {
+    if (this.state === "intro" || this._introDone) return;
+    this.state = "intro";
+    this.hud.hideOverlay();
+    this.hud.setCombatVisible(false);
+    this.weapon.group.visible = false; // hands on the rope, not the gun
+    this.audio.startRotor();
+    this.intro = new Intro(this.scene, this.camera, this.level.playerSpawn);
+    this.intro.start();
+    this.hud.killFeed("FAST-ROPE INSERTION — click to skip");
+    this._introT = 0;
+    this._spottedCalled = false;
+    this._introFar = new THREE.Vector3(0, -999, 0); // keeps enemies from detecting the player pre-game
+  }
+  _endIntro() {
+    if (this._introDone) return;
+    this._introDone = true;
+    if (this.intro) { this.intro.dispose(); this.intro = null; }
+    this.audio.stopRotor();
+    this.weapon.group.visible = true;
+    // settle the player at the spawn, facing into the compound
+    this.camera.position.set(this.level.playerSpawn.x, this.controller.eye, this.level.playerSpawn.z);
+    this.controller._euler.set(0, 0, 0);
+    this.camera.quaternion.setFromEuler(this.controller._euler);
+    this._startPlay();
   }
   _resume() {
     if (this.touch.enabled) this._startPlay();
@@ -171,6 +203,15 @@ class Game {
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
     this.level.update(t); // wave the objective flag
     this.laserBeam.visible = false; // re-shown each frame during play
+    if (this.state === "intro") {
+      this.intro.update(dt);
+      this.combat.update(dt, t, this._introFar); // enemies patrol/idle normally, never detect the player yet
+      this._introT += dt;
+      if (!this._spottedCalled && this._introT > 2.0) { this._spottedCalled = true; this.voice.enemySpotted(); }
+      const pressed = this.input.drainPresses();
+      if (this.intro.done || this.input.mouseDown || pressed.length || this.input.touch.fire) this._endIntro();
+      return;
+    }
     if (this.state !== "play") { this.input.drainPresses(); return; }
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
 

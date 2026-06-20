@@ -24,6 +24,7 @@ export class Audio {
   }
   async _loadClips() {
     const clips = {
+      helicopter: "/audio/helicopter.ogg", // load first so the intro rotor is ready
       fire_player: "/audio/fire_player.wav",
       fire_enemy: "/audio/fire_enemy.wav",
       clipout: "/audio/clipout.wav",
@@ -35,12 +36,13 @@ export class Audio {
       step4: "/audio/step4.wav",
       explosion: "/audio/explosion.wav",
       heli_fire: "/audio/heli_fire.wav",
-      helicopter: "/audio/helicopter.ogg",
     };
     for (const [name, url] of Object.entries(clips)) {
       try {
         const ab = await (await fetch(url)).arrayBuffer();
         this.buffers[name] = await this.ctx.decodeAudioData(ab);
+        // if the rotor is already running on the synth fallback, upgrade to the real clip now
+        if (name === "helicopter" && this._rotorWanted && !this._rotorSrc) { this._stopSynthRotor(); this._startRealRotor(); }
       } catch (e) { /* fall back to synth */ }
     }
   }
@@ -132,16 +134,19 @@ export class Audio {
     this._noiseBurst(0.08, 1800, 1, 0.2);
   }
   startRotor() {
-    if (!this.ctx || this._rotorSrc || this._rotor) return;
-    // real looping helicopter rotor clip
-    if (this.buffers.helicopter) {
-      const s = this.ctx.createBufferSource(); s.buffer = this.buffers.helicopter; s.loop = true;
-      const g = this.ctx.createGain(); g.gain.value = 0.55;
-      s.connect(g); g.connect(this.master); s.start();
-      this._rotorSrc = s; this._rotorGain = g;
-      return;
-    }
-    // synth fallback: low rumble + blade "whomp"
+    this._rotorWanted = true;
+    if (!this.ctx || this._rotorSrc || this._rotor) return; // already running (or no ctx yet)
+    if (this.buffers.helicopter) this._startRealRotor();
+    else this._startSynthRotor();
+  }
+  _startRealRotor() {
+    const s = this.ctx.createBufferSource(); s.buffer = this.buffers.helicopter; s.loop = true;
+    const g = this.ctx.createGain(); g.gain.value = 0.6;
+    s.connect(g); g.connect(this.master); s.start();
+    this._rotorSrc = s; this._rotorGain = g;
+  }
+  _startSynthRotor() {
+    // low rumble + blade "whomp"
     this._turbine = this.ctx.createOscillator();
     this._turbineG = this.ctx.createGain();
     const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 130; lp.Q.value = 0.6;
@@ -153,11 +158,15 @@ export class Audio {
     chop();
     this._rotor = setInterval(chop, 92);
   }
-  stopRotor() {
-    if (this._rotorSrc) { try { this._rotorSrc.stop(); } catch (e) { /* already stopped */ } this._rotorSrc.disconnect(); this._rotorSrc = null; }
+  _stopSynthRotor() {
     if (this._rotor) { clearInterval(this._rotor); this._rotor = null; }
     if (this._turbine) { try { this._turbine.stop(); } catch (e) { /* already stopped */ } this._turbine.disconnect(); this._turbine = null; }
     if (this._turbineLP) { this._turbineLP.disconnect(); this._turbineLP = null; }
+  }
+  stopRotor() {
+    this._rotorWanted = false;
+    if (this._rotorSrc) { try { this._rotorSrc.stop(); } catch (e) { /* already stopped */ } this._rotorSrc.disconnect(); this._rotorSrc = null; }
+    this._stopSynthRotor();
   }
   win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this._tone(f, 0.18, "square", 0.22), i * 130)); }
   lose() { [330, 262, 196, 131].forEach((f, i) => setTimeout(() => this._tone(f, 0.25, "sawtooth", 0.22), i * 160)); }

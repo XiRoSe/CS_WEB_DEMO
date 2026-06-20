@@ -21,6 +21,28 @@ export function preloadEnemies() {
   return _loading;
 }
 
+// A standalone rigged soldier clone (for the intro cinematic). Returns { model, bones } or null.
+export function makeSoldier() {
+  if (!_asset) return null;
+  const model = skeletonClone(_asset.scene);
+  model.scale.setScalar(_asset.scale);
+  model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  const bones = {};
+  model.traverse((o) => {
+    if (o.name === "mixamorigLeftArm") bones.lArm = o;
+    else if (o.name === "mixamorigRightArm") bones.rArm = o;
+    else if (o.name === "mixamorigLeftForeArm") bones.lFore = o;
+    else if (o.name === "mixamorigRightForeArm") bones.rFore = o;
+    else if (o.name === "mixamorigLeftUpLeg") bones.lUpLeg = o;
+    else if (o.name === "mixamorigRightUpLeg") bones.rUpLeg = o;
+    else if (o.name === "mixamorigLeftLeg") bones.lLeg = o;
+    else if (o.name === "mixamorigRightLeg") bones.rLeg = o;
+    else if (o.name === "mixamorigLeftHand") bones.lHand = o;
+    else if (o.name === "mixamorigRightHand") bones.rHand = o;
+  });
+  return { model, bones };
+}
+
 export class Enemy {
   constructor(scene, spawn, level) {
     this.scene = scene;
@@ -36,6 +58,8 @@ export class Enemy {
     this.counted = false;
     this.alertT = 0;
     this.fireCd = 0.7 + Math.random() * 0.8;
+    this.burstLeft = 0;   // shots remaining in the current 5-round burst
+    this.burstTimer = 0;
     this.deathT = 0;
     // cover behaviour
     this.coverPos = this.pos.clone();
@@ -161,8 +185,8 @@ export class Enemy {
 
   canSee(playerPos) {
     const d = Math.hypot(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
-    // elevated watchtower guards look down OVER all the cover (everything is shorter than them)
-    if (this.baseY > 0) return d < 50;
+    // elevated watchtower guards look down OVER low cover, but tall walls/buildings still block them
+    if (this.baseY > 0) return d < 50 && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z, 2.8);
     if (d > 26) return false;
     return !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z);
   }
@@ -226,15 +250,30 @@ export class Enemy {
     const engaged = this.alertT > 0;
     this._applyGun();   // rifle held in the right hand via the natural animation (clean, reliable)
 
-    // ~1s before firing, raise into the shooting aim (hand + rifle come up on target together)
+    // fire in bursts of 5 shots, with 2-5s between bursts; raise into the aim ~1s before + during a burst
     this._aimHold = Math.max(0, (this._aimHold || 0) - dt);
     let aiming = this._aimHold > 0;
+    let fireNow = false;
     if (see) {
-      this.fireCd -= dt;
-      if (this.fireCd <= 1.0) aiming = true;
-      if (this.fireCd <= 0) { this.fireCd = 2 + Math.random() * 4; this._fire(playerPos, ctx); this._aimHold = 0.6; aiming = true; }
+      if (this.burstLeft > 0) {
+        aiming = true;
+        this.burstTimer -= dt;
+        if (this.burstTimer <= 0) {
+          fireNow = true;
+          this.burstLeft--;
+          this.burstTimer = 0.12;          // ~0.12s between shots in a burst
+          this._aimHold = 0.4;
+          if (this.burstLeft === 0) this.fireCd = 2 + Math.random() * 3; // 2-5s until the next burst
+        }
+      } else {
+        this.fireCd -= dt;
+        if (this.fireCd <= 1.0) aiming = true; // shoulder the rifle just before the burst
+        if (this.fireCd <= 0) { this.burstLeft = 5; this.burstTimer = 0; aiming = true; }
+      }
     }
+    // apply the aim pose FIRST so the shot leaves the raised barrel, not the hip-carry tip
     if (aiming) this._aimArm();
+    if (fireNow) { this.model.updateWorldMatrix(true, true); this._fire(playerPos, ctx); }
 
     // watchtower guard: never moves — just tracks the player and fires from the post
     if (this.baseY > 0) {
@@ -247,15 +286,10 @@ export class Enemy {
 
     let movingNow = false;
     if (engaged) {
+      // simple: face the player, walk toward them, stop at a short standoff and shoot
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
-      this.peekTimer -= dt;
-      if (this.peeking) {
-        movingNow = !this._moveToward(this.peekPos.x, this.peekPos.z, dt);
-        if (this.peekTimer <= 0) { this.peeking = false; this.peekTimer = 1.5 + Math.random() * 1.6; }
-      } else {
-        movingNow = !this._moveToward(this.coverPos.x, this.coverPos.z, dt);
-        if (this.peekTimer <= 0) { this.peeking = true; this.peekTimer = 0.9 + Math.random() * 0.7; this._computePeek(playerPos); }
-      }
+      const dist = Math.hypot(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+      if (dist > 6) movingNow = !this._moveToward(playerPos.x, playerPos.z, dt); // advance until ~6m away
       this._play(movingNow ? "Walk" : "Idle");
     } else {
       const t = this.patrol[this.wp];

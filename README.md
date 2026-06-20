@@ -47,6 +47,8 @@ textures, Web Audio. Single-page; no backend.
 
 ## Credits
 
-- Attack helicopter: built procedurally (no external model).
+- Attack helicopter & intro insertion helicopter: built procedurally (no external model).
+- Player operator (SWAT): from the CC0 "Ultimate Modular Men" low-poly character pack.
 - Helicopter rotor loop: from [w84death/the-complex-project](https://github.com/w84death/the-complex-project) (MIT).
+- "Enemy spotted" radio callout: Counter-Strike radio sound.
 - Soldier model & CS audio: see in-repo sources.
