@@ -34,12 +34,14 @@ export class Enemy {
     this.burstLeft = 0;   // shots remaining in the current 5-round burst
     this.burstTimer = 0;
     this.deathT = 0;
-    // cover behaviour
-    this.coverPos = this.pos.clone();
+    // cover behaviour: run to the nearest cover between us and the player, hide, peek to shoot
+    this.cover = null;                 // { cx, cz, r, hx, hz } chosen cover object
+    this.coverScanCd = 0;              // cooldown before re-scanning for better cover
+    this.coverPos = this.pos.clone();  // hide spot (far side of cover from the player)
     this.peeking = false;
-    this.peekTimer = 1.2 + Math.random() * 1.6; // time hidden before peeking
+    this.peekTimer = 1.2 + Math.random() * 1.6;
     this.peekSide = Math.random() < 0.5 ? 1 : -1;
-    this.peekPos = this.pos.clone();
+    this.peekPos = this.pos.clone();   // peek spot (lateral, has line of sight)
     this._toP = new THREE.Vector3();
     // occasional jump/duck dodge
     this.dodgeCd = 2 + Math.random() * 2.5;
@@ -173,11 +175,11 @@ export class Enemy {
     }
     return false;
   }
-  _moveToward(tx, tz, dt) {
+  _moveToward(tx, tz, dt, speed = this.speed) {
     const dx = tx - this.pos.x, dz = tz - this.pos.z;
     const d = Math.hypot(dx, dz);
     if (d < 0.05) return true;
-    const step = Math.min(this.speed * dt, d);
+    const step = Math.min(speed * dt, d);
     const nx = this.pos.x + (dx / d) * step, nz = this.pos.z + (dz / d) * step;
     if (!this._blocked(nx, this.pos.z)) this.pos.x = nx;
     if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
@@ -201,7 +203,7 @@ export class Enemy {
     this.mixer.update(dt);
 
     const see = this.canSee(playerPos);
-    if (see) this.alertT = 5; else this.alertT -= dt;
+    if (see) this.alertT = 8; else this.alertT -= dt; // stay engaged through hide cycles
     const engaged = this.alertT > 0;
     this._applyGun();   // rifle held in the right hand via the natural animation (clean, reliable)
 
@@ -241,12 +243,30 @@ export class Enemy {
 
     let movingNow = false;
     if (engaged) {
-      // simple: face the player, walk toward them, stop at a short standoff and shoot
+      // always face the player; run to cover, hide, and pop out to shoot
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
       const dist = Math.hypot(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
-      if (dist > 6) movingNow = !this._moveToward(playerPos.x, playerPos.z, dt); // advance until ~6m away
-      this._play(movingNow ? "Walk" : "Idle");
+      const runSp = this.speed * 1.7; // sprint to cover
+      this.coverScanCd -= dt;
+      // (re)acquire cover while hidden (don't change cover mid-peek)
+      if (this.coverScanCd <= 0 && !this.peeking) { this._pickCover(playerPos); this.coverScanCd = 2.5 + Math.random() * 2; }
+
+      if (this.cover) {
+        this.peekTimer -= dt;
+        if (this.peeking) {
+          movingNow = !this._moveToward(this.peekPos.x, this.peekPos.z, dt, runSp);
+          // stay exposed until the burst finishes, then duck back behind cover
+          if (this.peekTimer <= 0 && this.burstLeft === 0) { this.peeking = false; this.peekTimer = 1.4 + Math.random() * 1.6; }
+        } else {
+          movingNow = !this._moveToward(this.coverPos.x, this.coverPos.z, dt, runSp);
+          if (this.peekTimer <= 0) { this.peeking = true; this.peekTimer = 1.0 + Math.random() * 0.8; this._computePeek(playerPos); }
+        }
+      } else if (dist > 6) {
+        movingNow = !this._moveToward(playerPos.x, playerPos.z, dt, runSp); // no cover -> advance
+      }
+      this._play(movingNow ? (this.actions.Run ? "Run" : "Walk") : "Idle");
     } else {
+      this.cover = null; this.peeking = false;
       const t = this.patrol[this.wp];
       if (this._moveToward(t.x, t.z, dt)) this.wp = (this.wp + 1) % this.patrol.length;
       this.yaw = Math.atan2(t.x - this.pos.x, t.z - this.pos.z);
@@ -256,8 +276,8 @@ export class Enemy {
     this.group.position.set(this.pos.x, this.baseY, this.pos.z);
     this.group.rotation.y = this.yaw;
 
-    // occasional jump/duck dodge while engaged (infrequent)
-    if (engaged && !this.dodging) {
+    // occasional jump dodge while exposed (peeking, or out in the open with no cover)
+    if (engaged && (this.peeking || !this.cover) && !this.dodging) {
       this.dodgeCd -= dt;
       if (this.dodgeCd <= 0) {
         this.dodging = "jump"; // crouch removed — only the jump dodge
@@ -274,17 +294,50 @@ export class Enemy {
     }
   }
 
-  // choose a peek position lateral to cover that has line of sight to the player
+  // pick the nearest cover object roughly between us and the player, and a hide spot behind it
+  _pickCover(playerPos) {
+    const ex = this.pos.x, ez = this.pos.z, px = playerPos.x, pz = playerPos.z;
+    let dx = px - ex, dz = pz - ez; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    let best = null, bestScore = Infinity;
+    for (const c of this.level.colliders) {
+      if (c.top < 0.9) continue;                          // too low to hide behind
+      const cx = (c.minX + c.maxX) / 2, cz = (c.minZ + c.maxZ) / 2;
+      const r = Math.max((c.maxX - c.minX) / 2, (c.maxZ - c.minZ) / 2) + 0.5;
+      if (r > 6) continue;                                // skip giant walls/buildings as primary cover
+      const tx = cx - ex, tz = cz - ez;
+      const t = tx * dx + tz * dz;                        // projection along enemy->player
+      if (t < 1 || t > L + 3) continue;                   // must be ahead, between us and the player
+      if (Math.abs(tx * -dz + tz * dx) > r + 3) continue; // roughly on the path
+      const distToEnemy = Math.hypot(tx, tz);
+      if (distToEnemy > 20) continue;
+      const cpl = Math.hypot(cx - px, cz - pz) || 1;       // hide spot on the far side from the player
+      const hx = cx + (cx - px) / cpl * (r + 0.5), hz = cz + (cz - pz) / cpl * (r + 0.5);
+      if (this._blocked(hx, hz)) continue;
+      const score = distToEnemy + Math.abs(tx * -dz + tz * dx) * 0.5; // near + on-path
+      if (score < bestScore) { bestScore = score; best = { cx, cz, r, hx, hz }; }
+    }
+    if (best) {
+      this.cover = best;
+      this.coverPos.set(best.hx, 0, best.hz);
+      this.peeking = false; this.peekTimer = 0.5 + Math.random() * 0.6;
+    } else {
+      this.cover = null;
+    }
+  }
+
+  // choose a peek position lateral to the cover that has line of sight to the player
   _computePeek(playerPos) {
-    this._toP.set(playerPos.x - this.coverPos.x, 0, playerPos.z - this.coverPos.z).normalize();
+    if (!this.cover) return;
+    const { cx, cz, r } = this.cover;
+    this._toP.set(playerPos.x - cx, 0, playerPos.z - cz).normalize();
     const px = -this._toP.z, pz = this._toP.x; // perpendicular
     for (const side of [this.peekSide, -this.peekSide]) {
-      const cx = this.coverPos.x + px * side * 1.6, cz = this.coverPos.z + pz * side * 1.6;
-      if (!this._blocked(cx, cz) && !this.level.segmentBlocked(cx, cz, playerPos.x, playerPos.z)) {
-        this.peekPos.set(cx, 0, cz); this.peekSide = side; return;
+      const qx = cx + px * side * (r + 0.6), qz = cz + pz * side * (r + 0.6);
+      if (!this._blocked(qx, qz) && !this.level.segmentBlocked(qx, qz, playerPos.x, playerPos.z)) {
+        this.peekPos.set(qx, 0, qz); this.peekSide = side; return;
       }
     }
-    this.peekPos.set(this.coverPos.x + this._toP.x * 0.9, 0, this.coverPos.z + this._toP.z * 0.9);
+    this.peekPos.set(cx + this._toP.x * (r + 0.4), 0, cz + this._toP.z * (r + 0.4));
   }
 
   _fire(playerPos, ctx) {

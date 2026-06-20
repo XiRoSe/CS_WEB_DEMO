@@ -14,6 +14,9 @@ export const config = {
   helicopter: {
     spawnDelay: 5,    // seconds into the fight the enemy gunship arrives
   },
+  objective: {
+    type: "exfil",    // "exfil" = clear all + reach the flag; "defuse" = disarm the bomb (timed)
+  },
   intro: {
     enabled: true,
     spottedCalloutAt: 2.0, // seconds into the intro the "enemy spotted" radio call plays

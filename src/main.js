@@ -68,6 +68,15 @@ class Game {
     this._heliSpawned = false;
     this._heliKilled = false;
 
+    // objective
+    this.objType = this.cfg.objective.type;
+    if (this.objType === "defuse") {
+      this.bombTime = this.cfg.objective.timeLimit;
+      this.codeLen = this.cfg.objective.codeLength || 3;
+      this.bombCode = Array.from({ length: this.codeLen }, () => Math.floor(Math.random() * 10)).join("");
+      this.defusing = false; this.defused = false; this.codeTyped = ""; this.codeFeedback = "";
+    }
+
     this.health = this.cfg.player.maxHealth;
     this.shotsFired = 0;
     this.shotsHit = 0;
@@ -91,9 +100,19 @@ class Game {
   async _boot() {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
-    await Promise.all([preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles()]); // models: enemies, heli, player, vehicles
+    // load models progressively (async, off the main thread) with a progress readout
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles()];
+    let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
+    jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
+    await Promise.all(jobs);
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
+    // warm up the procedural gunship build (populates the shared geometry caches) so its
+    // first real spawn mid-fight doesn't hitch the frame
+    const warm = new Helicopter(this.scene, this.level);
+    this.scene.remove(warm.group);
+    if (warm.headLight) this.scene.remove(warm.headLight, warm.headLight.target, warm.headBeam);
+    this.hud.setLoadingProgress(jobs.length + 1, jobs.length + 1);
     this.camera.position.set(this.level.playerSpawn.x, this.controller.eye, this.level.playerSpawn.z);
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
@@ -102,7 +121,12 @@ class Game {
     });
     this.hud.setHostiles(this.combat.enemiesLeft);
     this.state = "start";
-    this.hud.showStart(() => this._deploy());
+    this.hud.showStart(() => this._deploy(), {
+      title: this.levelDef.name,
+      brief: this.objType === "defuse"
+        ? "Infiltrate the base and disarm the bomb before it detonates."
+        : "Push to the extraction zone. Eliminate anyone in your way.",
+    });
   }
 
   // Mobile (a finger tapped Deploy -> touch active) starts directly; desktop uses pointer lock.
@@ -148,6 +172,14 @@ class Game {
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
+    if (this.objType === "defuse") {
+      this.hud.showTimer(true);
+      this.hud.setMissionTimer(this.bombTime);
+      this.hud.setObjective('Reach &amp; disarm the <span class="arrow">BOMB ◎</span>');
+      this.hud.setCounter("Eliminated", this.combat.killCount);
+    } else {
+      this.hud.setCounter("Hostiles", this.combat.enemiesLeft);
+    }
     this.touch.show();
     if (!this._deployed) { this._deployed = true; this.voice.deploy(); }
     this.state = "play";
@@ -163,25 +195,68 @@ class Game {
     if (this.health <= 0) this._lose();
   }
 
-  _win() {
+  _win(extra = {}) {
     if (this.state === "win") return;
     this.state = "win";
     const acc = this.shotsFired ? Math.round((this.shotsHit / this.shotsFired) * 100) : 0;
     this.hud.setCombatVisible(false);
+    this.hud.showTimer(false); this.hud.hideDefuse();
     this.controller.unlock();
     this.audio.stopRotor();
-    this.hud.showWin({ kills: this.combat.killCount, total: this.combat.totalEnemies, acc });
+    this.hud.showWin({ kills: this.combat.killCount, total: extra.disarmed ? 0 : this.combat.totalEnemies, acc, ...extra });
     this.audio.win();
     this.voice.win();
   }
-  _lose() {
+  _lose(sub, title) {
+    if (this.state === "lose") return;
     this.state = "lose";
     this.audio.stopRotor();
     this.hud.setCombatVisible(false);
+    this.hud.showTimer(false); this.hud.hideDefuse();
     this.controller.unlock();
-    this.hud.showLose();
+    this.hud.showLose(sub, title);
     this.audio.lose();
     this.voice.lose();
+  }
+
+  // bomb objective: countdown, proximity disarm panel, code entry, win/lose
+  _updateDefuse(dt, presses) {
+    this.bombTime -= dt;
+    this.hud.setMissionTimer(this.bombTime);
+    this.hud.setCounter("Eliminated", this.combat.killCount);
+    if (this.bombTime <= 0) { this._lose("The bomb detonated", 'Mission <span class="hz">Failed</span>'); return; }
+    if (this.defused) return;
+
+    const bmb = this.level.bomb;
+    const dx = this.camera.position.x - bmb.x, dz = this.camera.position.z - bmb.z;
+    const near = (dx * dx + dz * dz) < bmb.r * bmb.r;
+    if (near && !this.defusing) {
+      this.defusing = true; this.codeTyped = "";
+      this.codeFeedback = `ENTER THE ${this.codeLen}-DIGIT CODE`;
+      this.hud.showDefuse(this.codeLen); this.hud.updateDefuse("", this.codeFeedback);
+    } else if (!near && this.defusing) {
+      this.defusing = false; this.hud.hideDefuse();
+    }
+
+    if (this.defusing && presses.length) {
+      for (const k of presses) {
+        if (/^[0-9]$/.test(k)) { if (this.codeTyped.length < this.codeLen) this.codeTyped += k; }
+        else if (k === "backspace") this.codeTyped = this.codeTyped.slice(0, -1);
+        else if (k === "enter" && this.codeTyped.length === this.codeLen) {
+          let correct = 0;
+          for (let i = 0; i < this.codeLen; i++) if (this.codeTyped[i] === this.bombCode[i]) correct++;
+          if (correct === this.codeLen) {
+            const left = Math.max(0, this.bombTime), mm = Math.floor(left / 60), ss = Math.floor(left % 60);
+            this.hud.hideDefuse();
+            this._win({ disarmed: true, timeLeft: `${mm}:${String(ss).padStart(2, "0")}`, title: 'Bomb <span class="hz">Disarmed</span>' });
+            return;
+          }
+          this.codeFeedback = `${correct}/${this.codeLen} CORRECT — RETRY`;
+          this.codeTyped = "";
+        }
+      }
+      this.hud.updateDefuse(this.codeTyped, this.codeFeedback);
+    }
   }
 
   _updateLaser() {
@@ -242,8 +317,9 @@ class Game {
     this._fovKick *= Math.pow(0.0009, dt);
     const fov = this.baseFov + this._fovKick;
     if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
-    // reload
-    if (this.input.drainPresses().includes("r")) this.weapon.reload();
+    // reload (+ keys reused by the bomb code entry below)
+    const presses = this.input.drainPresses();
+    if (presses.includes("r")) this.weapon.reload();
 
     this.combat.update(dt, t, this.camera.position);
 
@@ -276,22 +352,27 @@ class Game {
     }
 
     const heliAlive = this.heli && !this.heli.dead;
-    const cleared = this.combat.enemiesLeft === 0 && !heliAlive;
 
     // HUD sync
     this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
-    this.hud.setHostiles(this.combat.enemiesLeft + (heliAlive ? 1 : 0));
-    if (cleared !== this._cleared) {
-      this._cleared = cleared;
-      this.hud.setObjective(cleared ? this.cfg.messages.objectiveCleared : this.cfg.messages.objective);
-    }
 
-    // win check — reach the extraction flag, but ONLY once everything is dead
-    if (cleared) {
-      const e = this.level.exfil;
-      const dx = this.camera.position.x - e.x, dz = this.camera.position.z - e.z;
-      if (dx * dx + dz * dz < e.r * e.r) this._win();
+    if (this.objType === "defuse") {
+      // disarm-the-bomb objective (timed; doesn't require clearing the base)
+      this._updateDefuse(dt, presses);
+    } else {
+      // clear-and-extract objective
+      const cleared = this.combat.enemiesLeft === 0 && !heliAlive;
+      this.hud.setCounter("Hostiles", this.combat.enemiesLeft + (heliAlive ? 1 : 0));
+      if (cleared !== this._cleared) {
+        this._cleared = cleared;
+        this.hud.setObjective(cleared ? this.cfg.messages.objectiveCleared : this.cfg.messages.objective);
+      }
+      if (cleared) {
+        const e = this.level.exfil;
+        const dx = this.camera.position.x - e.x, dz = this.camera.position.z - e.z;
+        if (dx * dx + dz * dz < e.r * e.r) this._win();
+      }
     }
   }
 }

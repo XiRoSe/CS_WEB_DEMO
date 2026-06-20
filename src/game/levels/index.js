@@ -6,4 +6,4 @@ export const levels = {
   compound,
   "desert-base": desertBase,
 };
-export const DEFAULT_LEVEL = "compound";
+export const DEFAULT_LEVEL = "desert-base";

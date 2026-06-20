@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag } from "./builders.js";
+import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "./builders.js";
 import { makeVehicle } from "./vehicles.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
@@ -125,6 +125,21 @@ export class LevelBuilder {
     this.flag = makeFlag(); this.flag.position.set(x, 0, z); this.scene.add(this.flag);
   }
 
+  // bomb objective: a planted charge the player must reach + disarm; records the trigger circle
+  bomb(x, z, r = 3.2) {
+    const g = new THREE.Group();
+    const crate = box(1.2, 0.8, 0.9, 0x20242a, { metalness: 0.4, roughness: 0.6 }); crate.position.y = 0.4; g.add(crate);
+    for (const sx of [-0.32, 0, 0.32]) { const c = cyl(0.12, 0.12, 0.7, 0xb24b3a, 8, { roughness: 0.6 }); c.rotation.x = Math.PI / 2; c.position.set(sx, 0.5, 0.18); g.add(c); }
+    const panel = box(0.42, 0.24, 0.06, 0x0c0e10, { flat: true }); panel.position.set(0, 0.58, 0.46); g.add(panel);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.12), noOutline(new THREE.MeshBasicMaterial({ color: 0xff3322 })));
+    screen.position.set(0, 0.58, 0.5); g.add(screen);
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), noOutline(new THREE.MeshBasicMaterial({ color: 0xff2a1a })));
+    led.position.set(0, 0.88, 0.2); g.add(led); this._bombLed = led;
+    g.position.set(x, 0, z); this.scene.add(g); this.solidMeshes.push(g);
+    this.collide(x, z, 1.3, 1.0, 1.0);
+    this.bomb = { x, z, r };
+  }
+
   bunker(x, z) {
     const g = new THREE.Group();
     const w = 5, d = 4, h = 3, t = 0.4;
@@ -225,7 +240,7 @@ export class LevelBuilder {
     this.scene.add(g);
   }
 
-  floodlight(x, z, h, aimX, aimZ, sweep = false) {
+  floodlight(x, z, h, aimX, aimZ, sweep = false, range = 70) {
     const pole = cyl(0.1, 0.14, h, COLORS.metalDark, 8, { metalness: 0.4 });
     pole.position.set(x, h / 2, z); this.scene.add(pole); this.collide(x, z, 0.4, 0.4);
     const fix = new THREE.Vector3(x, h, z);
@@ -236,7 +251,7 @@ export class LevelBuilder {
     const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.24), new THREE.MeshBasicMaterial({ color: 0xfff3d0 }));
     lens.position.copy(fix).addScaledVector(dir.clone().normalize(), 0.24); lens.lookAt(tgt); this.scene.add(lens);
     const angle = 0.36;
-    const light = new THREE.SpotLight(0xfff2cc, 40, 70, angle, 0.45, 1.0);
+    const light = new THREE.SpotLight(0xfff2cc, 40, range, angle, 0.45, 1.0);
     light.position.copy(fix); light.target.position.copy(tgt); light.castShadow = false;
     this.scene.add(light, light.target);
     const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 18, 1, true),
@@ -286,6 +301,7 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
+    if (this._bombLed) this._bombLed.visible = Math.sin(t * 6) > -0.3; // blinking charge indicator
     if (!this.flag) return;
     const cloth = this.flag.userData.cloth, base = this.flag.userData.base, W = this.flag.userData.flagW;
     const pos = cloth.geometry.attributes.position;

@@ -8,6 +8,7 @@ export const desertBase = {
   config: {
     helicopter: { spawnDelay: 12 },                 // longer approach before the gunship
     scene: { fog: { color: 0x0e1626, near: 45, far: 200 } }, // see across the bigger base
+    objective: { type: "defuse", timeLimit: 180, codeLength: 3 }, // disarm the bomb in 3:00
   },
 
   build(b) {
@@ -62,8 +63,8 @@ export const desertBase = {
     b.enemy({ x: -32, z: -10, y: 4, patrol: [{ x: -32, z: -10 }] });
     b.enemy({ x: 32, z: -10, y: 4, patrol: [{ x: 32, z: -10 }] });
 
-    // ============ EXFIL (rear, z -62..-26) ============
-    b.objective(0, -60, 3.5);
+    // ============ OBJECTIVE: BOMB (rear, z -62..-26) ============
+    b.bomb(0, -58);
     b.sandbags(0, -52, 10, 0);
     b.crateStack(-12, -50, "pair"); b.crateStack(12, -52, "stack");
     b.barrels(-22, -58, 3); b.barrels(22, -54, 2);
@@ -76,15 +77,15 @@ export const desertBase = {
     b.enemy({ x: -33, z: -58, y: 4, patrol: [{ x: -33, z: -58 }] });
     b.enemy({ x: 33, z: -58, y: 4, patrol: [{ x: 33, z: -58 }] });
 
-    // ---- lighting ----
-    b.floodlight(-37, 40, 5.6, -20, 30);
-    b.floodlight(37, 40, 5.6, 20, 30);
-    b.floodlight(-37, -30, 5.6, -18, -20);
-    b.floodlight(37, -30, 5.6, 18, -20);
-    b.floodlight(-30, 46, 6.4, 0, 30, true);   // tower searchlights (sweep)
-    b.floodlight(30, 46, 6.4, 0, 30, true);
-    b.floodlight(-32, -10, 6.4, 0, -10, true);
-    b.floodlight(32, -10, 6.4, 0, -10, true);
+    // ---- lighting (long range — the base is big, so beams reach well across it) ----
+    b.floodlight(-37, 40, 5.6, -20, 30, false, 160);
+    b.floodlight(37, 40, 5.6, 20, 30, false, 160);
+    b.floodlight(-37, -30, 5.6, -18, -20, false, 160);
+    b.floodlight(37, -30, 5.6, 18, -20, false, 160);
+    b.floodlight(-30, 46, 6.4, 0, 30, true, 170);   // tower searchlights (sweep)
+    b.floodlight(30, 46, 6.4, 0, 30, true, 170);
+    b.floodlight(-32, -10, 6.4, 0, -10, true, 170);
+    b.floodlight(32, -10, 6.4, 0, -10, true, 170);
 
     // ---- perimeter dressing ----
     b.fence(-38, 57, -38, -65); b.fence(38, 57, 38, -65);

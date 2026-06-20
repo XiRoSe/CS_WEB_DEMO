@@ -67,6 +67,20 @@ const CSS = `
 .overlay .controls kbd{ color:var(--hud); border:1px solid var(--line); padding:1px 8px; margin:0 2px; }
 .overlay .stats{ font-size:20px; letter-spacing:.1em; line-height:1.8; }
 @keyframes pulse{ 50%{ transform:translateY(-4px); } }
+
+/* mission countdown (bomb) */
+#timer{ left:50%; top:74px; transform:translateX(-50%); text-align:center; }
+#timer .t{ font-size:30px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+#timer.danger .t{ color:var(--danger); animation:blink .6s steps(2) infinite; }
+
+/* bomb disarm panel */
+#defuse{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(8,10,7,.72); pointer-events:none; }
+#defuse .box{ background:var(--panel); border:1px solid var(--line); padding:28px 46px; text-align:center; }
+#defuse .ttl{ font-size:14px; color:var(--hz); letter-spacing:.22em; text-transform:uppercase; }
+#defuse .code{ font-size:56px; font-weight:700; letter-spacing:.32em; font-variant-numeric:tabular-nums; margin:12px 0 6px; }
+#defuse .fb{ font-size:18px; color:var(--ok); letter-spacing:.1em; min-height:24px; }
+#defuse .hint{ font-size:13px; color:var(--dim); letter-spacing:.12em; margin-top:12px; }
 .hidden{ display:none !important; }
 `;
 
@@ -82,9 +96,15 @@ export class HUD {
       <div id="mission" class="panel"><div class="lbl">Operation</div><div class="op mil-title">Clear the Compound</div></div>
       <div id="hostiles" class="panel"><div class="lbl">Hostiles</div><b>0</b></div>
       <div id="objective" class="panel"><div class="lbl">Objective</div><div class="obj mil-title">Eliminate hostiles · reach <span class="arrow">EXTRACTION ▲</span></div></div>
+      <div id="timer" class="panel hidden"><div class="lbl">Detonation</div><div class="t">3:00</div></div>
       <div id="health" class="panel"><div class="lbl">Vitals</div><div class="row"><b>100</b><span class="dim">HP</span></div><div id="hpbar"><i></i></div></div>
       <div id="ammo" class="panel"><div class="gun">MK-4 CARBINE</div><div class="count"><b>30</b><s> / 150</s></div></div>
       <div id="feed"></div>
+      <div id="defuse" class="hidden"><div class="box">
+        <div class="ttl">⚠ Bomb · Enter Disarm Code</div>
+        <div class="code">_ _ _</div><div class="fb"></div>
+        <div class="hint">type digits · ENTER submit · ESC cancel</div>
+      </div></div>
     `;
     this.xhair = this.root.querySelector("#xhair");
     this.hitmark = this.root.querySelector("#hitmark");
@@ -114,15 +134,16 @@ export class HUD {
   }
   _clearOverlay() { const e = this.root.querySelector("#overlay"); if (e) e.remove(); }
 
-  showStart(onDeploy) {
+  showStart(onDeploy, opts = {}) {
+    const title = opts.title || "Clear the Compound";
+    const brief = opts.brief || "Push to the extraction zone. Eliminate anyone in your way.";
     const o = this._overlay(`
       <div class="sub">Tactical Operations · Solo Deployment</div>
-      <h1 class="mil-title">Clear the <span class="hz">Compound</span></h1>
+      <h1 class="mil-title">${title}</h1>
       <button class="cta" id="deploy">▶ Click to Deploy</button>
-      <div class="controls"><kbd>WASD</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>C</kbd> duck &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
-      Push to the extraction zone. Eliminate anyone in your way.</div>`);
-    const go = () => { onDeploy(); };
-    o.querySelector("#deploy").addEventListener("click", go);
+      <div class="controls"><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>C</kbd> duck &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
+      ${brief}</div>`);
+    o.querySelector("#deploy").addEventListener("click", () => onDeploy());
   }
   showPause(onResume) {
     const o = this._overlay(`<div class="sub">Paused</div><h1 class="mil-title">Stand <span class="hz">By</span></h1>
@@ -130,13 +151,18 @@ export class HUD {
     o.querySelector("#resume").addEventListener("click", onResume);
   }
   showWin(stats) {
-    this._overlay(`<div class="sub">Mission Accomplished</div><h1 class="mil-title">Extraction <span class="hz">Complete</span></h1>
-      <div class="stats">HOSTILES ELIMINATED &nbsp;<b>${stats.kills}/${stats.total}</b><br>ACCURACY &nbsp;<b>${stats.acc}%</b></div>
+    const rows = [];
+    if (stats.timeLeft) rows.push(`BOMB DISARMED &nbsp;<b>${stats.timeLeft} TO SPARE</b>`);
+    rows.push(`ENEMIES ELIMINATED &nbsp;<b>${stats.total ? stats.kills + "/" + stats.total : stats.kills}</b>`);
+    rows.push(`ACCURACY &nbsp;<b>${stats.acc}%</b>`);
+    const title = stats.title || 'Extraction <span class="hz">Complete</span>';
+    this._overlay(`<div class="sub">Mission Accomplished</div><h1 class="mil-title">${title}</h1>
+      <div class="stats">${rows.join("<br>")}</div>
       <button class="cta" id="again">▶ Redeploy</button>`);
     this.root.querySelector("#again").addEventListener("click", () => location.reload());
   }
-  showLose() {
-    this._overlay(`<div class="sub">You were eliminated</div><h1 class="mil-title">K · <span class="hz">I</span> · A</h1>
+  showLose(sub = "You were eliminated", title = 'K · <span class="hz">I</span> · A') {
+    this._overlay(`<div class="sub">${sub}</div><h1 class="mil-title">${title}</h1>
       <button class="cta" id="again">▶ Redeploy</button>`);
     this.root.querySelector("#again").addEventListener("click", () => location.reload());
   }
@@ -155,11 +181,36 @@ export class HUD {
     this.ammoEl.classList.toggle("low", !reloading && ammo <= 6);
   }
   setHostiles(n) { this.hostiles.textContent = n; }
+  // generic top-left counter (e.g. "Hostiles" remaining, or "Eliminated" kill count)
+  setCounter(label, value) { this.root.querySelector("#hostiles .lbl").textContent = label; this.hostiles.textContent = value; }
   setObjective(html) { const o = this.root.querySelector("#objective .obj"); if (o) o.innerHTML = html; }
   setOperation(name) { const o = this.root.querySelector("#mission .op"); if (o) o.textContent = name; }
 
+  // ---- bomb objective ----
+  showTimer(v) { this.root.querySelector("#timer").classList.toggle("hidden", !v); }
+  setMissionTimer(sec) {
+    sec = Math.max(0, sec);
+    const el = this.root.querySelector("#timer");
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    el.querySelector(".t").textContent = m + ":" + String(s).padStart(2, "0");
+    el.classList.toggle("danger", sec <= 30);
+  }
+  showDefuse(len = 3) { this._defLen = len; this.root.querySelector("#defuse").classList.remove("hidden"); this.updateDefuse("", ""); }
+  updateDefuse(typed, feedback) {
+    const d = this.root.querySelector("#defuse"); const len = this._defLen || 3;
+    let s = ""; for (let i = 0; i < len; i++) s += (i < typed.length ? typed[i] : "_") + (i < len - 1 ? " " : "");
+    d.querySelector(".code").textContent = s;
+    d.querySelector(".fb").textContent = feedback || "";
+  }
+  hideDefuse() { this.root.querySelector("#defuse").classList.add("hidden"); }
+
   showLoading() {
-    this._overlay(`<div class="sub">Preparing deployment</div><h1 class="mil-title">Loading<span class="hz">…</span></h1>`);
+    this._overlay(`<div class="sub">Preparing deployment</div><h1 class="mil-title">Loading<span class="hz">…</span></h1>
+      <div class="sub" id="loadpct">0%</div>`);
+  }
+  setLoadingProgress(done, total) {
+    const el = this.root.querySelector("#loadpct");
+    if (el) el.textContent = Math.round((done / total) * 100) + "%";
   }
 
   hitmarker(killed) {
