@@ -243,15 +243,21 @@ export class Enemy {
           this._spinAng += dt * this._spinRate;
           this.model.position.y = -0.9;                         // pivot around mid-body
           this.group.position.set(this.pos.x, Math.max(this.baseY, this._flyY) + 0.9, this.pos.z);
-          this.group.rotation.set(this._spinAng, this.yaw, this._spinAng * 0.4);
+          this.group.rotation.set(this._spinAng, this.yaw, 0); // forward flip, no sideways roll
           if (this._flyY <= this.baseY) { this._airborne = false; this._bv.set(0, 0, 0); }
         } else {
-          // grounded — drop back to a feet pivot and ease into a flat fallen pose, then stop
-          const k = Math.min(1, dt * 9);
-          this.model.position.y += (0 - this.model.position.y) * k;
-          this.group.position.set(this.pos.x, this.baseY, this.pos.z);
-          this.group.rotation.x += (-Math.PI / 2 - this.group.rotation.x) * k;
-          this.group.rotation.z += (0 - this.group.rotation.z) * k;
+          // grounded — settle into a clean flat prone pose (no sideways flopping)
+          if (!this._settled) {
+            // normalize the tumbled pitch so it eases to flat the SHORT way, and kill any roll
+            let rx = this.group.rotation.x % (Math.PI * 2);
+            if (rx > Math.PI) rx -= Math.PI * 2; else if (rx < -Math.PI) rx += Math.PI * 2;
+            this.group.rotation.set(rx, this.yaw, 0);
+            this.model.position.y = 0;
+            this.group.position.set(this.pos.x, this.baseY, this.pos.z);
+            this._settled = true;
+          }
+          const k = Math.min(1, dt * 10);
+          this.group.rotation.x += (-Math.PI / 2 - this.group.rotation.x) * k; // ease flat, lying down
         }
       } else {
         const p = Math.min(this.deathT / 0.7, 1);

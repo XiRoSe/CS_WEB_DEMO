@@ -25,13 +25,14 @@ export class Weapon {
     // secondary weapon: missile launcher (real model viewmodel), toggled with Q
     this.mode = "rifle";          // "rifle" | "launcher"
     this.rockets = 4;
-    this.rocketRate = 1.1;        // seconds between rockets
+    this.rocketRate = 3.0;        // reload time between rockets
     this._lastRocket = -10;
+    this._rocketLoaded = true;    // a missile sits in the tube; gone for 3s after firing
     this.launcher = new THREE.Group();
     this.launcher.visible = false;
-    this.launcher.position.set(0.3, -0.4, -0.5);
+    this.launcher.position.set(0.36, -0.46, -0.5);
     this.launcher.rotation.set(0.05, Math.PI, 0);
-    this.launcher.scale.setScalar(0.5);
+    this.launcher.scale.setScalar(0.98);
     camera.add(this.launcher);
 
     // recoil / sway state
@@ -110,6 +111,15 @@ export class Weapon {
   buildLauncher() {
     const lm = makeLauncher();
     if (lm) this.launcher.add(lm);
+    // a loaded missile poking out of the tube — hidden for 3s after firing, then "reloaded"
+    const m = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.5, 10), new THREE.MeshStandardMaterial({ color: 0x4b5320, roughness: 0.6, metalness: 0.3 }));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x8a2b1a, roughness: 0.5 })); nose.position.y = 0.36;
+    m.add(body, nose);
+    m.rotation.x = Math.PI / 2;        // lay along the tube (Z) axis
+    m.position.set(-0.01, 0.37, 0.82); // poking out of the muzzle / bore (launcher-local)
+    this.launcher.add(m);
+    this._loadedMissile = m;
   }
 
   // switch between the rifle and the missile launcher
@@ -124,12 +134,14 @@ export class Weapon {
     return !this.reloading && this.ammo > 0 && (t - this._lastShot) >= this.fireRate;
   }
 
-  canFireRocket(t) { return this.rockets > 0 && (t - this._lastRocket) >= this.rocketRate; }
+  canFireRocket(t) { return this.rockets > 0 && this._rocketLoaded; }
   fireRocket(t) {
     this.rockets--;
     this._lastRocket = t;
-    this.kick = 0.2; this.kickRot = 0.28; // big launcher recoil
-    this.audio?.explosion?.();             // launch whump (reuse blast clip, quiet)
+    this._rocketLoaded = false;            // tube is now empty until reloaded (~3s)
+    if (this._loadedMissile) this._loadedMissile.visible = false;
+    this.kick = 0.2; this.kickRot = 0.28;  // big launcher recoil
+    this.audio?.explosion?.();             // launch whump
   }
 
   fire(t) {
@@ -155,6 +167,12 @@ export class Weapon {
   }
 
   update(dt, moving) {
+    // reload the launcher tube ~3s after firing (the missile reappears + you can fire again)
+    if (!this._rocketLoaded && this.rockets > 0) {
+      this._reloadT2 = (this._reloadT2 || 0) + dt;
+      if (this._reloadT2 >= this.rocketRate) { this._rocketLoaded = true; this._reloadT2 = 0; if (this._loadedMissile) this._loadedMissile.visible = true; }
+    }
+
     // recoil spring recovery
     this.kick += (0 - this.kick) * Math.min(1, dt * 12);
     this.kickRot += (0 - this.kickRot) * Math.min(1, dt * 12);

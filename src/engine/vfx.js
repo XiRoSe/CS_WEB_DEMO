@@ -170,6 +170,12 @@ export class VFX {
     this._dustPuff(point, 0x5a1410, 0.32);
   }
 
+  // rocket exhaust: a little fire + a puff of smoke, left behind each frame in flight
+  rocketTrail(point) {
+    this._flash(point, 0.32, 0xffb24a);
+    this._dustPuff(point, 0x6b6660, 0.4);
+  }
+
   update(dt) {
     const camQ = this._cam && this._cam.quaternion;
     for (const t of this.tracers) if (t.life > 0) { t.life -= dt; t.mesh.material.opacity = Math.max(0, t.life / t.max); if (t.life <= 0) t.mesh.visible = false; }

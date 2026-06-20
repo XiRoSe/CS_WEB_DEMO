@@ -251,12 +251,20 @@ class Game {
     this.weapon.fireRocket(t);
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
     const pos = this.camera.position.clone().addScaledVector(dir, 0.8);
-    const vel = dir.clone().multiplyScalar(48); // fast, flat trajectory
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8),
-      new THREE.MeshStandardMaterial({ color: 0x5a3320, metalness: 0.4, roughness: 0.5 }));
+    const vel = dir.clone().multiplyScalar(50); // fast, flat trajectory
+    // a proper missile: olive body + red nose cone + tail fins, built along +Y then aimed along flight
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 10), new THREE.MeshStandardMaterial({ color: 0x4b5320, metalness: 0.3, roughness: 0.6 }));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x8a2b1a, metalness: 0.3, roughness: 0.5 })); nose.position.y = 0.38;
+    mesh.add(body, nose);
+    for (let i = 0; i < 4; i++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.13, 0.12), new THREE.MeshStandardMaterial({ color: 0x2c2e26 }));
+      const a = i * Math.PI / 2; fin.position.set(Math.cos(a) * 0.08, -0.26, Math.sin(a) * 0.08); fin.rotation.y = -a;
+      mesh.add(fin);
+    }
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()); // point along flight
     const rocket = new Projectile(this.scene, mesh, pos, vel, { gravity: 2.5, fuse: 4, detonateOnHit: true });
-    rocket.radius = 9; rocket.damage = 600; rocket.power = 16; rocket.scale = 1.0;
+    rocket.radius = 9; rocket.damage = 900; rocket.power = 16; rocket.scale = 1.0; rocket.isRocket = true;
     this._projectiles.push(rocket);
     this._fovKick = Math.min(this._fovKick + 2.5, 6);
   }
@@ -265,16 +273,18 @@ class Game {
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
       p.update(dt, this.level);
-      // rockets detonate on contact with the flying gunship
+      if (p.isRocket) this.vfx.rocketTrail(p.pos); // fire+smoke exhaust trail
+      // rockets detonate on contact with the flying gunship (generous radius — the gunship is big)
       if (p.detonateOnHit && this.heli && !this.heli.dead) {
         const dx = this.heli.pos.x - p.pos.x, dy = (this.heli.pos.y || 0) - p.pos.y, dz = this.heli.pos.z - p.pos.z;
-        if (dx * dx + dy * dy + dz * dz < 12) p.done = true;
+        if (dx * dx + dy * dy + dz * dz < 36) { p.done = true; p._heliHit = this.heli; } // ~6m
       }
       if (p.done) {
         const c = p.pos.clone();
         this.vfx.explosion(c, p.scale || 0.6);
         this.audio.explosion?.();
         applyBlast(c, { radius: p.radius || 6, damage: p.damage || 200, power: p.power || 15 }, this.combat.enemies, this.heli, this.level.dynamics);
+        if (p._heliHit && !p._heliHit.dead) p._heliHit.takeDamage(9999); // a direct rocket destroys the gunship
         this.hud._shake = Math.max(this.hud._shake, p.scale > 0.7 ? 10 : 6);
         p.dispose();
         this._projectiles.splice(i, 1);
