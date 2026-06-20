@@ -147,9 +147,10 @@ export class Enemy {
     this.blasted = true;
     if (!this.dead) this._die();
     this._bv = impulse.clone();
-    this._flyY = this.baseY + 0.4;
+    this._flyY = this.baseY + 0.2;
+    this._airborne = true;
     this._spinAng = 0;
-    this._spinRate = 5 + Math.random() * 5; // tumble speed, proportional-ish to the hit
+    this._spinRate = 4 + Math.random() * 4; // tumble speed
   }
 
   // shoved by a nearby blast but survived — slide away from the centre, briefly staggered
@@ -233,19 +234,22 @@ export class Enemy {
     if (this.dead) {
       this.deathT += dt;
       if (this.blasted) {
-        // launched by an explosion: ballistic arc + tumble while airborne, then settle flat on the ground
-        if (this._flyY > this.baseY + 0.04) {
-          this._bv.y -= 24 * dt; // gravity
+        // launched by an explosion: ballistic arc + tumble. Tumble pivots around the body CENTRE
+        // (model shifted down, group raised by the same amount) so it never sweeps underground.
+        if (this._airborne) {
+          this._bv.y -= 18 * dt; // gravity
           this.pos.x += this._bv.x * dt; this.pos.z += this._bv.z * dt;
-          this._flyY += this._bv.y * dt;
-          this._spinAng += dt * this._spinRate;                 // tumble in flight
-          this.group.position.set(this.pos.x, Math.max(this.baseY, this._flyY), this.pos.z);
-          this.group.rotation.set(this._spinAng, this.yaw, this._spinAng * 0.5);
+          this._flyY += this._bv.y * dt;                        // _flyY = feet height (>= ground)
+          this._spinAng += dt * this._spinRate;
+          this.model.position.y = -0.9;                         // pivot around mid-body
+          this.group.position.set(this.pos.x, Math.max(this.baseY, this._flyY) + 0.9, this.pos.z);
+          this.group.rotation.set(this._spinAng, this.yaw, this._spinAng * 0.4);
+          if (this._flyY <= this.baseY) { this._airborne = false; this._bv.set(0, 0, 0); }
         } else {
-          // hit the ground — stop, and ease into a flat "fallen" pose (no more spinning)
-          this._bv.set(0, 0, 0); this._flyY = this.baseY;
-          this.group.position.set(this.pos.x, this.baseY, this.pos.z);
+          // grounded — drop back to a feet pivot and ease into a flat fallen pose, then stop
           const k = Math.min(1, dt * 9);
+          this.model.position.y += (0 - this.model.position.y) * k;
+          this.group.position.set(this.pos.x, this.baseY, this.pos.z);
           this.group.rotation.x += (-Math.PI / 2 - this.group.rotation.x) * k;
           this.group.rotation.z += (0 - this.group.rotation.z) * k;
         }

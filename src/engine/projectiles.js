@@ -64,8 +64,8 @@ export function blastAt(center, pos, { radius, damage, power }) {
   const falloff = f * f;              // quadratic: close blasts hit much harder
   const nx = dist > 0.01 ? dx / dist : (Math.random() - 0.5);
   const nz = dist > 0.01 ? dz / dist : (Math.random() - 0.5);
-  const mag = power * falloff;        // horizontal shove
-  const up = power * falloff * 0.85 + 2; // vertical pop (always a little lift in the kill zone)
+  const mag = power * falloff * 0.6;     // horizontal shove
+  const up = power * falloff + 2;        // strong vertical pop -> a real arc
   return { dmg: damage * (0.4 + 0.6 * falloff), falloff, impulse: new THREE.Vector3(nx * mag, up, nz * mag) };
 }
 

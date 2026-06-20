@@ -240,7 +240,7 @@ class Game {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
       new THREE.MeshStandardMaterial({ color: 0x2c3322, roughness: 0.7, metalness: 0.3 }));
     const g = new Projectile(this.scene, mesh, pos, vel, { gravity: 18, fuse: 1.5, bounce: 0.35, spin: true });
-    g.radius = 7; g.damage = 320; g.power = 19; g.scale = 0.6;
+    g.radius = 7; g.damage = 320; g.power = 11; g.scale = 0.6;
     this._projectiles.push(g);
     this.audio.playBuf?.("clipout", 0.4);
   }
