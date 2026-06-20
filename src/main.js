@@ -19,6 +19,7 @@ import { preloadOperator } from "./game/operator.js";
 import { preloadVehicles } from "./engine/vehicles.js";
 import { preloadPickups } from "./engine/pickups.js";
 import { Projectile, applyBlast } from "./engine/projectiles.js";
+import { preloadWeapons } from "./engine/weapons.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
 
@@ -112,10 +113,11 @@ class Game {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
     // load models progressively (async, off the main thread) with a progress readout
-    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups()];
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons()];
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);
+    this.weapon.buildLauncher(); // launcher model is loaded now
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
     // warm up the procedural gunship build (populates the shared geometry caches) so its
@@ -245,6 +247,20 @@ class Game {
     this.audio.playBuf?.("clipout", 0.4);
   }
 
+  _fireRocket(t) {
+    this.weapon.fireRocket(t);
+    const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
+    const pos = this.camera.position.clone().addScaledVector(dir, 0.8);
+    const vel = dir.clone().multiplyScalar(48); // fast, flat trajectory
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8),
+      new THREE.MeshStandardMaterial({ color: 0x5a3320, metalness: 0.4, roughness: 0.5 }));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()); // point along flight
+    const rocket = new Projectile(this.scene, mesh, pos, vel, { gravity: 2.5, fuse: 4, detonateOnHit: true });
+    rocket.radius = 9; rocket.damage = 600; rocket.power = 16; rocket.scale = 1.0;
+    this._projectiles.push(rocket);
+    this._fovKick = Math.min(this._fovKick + 2.5, 6);
+  }
+
   _updateProjectiles(dt) {
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
@@ -321,7 +337,7 @@ class Game {
 
   _updateLaser() {
     if (!this.combat) return;
-    if (this.weapon.reloading) { this.laserBeam.visible = false; return; } // no laser mid-reload
+    if (this.weapon.mode === "launcher" || this.weapon.reloading) { this.laserBeam.visible = false; return; } // no laser on the launcher / mid-reload
     // aim point = straight down the camera (crosshair)
     const dir = this._laserDir; this.camera.getWorldDirection(dir);
     this._laserRay.set(this.camera.position, dir);
@@ -379,8 +395,11 @@ class Game {
     this.weapon.update(dt, this.controller.moving);
     this._updateLaser();
 
-    // fire (auto) — mouse or touch FIRE button
-    if ((this.input.mouseDown || this.input.touch.fire) && this.weapon.canFire(t)) {
+    // fire — mouse or touch FIRE button (rifle = hitscan; launcher = rocket)
+    const firing = this.input.mouseDown || this.input.touch.fire;
+    if (this.weapon.mode === "launcher") {
+      if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t);
+    } else if (firing && this.weapon.canFire(t)) {
       this.shotsFired++;
       this.combat.tryShoot(t);
       this.hud.bloom();
@@ -395,6 +414,11 @@ class Game {
     if (presses.includes("r")) this.weapon.reload();
     // grenade (right-click)
     if (presses.includes("rmb") && this.grenades > 0) this._throwGrenade();
+    // swap rifle <-> missile launcher (Q)
+    if (presses.includes("q")) {
+      const m = this.weapon.toggle();
+      this.hud.setWeaponName(m === "launcher" ? "MISSILE LAUNCHER" : "MK-4 CARBINE");
+    }
 
     this.combat.update(dt, t, this.camera.position);
     this._updateProjectiles(dt);
@@ -427,6 +451,7 @@ class Game {
       this.combat.extraHittables.push(this.heli.hitbox);
       this.audio.startRotor();
       this.hud.killFeed(this.cfg.messages.gunshipInbound);
+      this.hud.showPrompt('Press <b>Q</b> to use the Missile Launcher', 6);
     }
     if (this.heli) {
       this.heli.update(dt, t, this.camera.position, {
@@ -444,8 +469,9 @@ class Game {
 
     const heliAlive = this.heli && !this.heli.dead;
 
-    // HUD sync
-    this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
+    // HUD sync (ammo readout swaps to rockets in launcher mode)
+    if (this.weapon.mode === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
+    else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
 
     if (this.objType === "defuse") {

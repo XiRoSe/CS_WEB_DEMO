@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { COLORS, box } from "./builders.js";
+import { makeLauncher } from "./weapons.js";
 
 // First-person rifle: viewmodel, ammo, recoil spring, muzzle flash.
 export class Weapon {
@@ -20,6 +21,18 @@ export class Weapon {
     this.group = new THREE.Group();
     this._build();
     camera.add(this.group);
+
+    // secondary weapon: missile launcher (real model viewmodel), toggled with Q
+    this.mode = "rifle";          // "rifle" | "launcher"
+    this.rockets = 4;
+    this.rocketRate = 1.1;        // seconds between rockets
+    this._lastRocket = -10;
+    this.launcher = new THREE.Group();
+    this.launcher.visible = false;
+    this.launcher.position.set(0.3, -0.4, -0.5);
+    this.launcher.rotation.set(0.05, Math.PI, 0);
+    this.launcher.scale.setScalar(0.5);
+    camera.add(this.launcher);
 
     // recoil / sway state
     this.kick = 0;        // backward kick (springs to 0)
@@ -93,8 +106,30 @@ export class Weapon {
     return this._muzzleWorld;
   }
 
+  // add the launcher viewmodel once its model has loaded (called after preload)
+  buildLauncher() {
+    const lm = makeLauncher();
+    if (lm) this.launcher.add(lm);
+  }
+
+  // switch between the rifle and the missile launcher
+  toggle() {
+    this.mode = this.mode === "rifle" ? "launcher" : "rifle";
+    this.group.visible = this.mode === "rifle";
+    this.launcher.visible = this.mode === "launcher";
+    return this.mode;
+  }
+
   canFire(t) {
     return !this.reloading && this.ammo > 0 && (t - this._lastShot) >= this.fireRate;
+  }
+
+  canFireRocket(t) { return this.rockets > 0 && (t - this._lastRocket) >= this.rocketRate; }
+  fireRocket(t) {
+    this.rockets--;
+    this._lastRocket = t;
+    this.kick = 0.2; this.kickRot = 0.28; // big launcher recoil
+    this.audio?.explosion?.();             // launch whump (reuse blast clip, quiet)
   }
 
   fire(t) {
