@@ -85,6 +85,10 @@ export class Weapon {
     // charging handle
     P(box(0.03, 0.03, 0.06, dark, gun), 0.07, 0.06, 0.18);
 
+    // gloved hands at the rifle's known grip points
+    const rh = this._glove(); rh.position.set(0.0, -0.14, 0.2); rh.rotation.set(-0.3, 0, 0.2); this.group.add(rh);   // firing hand on the pistol grip
+    const lh = this._glove(); lh.position.set(0.0, -0.03, -0.33); lh.rotation.set(-0.1, 0, 0); this.group.add(lh);   // support hand on the handguard
+
     // muzzle flash (hidden by default)
     this.muzzle = new THREE.Group();
     this.muzzle.position.set(0, 0.02, -0.8);
@@ -102,6 +106,18 @@ export class Weapon {
     this._flashT = 0;
   }
 
+  // a gloved fist for gripping the viewmodels — a rounded knuckle + a thumb nub.
+  // (a fist reads as "gripping" from any angle and can't look broken like splayed fingers)
+  _glove() {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6f6650, roughness: 0.85, metalness: 0 });
+    const fist = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), mat);
+    fist.scale.set(1.15, 1.0, 1.35); g.add(fist);
+    const thumb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.045, 0), mat);
+    thumb.position.set(0.02, 0.08, 0.05); g.add(thumb);
+    return g;
+  }
+
   get muzzleWorld() {
     this.muzzle.getWorldPosition(this._muzzleWorld);
     return this._muzzleWorld;
@@ -113,13 +129,17 @@ export class Weapon {
     if (lm) this.launcher.add(lm);
     // a loaded missile poking out of the tube — hidden for 3s after firing, then "reloaded"
     const m = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.5, 10), new THREE.MeshStandardMaterial({ color: 0x4b5320, roughness: 0.6, metalness: 0.3 }));
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x8a2b1a, roughness: 0.5 })); nose.position.y = 0.36;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.44, 12), new THREE.MeshStandardMaterial({ color: 0x4b5320, roughness: 0.6, metalness: 0.3 }));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.24, 12), new THREE.MeshStandardMaterial({ color: 0x8a2b1a, roughness: 0.5 })); nose.position.y = 0.34;
     m.add(body, nose);
     m.rotation.x = Math.PI / 2;        // lay along the tube (Z) axis
-    m.position.set(-0.01, 0.37, 0.82); // poking out of the muzzle / bore (launcher-local)
+    m.position.set(0, 0.37, 0.78);     // filling the bore, on the barrel axis (launcher-local)
     this.launcher.add(m);
     this._loadedMissile = m;
+
+    // gloved hands at the launcher's measured grip + a support grip on the tube
+    const gh = this._glove(); gh.position.set(0.0, 0.14, -0.06); this.launcher.add(gh); // firing fist on the pistol grip
+    const sh = this._glove(); sh.position.set(0.0, 0.26, 0.5); this.launcher.add(sh);   // support fist gripping the tube
   }
 
   // switch between the rifle and the missile launcher
