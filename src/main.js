@@ -635,11 +635,12 @@ class Game {
 // desktop/laptop (mouse + keyboard). Phones/tablets get a friendly "play on a computer" screen.
 function isMobileOrTablet() {
   const ua = navigator.userAgent || "";
-  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Silk/i.test(ua);
-  // touch-only device with no fine pointer (mouse/trackpad) — also catches desktop-UA iPads
-  const m = window.matchMedia;
-  const coarseOnly = (navigator.maxTouchPoints || 0) > 0 && m && m("(pointer: coarse)").matches && !m("(pointer: fine)").matches;
-  return uaMobile || coarseOnly;
+  // Gate purely on the user-agent — pointer media queries falsely flag touchscreen LAPTOPS as
+  // mobile (their primary pointer reads as "coarse" even with a trackpad), which blocked desktops.
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Silk/i.test(ua)) return true;
+  // iPadOS 13+ reports a Mac user-agent but exposes multi-touch (real Macs report 0 touch points)
+  if (/Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1) return true;
+  return false;
 }
 
 function showDesktopOnlyScreen() {
