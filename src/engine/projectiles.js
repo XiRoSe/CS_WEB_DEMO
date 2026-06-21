@@ -24,12 +24,18 @@ export class Projectile {
     const nx = this.pos.x + this.vel.x * dt, nz = this.pos.z + this.vel.z * dt;
     const ny = this.pos.y + this.vel.y * dt;
 
-    // hit a tall structure?
+    // hit a structure?
     if (level && level.colliders) {
       for (const c of level.colliders) {
-        if (c.top > 1.2 && nx > c.minX - 0.2 && nx < c.maxX + 0.2 && nz > c.minZ - 0.2 && nz < c.maxZ + 0.2 && ny < c.top) {
+        const inAABB = nx > c.minX - 0.2 && nx < c.maxX + 0.2 && nz > c.minZ - 0.2 && nz < c.maxZ + 0.2;
+        if (!inAABB) continue;
+        // rockets treat tall things (walls/towers/buildings, top>=2.8) as full-height so they always
+        // detonate on them; grenades only collide below the top so they can be lobbed over walls.
+        const tall = c.top >= 2.8;
+        const blocks = this.detonateOnHit ? (tall || (c.top > 1.2 && ny < c.top)) : (c.top > 1.2 && ny < c.top);
+        if (blocks) {
           if (this.detonateOnHit) { this.pos.set(nx, Math.max(0.2, ny), nz); this.done = true; return; }
-          this.vel.x *= -0.4; this.vel.z *= -0.4; // grenade bounces off the wall
+          this.vel.x *= -0.4; this.vel.z *= -0.4; // grenade bounces off
           break;
         }
       }

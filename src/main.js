@@ -76,12 +76,13 @@ class Game {
     if (this.objType === "defuse") {
       this.bombTime = this.cfg.objective.timeLimit;
       this.codeLen = this.cfg.objective.codeLength || 3;
-      // one solvable code: an arithmetic sequence the player can deduce from a single hint
-      const maxStep = Math.max(1, Math.floor(8 / (this.codeLen - 1)));
-      const step = 1 + Math.floor(Math.random() * maxStep);
-      const first = 1 + Math.floor(Math.random() * Math.max(1, 9 - (this.codeLen - 1) * step));
-      this.bombCode = Array.from({ length: this.codeLen }, (_, i) => first + i * step).join("");
-      this.bombHint = `HINT — first digit ${first}, then +${step} each`;
+      // one solvable code, but it takes a bit of thinking: the product of two 2-digit numbers
+      // (11..29 each -> always a 3-digit answer, 121..841)
+      const a = 11 + Math.floor(Math.random() * 19);
+      const b = 11 + Math.floor(Math.random() * 19);
+      this.bombCode = String(a * b);
+      this.codeLen = this.bombCode.length;
+      this.bombHint = `HINT — code = ${a} × ${b}`;
       this.maxTries = this.cfg.objective.maxTries || 3;
       this.codeTries = 0;
       this.defusing = false; this.defused = false; this.codeTyped = ""; this.codeFeedback = "";

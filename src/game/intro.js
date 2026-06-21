@@ -168,7 +168,8 @@ export class Intro {
     // --- player: ride tucked just under the heli during the flight, then fast-rope down only ON ARRIVAL ---
     const arrive = 0.7;                         // heli reaches the compound (matches the hover threshold)
     const flightY = this.anchor.y - 2.0;        // tucked right under the belly while flying
-    const slideK = k < arrive ? 0 : Math.min((k - arrive) / (1 - arrive), 1);
+    const slideSpan = 0.15;                     // faster fast-rope descent (~1.8s, was ~3.6s)
+    const slideK = k < arrive ? 0 : Math.min((k - arrive) / slideSpan, 1);
     const slide = slideK * slideK * (3 - 2 * slideK); // smoothstep
     // horizontal: hang under the anchor while flying, settle onto the spawn as he ropes down
     this.playerPos.x = this.anchor.x + (this.spawn.x - this.anchor.x) * slide;
