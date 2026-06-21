@@ -28,7 +28,7 @@ const CSS = `
 .panel .lbl{ font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.18em; }
 #mission{ left:18px; top:16px; }
 #mission .op{ font-size:15px; }
-#hostiles{ left:18px; top:64px; }
+#hostiles{ right:18px; top:16px; text-align:right; }
 #hostiles b{ font-size:26px; font-weight:700; color:var(--hz); line-height:1; }
 #objective{ left:50%; top:18px; transform:translateX(-50%); text-align:center; }
 #objective .arrow{ color:var(--hz); }
@@ -46,7 +46,7 @@ const CSS = `
 #ammo.low .count b{ color:var(--danger); animation:blink .6s steps(2) infinite; }
 @keyframes blink{ 50%{ opacity:.35; } }
 
-#feed{ right:18px; top:16px; text-align:right; display:flex; flex-direction:column; gap:4px; }
+#feed{ position:absolute; right:18px; top:86px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px; z-index:5; }
 #feed .k{ font-size:13px; color:var(--hud); background:var(--panel); border-right:3px solid var(--danger);
   padding:3px 10px; letter-spacing:.1em; animation:slideIn .25s ease; }
 @keyframes slideIn{ from{ transform:translateX(20px); opacity:0; } }
