@@ -630,4 +630,34 @@ class Game {
   }
 }
 
-window.__game = new Game();
+// --- Mobile gate -------------------------------------------------------------
+// The mobile/touch controls (touch.js) are kept intact, but for now the game is gated to
+// desktop/laptop (mouse + keyboard). Phones/tablets get a friendly "play on a computer" screen.
+function isMobileOrTablet() {
+  const ua = navigator.userAgent || "";
+  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Silk/i.test(ua);
+  // touch-only device with no fine pointer (mouse/trackpad) — also catches desktop-UA iPads
+  const m = window.matchMedia;
+  const coarseOnly = (navigator.maxTouchPoints || 0) > 0 && m && m("(pointer: coarse)").matches && !m("(pointer: fine)").matches;
+  return uaMobile || coarseOnly;
+}
+
+function showDesktopOnlyScreen() {
+  const d = document.createElement("div");
+  d.style.cssText =
+    "position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
+    "text-align:center;padding:34px;background:#0a0e13;color:#e8eef2;font-family:'Rajdhani','Saira Condensed',system-ui,sans-serif;";
+  d.innerHTML =
+    '<div style="letter-spacing:.3em;text-transform:uppercase;font-size:12px;color:#8a9bb0;margin-bottom:16px;">Operation Briefing</div>' +
+    '<div style="font-size:30px;font-weight:700;letter-spacing:.03em;line-height:1.25;max-width:560px;">' +
+      'This operation runs on <span style="color:#f0a000;">desktop &amp; laptop</span> only — for now.</div>' +
+    '<div style="margin-top:18px;font-size:16px;color:#aab6c2;max-width:520px;line-height:1.55;">' +
+      'It needs a mouse and keyboard for proper aiming and controls. Mobile support is coming — please deploy from a computer. 🖥️</div>';
+  document.body.appendChild(d);
+}
+
+if (isMobileOrTablet()) {
+  showDesktopOnlyScreen();
+} else {
+  window.__game = new Game();
+}
