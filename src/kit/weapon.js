@@ -35,6 +35,15 @@ export class Weapon {
     this.launcher.scale.setScalar(0.98);
     camera.add(this.launcher);
 
+    // sci-fi energy weapons — unlocked via island pickups, cycled with Q
+    this.owned = ["rifle", "launcher"]; // mode order for cycling
+    this.plasmaRate = 0.5; this._lastPlasma = -10;
+    this.arcRate = 0.7; this._lastArc = -10;
+    this.energy = new THREE.Group(); this.energy.visible = false;
+    this.energy.position.set(0.26, -0.2, -0.5); this.energy.rotation.set(0, Math.PI, 0);
+    camera.add(this.energy);
+    this._buildEnergy();
+
     // recoil / sway state
     this.kick = 0;        // backward kick (springs to 0)
     this.kickRot = 0;     // muzzle rise
@@ -122,17 +131,51 @@ export class Weapon {
     this._loadedMissile = m;
   }
 
-  // switch between the rifle and the missile launcher
-  toggle() {
-    this.mode = this.mode === "rifle" ? "launcher" : "rifle";
+  // a sleek glowing energy blaster (shared viewmodel for the plasma + arc weapons; emitter recolored per mode)
+  _buildEnergy() {
+    const g = this.energy, body = { metalness: 0.7, roughness: 0.3 };
+    g.add(box(0.12, 0.14, 0.5, 0x2b3038, body));
+    const grip = box(0.08, 0.16, 0.1, 0x20242a, body); grip.position.set(0, -0.13, 0.16); g.add(grip);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 10), new THREE.MeshStandardMaterial({ color: 0x3a4250, metalness: 0.6, roughness: 0.4 }));
+    barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.02, -0.32); g.add(barrel);
+    this._emitterMat = new THREE.MeshStandardMaterial({ color: 0x6fd0ff, emissive: 0x4fb4ff, emissiveIntensity: 2.6 });
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), this._emitterMat); core.position.set(0, 0.02, -0.5); g.add(core);
+    for (let i = 0; i < 3; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 16), this._emitterMat); ring.position.set(0, 0.02, -0.36 - i * 0.06); g.add(ring); }
+  }
+  _setEnergyColor(mode) {
+    const arc = mode === "arc";
+    this._emitterMat.color.setHex(arc ? 0xb98bff : 0x6fd0ff);
+    this._emitterMat.emissive.setHex(arc ? 0x7a3aff : 0x4fb4ff);
+  }
+  _showViewmodel() {
+    const energy = this.mode === "plasma" || this.mode === "arc";
     this.group.visible = this.mode === "rifle";
     this.launcher.visible = this.mode === "launcher";
+    this.energy.visible = energy;
+    if (energy) this._setEnergyColor(this.mode);
+  }
+
+  // cycle through owned weapons (Q)
+  toggle() {
+    const i = this.owned.indexOf(this.mode);
+    this.mode = this.owned[(i + 1) % this.owned.length];
+    this._showViewmodel();
     return this.mode;
+  }
+  // unlock + equip a weapon (from a pickup)
+  give(mode) {
+    if (!this.owned.includes(mode)) this.owned.push(mode);
+    this.mode = mode; this._showViewmodel();
   }
 
   canFire(t) {
     return !this.reloading && this.ammo > 0 && (t - this._lastShot) >= this.fireRate;
   }
+
+  canFirePlasma(t) { return this.mode === "plasma" && (t - this._lastPlasma) >= this.plasmaRate; }
+  firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.shoot?.(); }
+  canFireArc(t) { return this.mode === "arc" && (t - this._lastArc) >= this.arcRate; }
+  fireArc(t) { this._lastArc = t; this.kick = 0.06; this.kickRot = 0.08; this.audio?.shoot?.(); }
 
   canFireRocket(t) { return this.rockets > 0 && this._rocketLoaded; }
   fireRocket(t) {

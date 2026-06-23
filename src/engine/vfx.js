@@ -176,6 +176,31 @@ export class VFX {
     this._dustPuff(point, 0x6b6660, 0.4);
   }
 
+  // glowing plasma-bolt trail
+  plasmaTrail(point) { this._flash(point, 0.34, 0x4fb4ff); }
+
+  // sci-fi plasma detonation: a blue/cyan energy fireball + shockwave + sparks
+  energyBoom(point, scale = 1) {
+    for (let i = 0; i < 7; i++) {
+      const p = point.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.2, (Math.random() - 0.3) * 3.2, (Math.random() - 0.5) * 3.2));
+      this._flash(p, (3.2 + Math.random() * 2.4) * scale, i % 2 ? 0x7fd6ff : 0x2a8cff);
+    }
+    this._embers(point, 0x9fe8ff, 28, 14);
+    this._shockwave(point);
+    this._spawnDebris(point, Math.round(10 * scale));
+  }
+
+  // a jagged electric beam from a to b (reuses the tracer pool)
+  lightning(a, b) {
+    const prev = a.clone(), p = new THREE.Vector3();
+    for (let i = 1; i <= 4; i++) {
+      p.copy(a).lerp(b, i / 4);
+      if (i < 4) p.add(new THREE.Vector3((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.9));
+      this.tracer(prev, p); prev.copy(p);
+    }
+    this._flash(b, 0.7, 0x9fe8ff);
+  }
+
   update(dt) {
     const camQ = this._cam && this._cam.quaternion;
     for (const t of this.tracers) if (t.life > 0) { t.life -= dt; t.mesh.material.opacity = Math.max(0, t.life / t.max); if (t.life <= 0) t.mesh.visible = false; }

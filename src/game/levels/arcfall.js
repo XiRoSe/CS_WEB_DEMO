@@ -25,9 +25,11 @@ export const arcfall = {
                   [-44, 64], [90, -58], [-86, -52], [118, 42], [-118, -32], [16, 96]];
     for (const [x, z] of arcs) b.arc(x, z);
 
-    // gift crates (loot: ammo / health / grenades)
+    // gift crates (loot: ammo / health / grenades + two sci-fi weapons to find)
     b.giftCrate(8, -22, "ammo"); b.giftCrate(-22, 27, "health"); b.giftCrate(48, 42, "grenade");
     b.giftCrate(-62, -16, "ammo"); b.giftCrate(96, 12, "health"); b.giftCrate(-100, -26, "grenade");
+    b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
+    b.giftCrate(-50, 70, "arc");     // ARC LANCE out by the lake
 
     // hostiles — all terrain-following: raptors + spiders charge, a T-Rex roams, a giant mech guards a far arc
     const raptors = [[18, -26], [-24, -18], [40, 48], [-40, 58], [78, -46], [12, 70], [-70, 40], [64, 8]];

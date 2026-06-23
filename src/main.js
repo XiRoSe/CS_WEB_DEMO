@@ -265,11 +265,56 @@ class Game {
     this._fovKick = Math.min(this._fovKick + 2.5, 6);
   }
 
+  _weaponName(mode) {
+    return { rifle: "MK-4 CARBINE", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", arc: "ARC LANCE" }[mode] || "MK-4 CARBINE";
+  }
+
+  // Plasma Cannon: a glowing energy bolt that detonates in a big blue blast.
+  _firePlasma(t) {
+    this.weapon.firePlasma(t);
+    const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
+    const pos = this.camera.position.clone().addScaledVector(dir, 0.9);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10),
+      new THREE.MeshStandardMaterial({ color: 0xbfeaff, emissive: 0x2a8cff, emissiveIntensity: 3 }));
+    mesh.material.userData.outlineParameters = { visible: false };
+    const bolt = new Projectile(this.scene, mesh, pos, dir.clone().multiplyScalar(72), { gravity: 0, fuse: 3, detonateOnHit: true });
+    const b = this.cfg.balance.plasma;
+    bolt.radius = b.radius; bolt.damage = b.damage; bolt.power = b.power; bolt.scale = 1.1; bolt.energy = true; bolt.units = b.units;
+    this._projectiles.push(bolt);
+    this._fovKick = Math.min(this._fovKick + 1.6, 5);
+  }
+
+  // Arc Lance: a chaining lightning beam — hits the targeted enemy, then leaps to nearby ones.
+  _fireArc(t) {
+    this.weapon.fireArc(t);
+    this.hud.bloom();
+    const b = this.cfg.balance.arc;
+    const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
+    this._arcRay = this._arcRay || new THREE.Raycaster(); this._arcRay.far = 110;
+    this._arcRay.set(this.camera.position, dir);
+    const start = this.camera.position.clone().addScaledVector(dir, 1.0);
+    const live = this.combat.enemies.filter((e) => !e.dead);
+    const hits = this._arcRay.intersectObjects(live.map((e) => e.hitbox), true);
+    let target = null;
+    if (hits.length) { let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; target = o?.userData?.enemy; }
+    if (!target) { this.vfx.lightning(start, start.clone().addScaledVector(dir, 70)); return; } // missed — zap into the distance
+    const wp = (e) => e.hitbox.getWorldPosition(new THREE.Vector3());
+    this.vfx.lightning(start, wp(target)); target.takeDamage(b.damage); this.vfx.hitPuff(wp(target));
+    const chained = new Set([target]); let prev = target;
+    for (let n = 0; n < b.chains; n++) { // leap to the nearest un-zapped enemy
+      let best = null, bd = b.chainRange * b.chainRange;
+      for (const e of this.combat.enemies) { if (e.dead || chained.has(e)) continue; const d = e.pos.distanceToSquared(prev.pos); if (d < bd) { bd = d; best = e; } }
+      if (!best) break;
+      this.vfx.lightning(wp(prev), wp(best)); best.takeDamage(b.damage); this.vfx.hitPuff(wp(best)); chained.add(best); prev = best;
+    }
+  }
+
   _updateProjectiles(dt) {
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
       p.update(dt, this.level);
-      if (p.isRocket) this.vfx.rocketTrail(p.pos); // fire+smoke exhaust trail
+      if (p.energy) this.vfx.plasmaTrail(p.pos); // glowing plasma trail
+      else if (p.isRocket) this.vfx.rocketTrail(p.pos); // fire+smoke exhaust trail
       // rockets detonate on contact with the flying gunship (generous radius — the gunship is big)
       if (p.detonateOnHit && this.heli && !this.heli.dead) {
         const dx = this.heli.pos.x - p.pos.x, dy = (this.heli.pos.y || 0) - p.pos.y, dz = this.heli.pos.z - p.pos.z;
@@ -277,11 +322,11 @@ class Game {
       }
       if (p.done) {
         const c = p.pos.clone();
-        this.vfx.explosion(c, p.scale || 0.6);
+        if (p.energy) this.vfx.energyBoom(c, p.scale || 1); else this.vfx.explosion(c, p.scale || 0.6);
         this.audio.explosion?.();
         // enemies/props take the big AoE damage; the heli + destructibles use the "unit" scale (below)
         applyBlast(c, { radius: p.radius || 6, damage: p.damage || 200, power: p.power || 15 }, this.combat.enemies, null, this.level.dynamics);
-        const units = p.isRocket ? this.cfg.balance.units.rocket : this.cfg.balance.units.grenade; // rocket one-shots the gunship
+        const units = p.units || (p.isRocket ? this.cfg.balance.units.rocket : this.cfg.balance.units.grenade);
         const R = p.radius || 6;
         // gunship: a direct rocket hit, or being caught in the blast, applies unit damage
         if (this.heli && !this.heli.dead) {
@@ -374,10 +419,15 @@ class Game {
     this.weapon.update(dt, this.controller.moving);
     this._updateLaser();
 
-    // fire — mouse or touch FIRE button (rifle = hitscan; launcher = rocket)
+    // fire — mouse or touch FIRE button (per weapon mode)
     const firing = this.input.mouseDown || this.input.touch.fire;
-    if (this.weapon.mode === "launcher") {
+    const mode = this.weapon.mode;
+    if (mode === "launcher") {
       if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t);
+    } else if (mode === "plasma") {
+      if (firing && this.weapon.canFirePlasma(t)) this._firePlasma(t);
+    } else if (mode === "arc") {
+      if (firing && this.weapon.canFireArc(t)) this._fireArc(t);
     } else if (firing && this.weapon.canFire(t)) {
       this.shotsFired++;
       this.combat.tryShoot(t);
@@ -394,10 +444,7 @@ class Game {
     // grenade (right-click)
     if (presses.includes("rmb") && this.grenades > 0) this._throwGrenade();
     // swap rifle <-> missile launcher (Q)
-    if (presses.includes("q")) {
-      const m = this.weapon.toggle();
-      this.hud.setWeaponName(m === "launcher" ? "MISSILE LAUNCHER" : "MK-4 CARBINE");
-    }
+    if (presses.includes("q")) this.hud.setWeaponName(this._weaponName(this.weapon.toggle()));
 
     this.combat.update(dt, t, this.camera.position);
     this._updateProjectiles(dt);
@@ -429,7 +476,10 @@ class Game {
           this.audio.playBuf?.("clipin", 0.6);
           if (gf.kind === "grenade") { this.grenades += 2; this.hud.setGrenades(this.grenades); this.hud.notify("+2 GRENADES · GIFT"); }
           else if (gf.kind === "health") { this.health = Math.min(this.cfg.player.maxHealth, this.health + 40); this.hud.notify("+40 HEALTH · GIFT"); }
-          else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
+          else if (gf.kind === "plasma" || gf.kind === "arc") {
+            this.weapon.give(gf.kind); this.hud.setWeaponName(this._weaponName(gf.kind));
+            this.hud.notify(`✦ ${this._weaponName(gf.kind)} ACQUIRED — Q to cycle`);
+          } else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
         }
       }
     }
@@ -466,6 +516,7 @@ class Game {
 
     // HUD sync (ammo readout swaps to rockets in launcher mode)
     if (this.weapon.mode === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
+    else if (this.weapon.mode === "plasma" || this.weapon.mode === "arc") this.hud.setAmmo("∞", "∞", false);
     else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
 

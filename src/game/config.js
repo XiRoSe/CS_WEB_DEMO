@@ -25,6 +25,8 @@ export const config = {
     units: { rifle: 1, grenade: 5, rocket: 15 },          // damage dealt to destructibles + gunship
     grenade: { radius: 7, damage: 320, power: 11 },        // AoE damage to enemies + knockback impulse
     rocket: { radius: 9, damage: 900, power: 16 },
+    plasma: { radius: 8, damage: 520, power: 14, units: 8 },   // sci-fi plasma cannon: big blue blast
+    arc: { damage: 60, chains: 3, chainRange: 14 },            // chaining lightning lance
     gunship: { hp: 15 },                                   // in units (rifle=1 -> 15 shots; one rocket=15)
     vehicle: { blastRadius: 11, blastDamage: 320, blastPower: 20 }, // a destroyed car's explosion (vs enemies)
     destructibles: { barrelHp: [2, 3], fuelTankHp: 4, vehicleHp: [7, 8] }, // HP in units
