@@ -157,9 +157,11 @@ class Game {
     this.weapon.group.visible = false; // hands on the rope/canopy, not the gun
     const parachute = this.cfg.intro.style === "parachute";
     if (!parachute) this.audio.startRotor();
+    const sp = this.level.playerSpawn;
+    const groundY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     this.intro = parachute
-      ? new ParachuteIntro(this.scene, this.camera, this.level.playerSpawn)
-      : new Intro(this.scene, this.camera, this.level.playerSpawn);
+      ? new ParachuteIntro(this.scene, this.camera, sp, groundY)
+      : new Intro(this.scene, this.camera, sp);
     this.intro.start();
     this.hud.killFeed(this.cfg.messages.deployHint);
     this._introT = 0;
