@@ -1,62 +1,78 @@
 import * as THREE from "three";
-import { box, cyl, COLORS } from "../../engine/primitives.js";
+import { CREATURES } from "./creature-assets.js";
 
-// A giant slow mech: tanky, walks toward the player and fires its arm-cannon (LOS-checked). Goes up
-// in a big explosion on death. Drop-in compatible with Combat (same interface as Enemy).
+// A giant animated mech (Quaternius): lumbers toward the player and fires (LOS-checked), big boom on
+// death. Drop-in compatible with Combat (pos, hp, dead, counted, removable, hitbox, takeDamage, update).
 export class Robot {
   constructor(scene, spawn, level) {
     this.scene = scene; this.level = level;
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.hp = spawn.hp || 600;
-    this.speed = spawn.speed || 1.4;
+    this.speed = spawn.speed || 1.6;
     this.dead = false; this.counted = false; this.removable = false;
-    this.yaw = 0; this._t = Math.random() * 6; this._fireCd = 2.5; this._deathT = 0; this._needBoom = false;
+    this.yaw = 0; this._fireCd = 2.5; this._deathT = 0; this._needBoom = false; this._cur = null; this._curAction = null;
     this._muzzle = new THREE.Vector3(); this._tmp = new THREE.Vector3();
+
     this.group = new THREE.Group(); this.group.position.copy(this.pos); this.scene.add(this.group);
-    this._build();
+    const inst = CREATURES.mech.make();
+    if (inst) {
+      this.model = inst.model;
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+      this.group.add(this.model);
+      this.mixer = new THREE.AnimationMixer(this.model);
+      this._actions = {}; for (const c of inst.animations) this._actions[c.name] = this.mixer.clipAction(c);
+      this._play("idle");
+    }
+    this._gunTip = new THREE.Object3D(); this._gunTip.position.set(0, 5.2, 2.4); this.group.add(this._gunTip);
+    const hbMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    hbMat.userData.outlineParameters = { visible: false }; // no ink outline on the invisible hitbox
+    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(3.2, 7.2, 3.0), hbMat);
+    this.hitbox.position.y = 3.6; this.hitbox.userData.enemy = this; this.group.add(this.hitbox);
   }
 
-  _build() {
-    const dark = COLORS.metalDark, metal = COLORS.metal;
-    const torso = box(2.2, 2.4, 1.6, metal, { metalness: 0.6, roughness: 0.4 }); torso.position.y = 4.6; torso.castShadow = true; this.group.add(torso);
-    const head = box(1.0, 0.9, 1.0, dark, { metalness: 0.6 }); head.position.y = 6.1; this.group.add(head);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff3a2a, emissive: 0xff2a18, emissiveIntensity: 2.6 }));
-    eye.position.set(0, 6.12, 0.52); this.group.add(eye);
-    const arm = cyl(0.32, 0.32, 2.1, dark, 10, { metalness: 0.6 }); arm.rotation.x = Math.PI / 2; arm.position.set(1.45, 4.8, 0.7); this.group.add(arm);
-    for (const dx of [-0.72, 0.72]) { const leg = box(0.72, 3.4, 0.85, dark, { metalness: 0.5 }); leg.position.set(dx, 1.7, 0); leg.castShadow = true; this.group.add(leg); }
-    this._gunTip = new THREE.Object3D(); this._gunTip.position.set(1.45, 4.8, 1.8); this.group.add(this._gunTip);
-    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(2.8, 6.6, 2.1), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
-    this.hitbox.position.y = 3.4; this.hitbox.userData.enemy = this; this.group.add(this.hitbox);
+  _play(key, fade = 0.25, once = false) {
+    if (!this._actions) return;
+    const name = Object.keys(this._actions).find((n) => n.toLowerCase() === key) || Object.keys(this._actions).find((n) => n.toLowerCase().includes(key));
+    if (!name || name === this._cur) return;
+    const next = this._actions[name];
+    if (once) { next.setLoop(THREE.LoopOnce, 1); next.clampWhenFinished = true; } else next.setLoop(THREE.LoopRepeat, Infinity);
+    if (this._curAction) this._curAction.fadeOut(fade);
+    next.reset().fadeIn(fade).play();
+    this._cur = name; this._curAction = next;
   }
 
   takeDamage(dmg) { if (this.dead) return; this.hp -= dmg; if (this.hp <= 0) this._die(); }
-  _die() { this.dead = true; this.hitbox.userData.enemy = null; this.hitbox.visible = false; this._deathT = 1.6; this._needBoom = true; }
+  _die() { this.dead = true; this.hitbox.userData.enemy = null; this.hitbox.visible = false; this._deathT = 2.0; this._needBoom = true; this._play("death", 0.12, true); }
 
   update(dt, playerPos, ctx) {
-    this._t += dt;
-    if (this.dead) { // big boom, then topple + sink
-      if (this._needBoom) { this._needBoom = false; ctx.vfx?.explosion?.(this._tmp.copy(this.group.position).setY(4), 1.9); ctx.audio?.explosion?.(); }
-      this.group.rotation.z += dt * 1.1; this.group.position.y -= dt * 2.4;
+    this.mixer?.update(dt);
+    const groundY = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
+    if (this.dead) {
+      if (this._needBoom) { this._needBoom = false; ctx.vfx?.explosion?.(this._tmp.copy(this.group.position).setY(groundY + 4), 1.9); ctx.audio?.explosion?.(); }
+      this.group.position.y = groundY;
       if ((this._deathT -= dt) <= 0) this.removable = true;
       return;
     }
-    const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z;
-    const d = Math.hypot(dx, dz) || 1;
+    const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
-    if (d > 14) { // lumber toward the player
+    if (d > 16) { // lumber toward the player
       const step = this.speed * dt;
       const nx = this.pos.x + (dx / d) * step, nz = this.pos.z + (dz / d) * step;
       if (!this._blocked(nx, this.pos.z)) this.pos.x = nx;
       if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
-      this.group.position.set(this.pos.x, Math.abs(Math.sin(this._t * 3)) * 0.12, this.pos.z);
+      this._play("walk");
+    } else {
+      this._play("idle");
     }
+    this.group.position.set(this.pos.x, groundY, this.pos.z);
     if ((this._fireCd -= dt) <= 0 && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z, 2.8)) {
-      this._fireCd = 1.6 + Math.random() * 1.2;
+      this._fireCd = 1.7 + Math.random() * 1.1;
+      this._play("shoot", 0.1, true);
       this._gunTip.getWorldPosition(this._muzzle);
       ctx.vfx?.muzzle?.(this._muzzle);
       ctx.vfx?.tracer?.(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z));
       ctx.audio?.heliShot?.();
-      if (Math.random() < 0.4) ctx.onPlayerHit?.(10 + Math.floor(Math.random() * 8));
+      if (Math.random() < 0.45) ctx.onPlayerHit?.(10 + Math.floor(Math.random() * 9));
     }
   }
 

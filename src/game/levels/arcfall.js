@@ -2,9 +2,9 @@ import { COLORS } from "../../engine/primitives.js";
 
 // "The Lost Arcs" — a daytime island: parachute in, hunt the 12 lost arcs, fight whatever's guarding
 // them. A different game on the same engine/kit (Fortnite-drop × Helldivers-solo flavored).
-export const arcIsland = {
-  id: "arc-island",
-  name: "THE LOST ARCS",
+export const arcfall = {
+  id: "arcfall",
+  name: "ARCFALL",
   config: {
     scene: { sky: "day", fog: { color: 0xbfe0f4, near: 160, far: 700 }, fov: 75 },
     intro: { enabled: true, style: "parachute", spottedCalloutAt: 4.5 },
@@ -37,11 +37,14 @@ export const arcIsland = {
     b.giftCrate(8, -22, "ammo"); b.giftCrate(-22, 27, "health"); b.giftCrate(48, 42, "grenade");
     b.giftCrate(-62, -16, "ammo"); b.giftCrate(96, 12, "health"); b.giftCrate(-100, -26, "grenade");
 
-    // hostiles: monsters charge you; raiders shoot; a giant robot guards a far arc
-    const monsters = [[18, -26], [-24, -18], [40, 48], [-40, 58], [78, -46], [12, 70]];
-    for (const [x, z] of monsters) b.enemy({ kind: "monster", x, z, hp: 70, speed: 4.2 });
+    // hostiles: raptors + spiders charge you, raiders shoot, a T-Rex roams, a giant mech guards a far arc
+    const raptors = [[18, -26], [-24, -18], [40, 48], [-40, 58], [78, -46], [12, 70]];
+    for (const [x, z] of raptors) b.enemy({ kind: "monster", x, z });
+    const spiders = [[-30, 40], [60, -20], [-90, -20], [30, -55]];
+    for (const [x, z] of spiders) b.enemy({ kind: "spider", x, z });
     const raiders = [[-26, -22], [56, -34], [-60, 26], [-76, -40], [100, 30]];
     for (const [x, z] of raiders) b.enemy({ x, z, patrol: [{ x, z }, { x: x + 6, z: z + 4 }], hp: 100, speed: 2.6 });
-    b.enemy({ kind: "robot", x: 118, z: 46, hp: 600, speed: 1.4 }); // giant robot near a far arc
+    b.enemy({ kind: "trex", x: -110, z: 60 });            // T-Rex mini-boss roaming the far side
+    b.enemy({ kind: "robot", x: 118, z: 46 });            // giant mech guarding a far arc
   },
 };

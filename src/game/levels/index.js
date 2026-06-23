@@ -1,11 +1,11 @@
 import { compound } from "./compound.js";
 import { desertBase } from "./desert-base.js";
-import { arcIsland } from "./arc-island.js";
+import { arcfall } from "./arcfall.js";
 
 // Level registry. Add a level here and it's selectable via ?level=<id>.
 export const levels = {
   compound,
   "desert-base": desertBase,
-  "arc-island": arcIsland,
+  arcfall,
 };
 export const DEFAULT_LEVEL = "desert-base";

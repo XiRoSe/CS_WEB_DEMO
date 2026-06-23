@@ -1,58 +1,71 @@
 import * as THREE from "three";
-import { box } from "../../engine/primitives.js";
+import { CREATURES } from "./creature-assets.js";
 
-// A fast low-poly beast that charges the player and melees on contact. Drop-in compatible with
-// Combat (same interface as Enemy: pos, hp, dead, counted, removable, hitbox, takeDamage, update).
+// An animated creature that charges the player and bites on contact (Quaternius raptor/spider/trex).
+// kind: "monster"|"raptor" -> velociraptor, "spider" -> spider, "trex" -> a big mini-boss.
+// Drop-in compatible with Combat (pos, hp, dead, counted, removable, hitbox, takeDamage, update).
 export class Monster {
   constructor(scene, spawn, level) {
     this.scene = scene; this.level = level;
+    this.kind = spawn.kind === "spider" ? "spider" : spawn.kind === "trex" ? "trex" : "raptor";
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
-    this.hp = spawn.hp || 70;
-    this.speed = spawn.speed || 4.2;
+    this.hp = spawn.hp || (this.kind === "trex" ? 420 : this.kind === "spider" ? 90 : 70);
+    this.speed = spawn.speed || (this.kind === "trex" ? 2.6 : this.kind === "spider" ? 3.6 : 4.6);
+    this.melee = this.kind === "trex" ? 24 : this.kind === "spider" ? 9 : 11;
+    this.reach = this.kind === "trex" ? 5.0 : 2.6;
     this.dead = false; this.counted = false; this.removable = false;
-    this.yaw = 0; this._t = Math.random() * 6; this._atkCd = 0; this._deathT = 0;
+    this.yaw = 0; this._atkCd = 0; this._deathT = 0; this._cur = null; this._curAction = null;
+
     this.group = new THREE.Group(); this.group.position.copy(this.pos); this.scene.add(this.group);
-    this._build();
+    const inst = CREATURES[this.kind].make();
+    if (inst) {
+      this.model = inst.model;
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+      this.group.add(this.model);
+      this.mixer = new THREE.AnimationMixer(this.model);
+      this._actions = {}; for (const c of inst.animations) this._actions[c.name] = this.mixer.clipAction(c);
+      this._play("idle");
+    }
+    const big = this.kind === "trex";
+    const hw = big ? 3 : this.kind === "spider" ? 3 : 1.6, hh = big ? 6 : this.kind === "spider" ? 1.6 : 2.6;
+    const hbMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    hbMat.userData.outlineParameters = { visible: false }; // no ink outline on the invisible hitbox
+    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hw), hbMat);
+    this.hitbox.position.y = hh / 2; this.hitbox.userData.enemy = this; this.group.add(this.hitbox);
   }
 
-  _build() {
-    const body = box(0.95, 0.8, 1.35, 0x6e2a2a, { roughness: 0.85 }); body.position.y = 1.0; body.castShadow = true; this.group.add(body);
-    const head = box(0.62, 0.55, 0.6, 0x7d3232, { roughness: 0.85 }); head.position.set(0, 1.28, 0.85); this.group.add(head);
-    for (const dx of [-0.16, 0.16]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffd23a, emissive: 0xffaa00, emissiveIntensity: 2.2 }));
-      e.position.set(dx, 1.34, 1.12); this.group.add(e);
-    }
-    for (const [dx, dz] of [[-0.36, 0.42], [0.36, 0.42], [-0.36, -0.42], [0.36, -0.42]]) {
-      const l = box(0.2, 0.95, 0.2, 0x4a1d1d, { roughness: 0.9 }); l.position.set(dx, 0.47, dz); this.group.add(l);
-    }
-    this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.7, 1.7), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
-    this.hitbox.position.y = 1.0; this.hitbox.userData.enemy = this; this.group.add(this.hitbox);
+  // crossfade to the first clip whose name contains `key`
+  _play(key, fade = 0.2, once = false) {
+    if (!this._actions) return;
+    const name = Object.keys(this._actions).find((n) => n.toLowerCase().includes(key));
+    if (!name || name === this._cur) return;
+    const next = this._actions[name];
+    if (once) { next.setLoop(THREE.LoopOnce, 1); next.clampWhenFinished = true; } else next.setLoop(THREE.LoopRepeat, Infinity);
+    if (this._curAction) this._curAction.fadeOut(fade);
+    next.reset().fadeIn(fade).play();
+    this._cur = name; this._curAction = next;
   }
 
   takeDamage(dmg) { if (this.dead) return; this.hp -= dmg; if (this.hp <= 0) this._die(); }
-  _die() { this.dead = true; this.hitbox.userData.enemy = null; this.hitbox.visible = false; this._deathT = 1.1; }
+  _die() { this.dead = true; this.hitbox.userData.enemy = null; this.hitbox.visible = false; this._deathT = 2.0; this._play("death", 0.12, true); }
 
   update(dt, playerPos, ctx) {
-    this._t += dt;
-    if (this.dead) { // topple + sink, then let Combat remove it
-      this.group.rotation.x = Math.min(Math.PI / 2, this.group.rotation.x + dt * 3.2);
-      this.group.position.y = Math.max(-0.7, this.group.position.y - dt * 0.9);
-      if ((this._deathT -= dt) <= 0) this.removable = true;
-      return;
-    }
-    const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z;
-    const d = Math.hypot(dx, dz) || 1;
+    this.mixer?.update(dt);
+    const groundY = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
+    if (this.dead) { this.group.position.y = groundY; if ((this._deathT -= dt) <= 0) this.removable = true; return; }
+    const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
-    if (d > 2.0) { // charge
+    if (d > this.reach) { // charge
       const step = this.speed * dt;
       const nx = this.pos.x + (dx / d) * step, nz = this.pos.z + (dz / d) * step;
       if (!this._blocked(nx, this.pos.z)) this.pos.x = nx;
       if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
-      this.group.position.set(this.pos.x, Math.abs(Math.sin(this._t * 11)) * 0.2, this.pos.z); // gallop
-    } else { // melee on a cooldown
-      this.group.position.set(this.pos.x, 0, this.pos.z);
-      if ((this._atkCd -= dt) <= 0) { this._atkCd = 0.85; ctx.onPlayerHit?.(8 + Math.floor(Math.random() * 6)); }
+      this._play("run");
+    } else { // bite on a cooldown
+      this._play("attack", 0.12);
+      if ((this._atkCd -= dt) <= 0) { this._atkCd = 1.0; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 5)); }
     }
+    this.group.position.set(this.pos.x, groundY, this.pos.z);
   }
 
   _blocked(x, z) {
