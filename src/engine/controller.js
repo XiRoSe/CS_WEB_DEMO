@@ -66,7 +66,7 @@ export class Controller {
     const r = this.radius, clear = this.feetY + this.stepHeight;
     for (const c of this.level.colliders) {
       if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) {
-        if ((c.top ?? 3.4) > clear) return true; // taller than we can step/stand onto -> wall
+        if ((c.top ?? 3.4) + (c.baseY || 0) > clear) return true; // taller than we can step/stand onto -> wall
       }
     }
     return false;

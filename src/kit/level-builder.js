@@ -457,17 +457,40 @@ export class LevelBuilder {
   // a low-poly GLB tree (Quaternius birch/palm); the trunk blocks movement, seated on the terrain
   tree(x, z, s = 1, kind = "tree") {
     const g = makeTree(kind); if (!g) return;
-    g.position.set(x, this._groundY(x, z), z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
+    const gy = this._groundY(x, z);
+    g.position.set(x, gy, z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
     this.scene.add(g);
-    this.collide(x, z, 0.7 * s, 0.7 * s, 1.4);
+    const c = this.collide(x, z, 0.7 * s, 0.7 * s, 1.4); c.baseY = gy;
   }
 
   // a low-poly GLB rock (cover / dressing), seated on the terrain
   rock(x, z, s = 1) {
     const g = makeRock(Math.floor(Math.random() * 2)); if (!g) return;
-    g.position.set(x, this._groundY(x, z), z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
+    const gy = this._groundY(x, z);
+    g.position.set(x, gy, z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
     this.scene.add(g);
-    this.collide(x, z, 1.3 * s, 1.3 * s, 1.0);
+    const c = this.collide(x, z, 1.3 * s, 1.3 * s, 1.0); c.baseY = gy;
+  }
+
+  // a climbable wooden lookout: a raised platform reached by a walkable staircase (terrain-seated).
+  // Great as high ground to spot arcs + snipe from. Returns { x, z, top } for placing loot on top.
+  lookout(x, z) {
+    const gy = this._groundY(x, z), H = 3.4;
+    const plat = box(5, 0.4, 5, COLORS.woodDark, { roughness: 0.85 }); plat.position.set(x, gy + H, z); plat.castShadow = true; this.scene.add(plat);
+    const pc = this.collide(x, z, 5, 5, H); pc.baseY = gy;
+    for (const [dx, dz, w, d] of [[0, -2.4, 5, 0.2], [0, 2.4, 5, 0.2], [-2.4, 0, 0.2, 5], [2.4, 0, 0.2, 5]]) {
+      const rl = box(w, 0.6, d, COLORS.woodDark, { roughness: 0.85 }); rl.position.set(x + dx, gy + H + 0.5, z + dz); this.scene.add(rl);
+    }
+    for (const [dx, dz] of [[-2.3, -2.3], [2.3, -2.3], [-2.3, 2.3], [2.3, 2.3]]) {
+      const p = cyl(0.16, 0.16, H, COLORS.woodDark, 6, { roughness: 0.9 }); p.position.set(x + dx, gy + H / 2, z + dz); this.scene.add(p);
+    }
+    const n = Math.ceil(H / 0.34);
+    for (let i = 1; i <= n; i++) {
+      const h = i * 0.34, sz = z + 2.5 + i * 0.6;
+      const step = box(1.6, 0.18, 0.66, COLORS.woodDark, { roughness: 0.85 }); step.position.set(x, gy + h - 0.09, sz); this.scene.add(step);
+      const c = this.collide(x, sz, 1.6, 0.66, h); c.baseY = gy;
+    }
+    return { x, z, top: gy + H };
   }
 
   scatterTrees(n, rMin, rMax) {
