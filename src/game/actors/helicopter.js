@@ -8,11 +8,12 @@ export async function preloadHeli() { /* using a procedural attack gunship — n
 // Attack helicopter boss: descends from the sky, hovers and strafes while firing,
 // can be shot down, then explodes and crashes.
 export class Helicopter {
-  constructor(scene, level, sharedLight = null) {
+  constructor(scene, level, sharedLight = null, hp = 15) {
     this.scene = scene;
     this.level = level;
     this._sharedLight = sharedLight;
-    this.hp = 15; // HP in "units": 15 rifle shots, or one rocket (15 units)
+    this.hp = hp; // HP in "units" (rifle=1 -> N shots; one rocket = 15 units). Tuned via config.balance.gunship.hp
+    this.maxHp = hp;
     this.dead = false;
     this.removable = false;
     this.state = "descend";

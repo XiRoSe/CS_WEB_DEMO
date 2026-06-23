@@ -43,7 +43,7 @@ class Game {
     this.engine.setupNight(this.scene);
     this.engine.addLights(this.scene);
 
-    this.level = new LevelBuilder(this.scene); // built in _boot, once assets are loaded
+    this.level = new LevelBuilder(this.scene, this.cfg.balance); // built in _boot, once assets are loaded
     this.controller = new Controller(this.camera, this.engine.renderer.domElement, this.level);
     this.controller.onStep = () => this.audio.step();
     this.weapon = new Weapon(this.camera, this.audio);
@@ -144,7 +144,7 @@ class Game {
     this.scene.add(this.heliLight, this.heliLight.target);
     // Warm up: build the gunship once (using the shared light), compile shaders + render one hidden
     // frame so the first real spawn mid-fight is already fully compiled and uploaded.
-    const warm = new Helicopter(this.scene, this.level, this.heliLight);
+    const warm = new Helicopter(this.scene, this.level, this.heliLight, this.cfg.balance.gunship.hp);
     this.engine.renderer.compile(this.scene, this.camera);
     this.engine.outline.render(this.scene, this.camera);
     this.scene.remove(warm.group, warm.headBeam);
@@ -267,7 +267,8 @@ class Game {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
       new THREE.MeshStandardMaterial({ color: 0x2c3322, roughness: 0.7, metalness: 0.3 }));
     const g = new Projectile(this.scene, mesh, pos, vel, { gravity: 18, fuse: 1.5, bounce: 0.35, spin: true });
-    g.radius = 7; g.damage = 320; g.power = 11; g.scale = 0.6;
+    const gb = this.cfg.balance.grenade;
+    g.radius = gb.radius; g.damage = gb.damage; g.power = gb.power; g.scale = 0.6;
     this._projectiles.push(g);
     this.audio.playBuf?.("clipout", 0.4);
   }
@@ -317,7 +318,8 @@ class Game {
     this.vfx.explosion(c, 1.7);
     this.audio.explosion?.();
     this.hud._shake = Math.max(this.hud._shake || 0, 14);
-    const opts = { radius: 11, damage: 320, power: 20 };
+    const vb = this.cfg.balance.vehicle;
+    const opts = { radius: vb.blastRadius, damage: vb.blastDamage, power: vb.blastPower };
     applyBlast(c, opts, this.combat.enemies, null, lvl.dynamics); // heli takes only unit damage, handled elsewhere
     // launch the wreck itself into the air (override the heavy mass — this is its own blast)
     if (rec.dyn) {
@@ -352,7 +354,8 @@ class Game {
     }
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()); // point along flight
     const rocket = new Projectile(this.scene, mesh, pos, vel, { gravity: 2.5, fuse: 4, detonateOnHit: true });
-    rocket.radius = 9; rocket.damage = 900; rocket.power = 16; rocket.scale = 1.0; rocket.isRocket = true;
+    const rb = this.cfg.balance.rocket;
+    rocket.radius = rb.radius; rocket.damage = rb.damage; rocket.power = rb.power; rocket.scale = 1.0; rocket.isRocket = true;
     this._projectiles.push(rocket);
     this._fovKick = Math.min(this._fovKick + 2.5, 6);
   }
@@ -373,7 +376,7 @@ class Game {
         this.audio.explosion?.();
         // enemies/props take the big AoE damage; the heli + destructibles use the "unit" scale (below)
         applyBlast(c, { radius: p.radius || 6, damage: p.damage || 200, power: p.power || 15 }, this.combat.enemies, null, this.level.dynamics);
-        const units = p.isRocket ? 15 : 5; // rocket = 15 units (one-shots the 15-unit gunship), grenade = 5
+        const units = p.isRocket ? this.cfg.balance.units.rocket : this.cfg.balance.units.grenade; // rocket one-shots the gunship
         const R = p.radius || 6;
         // gunship: a direct rocket hit, or being caught in the blast, applies unit damage
         if (this.heli && !this.heli.dead) {
@@ -399,7 +402,7 @@ class Game {
   _detonate() {
     if (this.state === "detonate" || this.state === "lose") return;
     this.state = "detonate";
-    this._detT = 4.2; this._detBlast = 0; // longer so the player's flight clear out of the compound plays out
+    this._detT = this.cfg.balance.detonation.duration; this._detBlast = 0; // long enough for the player's flight to play out
     this.defusing = false; this.hud.hideDefuse(); this.hud.showTimer(false); this.hud.setCombatVisible(false);
     this.controller.unlock(); this.audio.stopRotor();
     const b = this.level.bomb; this._bombPos = new THREE.Vector3(b.x, 1, b.z);
@@ -411,7 +414,8 @@ class Game {
     const away = new THREE.Vector3(this.camera.position.x - b.x, 0, this.camera.position.z - b.z);
     if (away.lengthSq() < 0.5) this.camera.getWorldDirection(away).setY(0).multiplyScalar(-1); // shoved backward if right on it
     away.y = 0; away.normalize();
-    this._camVel = new THREE.Vector3(away.x * 30, 46, away.z * 30); // hurled high AND far — clear out of the compound
+    const det = this.cfg.balance.detonation;
+    this._camVel = new THREE.Vector3(away.x * det.launchOut, det.launchUp, away.z * det.launchOut); // hurled high AND far
     this._camSpin = new THREE.Vector3(0.6 + Math.random() * 1.6, (Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 5); // wild tumble
   }
 
@@ -582,7 +586,7 @@ class Game {
     this._playTime += dt;
     if (!this._heliSpawned && this._playTime >= this._heliDelay) {
       this._heliSpawned = true;
-      this.heli = new Helicopter(this.scene, this.level, this.heliLight);
+      this.heli = new Helicopter(this.scene, this.level, this.heliLight, this.cfg.balance.gunship.hp);
       this.combat.extraHittables.push(this.heli.hitbox);
       this.audio.startRotor();
       this.hud.killFeed(this.cfg.messages.gunshipInbound);

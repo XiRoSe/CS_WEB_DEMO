@@ -6,9 +6,14 @@ import { makeAmmo } from "./content/pickups.js";
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,
 // enemy spawns, floodlights and the objective, and animates the flag + searchlights each frame.
+// pick an HP value: a number is used as-is, a [min,max] range rolls inclusively (in "units")
+const rollHp = (r) => (Array.isArray(r) ? r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1)) : r);
+
 export class LevelBuilder {
-  constructor(scene) {
+  constructor(scene, balance = {}) {
     this.scene = scene;
+    // destructible HP (in "units") — injected from the game's config.balance so tuning stays data.
+    this.hp = balance.destructibles || { barrelHp: [2, 3], fuelTankHp: 4, vehicleHp: [7, 8] };
     this.colliders = [];   // AABB {minX,maxX,minZ,maxZ,top} in the XZ plane
     this.solidMeshes = []; // occluders for bullet raycasts (walls, crates, buildings…)
     this.explosives = [];  // shootable fuel barrels { mesh, x, z, exploded } that blow up when hit
@@ -134,7 +139,7 @@ export class LevelBuilder {
       const dyn = this._addDynamic(b, 0.55, 1.3);
       // shootable explosive (HP in "units": 1 rifle shot = 1, grenade = 5, rocket = 15).
       // barrels pop in 2-3 shots.
-      const rec = { mesh: b, x: bx, z: bz, hp: 2 + Math.floor(Math.random() * 2), exploded: false, collider: col, dyn };
+      const rec = { mesh: b, x: bx, z: bz, hp: rollHp(this.hp.barrelHp), exploded: false, collider: col, dyn };
       b.traverse((o) => { o.userData.explosive = rec; });
       b.userData.explosive = rec;
       this.explosives.push(rec);
@@ -300,7 +305,7 @@ export class LevelBuilder {
     // then gets launched into the air as a heavy dynamic and vanishes shortly after landing.
     const dyn = this._addDynamic(g, 0, 60); // heavy: ordinary blasts barely nudge it
     // HP in "units" (1 rifle shot = 1): cars take 7-8 shots
-    const rec = { mesh: g, x, z, hp: 7 + Math.floor(Math.random() * 2), exploded: false, collider: col, dyn };
+    const rec = { mesh: g, x, z, hp: rollHp(this.hp.vehicleHp), exploded: false, collider: col, dyn };
     g.traverse((o) => { o.userData.vehicle = rec; });
     g.userData.vehicle = rec;
     this.vehicles.push(rec);
@@ -318,7 +323,7 @@ export class LevelBuilder {
     const cx = x + (n - 1) * 1.2;
     const col = this.collide(cx, z, (n - 1) * 2.4 + 1.8, 3.2, 2.0);
     // shootable industrial fuel tanks: tough, and a BIG explosion when they finally go up
-    const rec = { mesh: g, x: cx, z, cy: 1.1, hp: 4, scale: 1.9, radius: 13, damage: 340, exploded: false, collider: col };
+    const rec = { mesh: g, x: cx, z, cy: 1.1, hp: rollHp(this.hp.fuelTankHp), scale: 1.9, radius: 13, damage: 340, exploded: false, collider: col };
     g.traverse((o) => { o.userData.explosive = rec; });
     g.userData.explosive = rec;
     this.explosives.push(rec);
