@@ -46,10 +46,13 @@ export class ParachuteIntro {
       this.canopy.add(panel);
     }
     this.group.add(this.canopy);
-    const harness = new THREE.Vector3(0, 2.2, 0), riserMat = noOutline(new THREE.MeshBasicMaterial({ color: 0x1a1d22 })), up = new THREE.Vector3(0, 1, 0);
+    // risers attach to two shoulder points (a harness on the back), not a single point at the head
+    const shL = new THREE.Vector3(-0.5, 1.7, -0.15), shR = new THREE.Vector3(0.5, 1.7, -0.15);
+    const riserMat = noOutline(new THREE.MeshBasicMaterial({ color: 0x1a1d22 })), up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < 8; i++) {
       const a = i / 8 * Math.PI * 2, skirt = new THREE.Vector3(Math.cos(a) * R * 0.82, canopyY - 0.4, Math.sin(a) * R * 0.82);
-      const len = skirt.distanceTo(harness), line = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, len, 4), riserMat);
+      const harness = i % 2 === 0 ? shL : shR;
+      const len = skirt.distanceTo(harness), line = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 4), riserMat);
       line.position.copy(skirt).add(harness).multiplyScalar(0.5);
       line.quaternion.setFromUnitVectors(up, harness.clone().sub(skirt).normalize());
       this.group.add(line);

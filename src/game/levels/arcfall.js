@@ -17,10 +17,10 @@ export const arcfall = {
     b.setBounds({ minX: -205, maxX: 205, minZ: -205, maxZ: 205 });
     b.lake(-46, 20, 18, 1.5); b.lake(70, -64, 22, 1.6); b.lake(30, 90, 16, 1.4); // shallow wadeable lakes (carved first)
     b.islandTerrain({ size: 460 });   // hills → beach → sea → distant mountains
-    b.scatterTrees(110, 22, 195);     // GLB forest (birch + palms), seated on the terrain
-    b.scatterRocks(45, 26, 195);      // GLB rocks (cover + dressing)
+    b.scatterTrees(260, 20, 198);     // thick GLB forest (birch + palms), seated on the terrain
+    b.scatterRocks(55, 26, 198);      // GLB rocks (cover + dressing)
     b.lookout(28, -46); b.lookout(-58, 30); // climbable lookouts — high ground to spot arcs + snipe
-    b.car(14, 20, "suv"); b.car(-30, -8, "truck"); // driveable cars near the drop (press E)
+    b.car(9, 13, "racefuture"); b.car(-12, 7, "sportscar"); b.car(2, -15, "race"); // fast sports cars in the clear drop zone (press E)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
     const arcs = [[0, -44], [44, -22], [-38, -26], [74, 22], [-68, 16], [32, 58],

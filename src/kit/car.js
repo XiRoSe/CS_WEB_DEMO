@@ -10,7 +10,7 @@ export class Car {
     this.pos = new THREE.Vector3(x, 0, z);
     this.yaw = Math.random() * Math.PI * 2; this.speed = 0;
     this.r = 3.2;                 // enter/interact radius
-    this.maxSpeed = 30; this.maxRev = 9;
+    this.maxSpeed = 46; this.maxRev = 12;   // fast sports car
     this._tmp = new THREE.Vector3(); this._look = new THREE.Vector3();
     this.scene.add(this.group);
     this.seat();
@@ -31,11 +31,11 @@ export class Car {
   update(dt, input) {
     const accel = input.isDown("w", "arrowup") ? 1 : input.isDown("s", "arrowdown") ? -1 : 0;
     const steer = (input.isDown("a", "arrowleft") ? 1 : 0) - (input.isDown("d", "arrowright") ? 1 : 0);
-    this.speed += accel * 22 * dt;
-    this.speed *= accel ? 1 : 0.95;                          // coast/brake drag
+    this.speed += accel * 30 * dt;
+    this.speed *= accel ? 1 : 0.96;                          // coast/brake drag
     this.speed = Math.max(-this.maxRev, Math.min(this.maxSpeed, this.speed));
     if (Math.abs(this.speed) < 0.05) this.speed = 0;
-    this.yaw += steer * 1.7 * dt * Math.max(-1, Math.min(1, this.speed / 8)); // steering scales with speed (and reverses in reverse)
+    this.yaw += steer * 2.0 * dt * Math.max(-1, Math.min(1, this.speed / 9)); // steering scales with speed (and reverses in reverse)
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), d = this.speed * dt;
     const nx = this.pos.x + fx * d, nz = this.pos.z + fz * d;
     if (!this._blocked(nx, this.pos.z)) this.pos.x = nx; else this.speed *= 0.3;

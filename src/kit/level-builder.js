@@ -496,7 +496,7 @@ export class LevelBuilder {
 
   // clustered forests with clearings between (rather than a uniform sprinkle)
   scatterTrees(n, rMin, rMax) {
-    const clusters = 8;
+    const clusters = 13;
     for (let cI = 0; cI < clusters; cI++) {
       const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin);
       const cx = Math.cos(a) * r, cz = Math.sin(a) * r, palmy = Math.hypot(cx, cz) > rMax * 0.82; // palms toward the shore
@@ -505,7 +505,8 @@ export class LevelBuilder {
         const aa = Math.random() * 6.28, rr = Math.pow(Math.random(), 0.7) * spread;
         const tx = cx + Math.cos(aa) * rr, tz = cz + Math.sin(aa) * rr;
         if (Math.hypot(tx, tz) > rMax + 12) continue;
-        this.tree(tx, tz, 0.8 + Math.random() * 0.9, (palmy ? Math.random() < 0.6 : Math.random() < 0.2) ? "palm" : "tree");
+        this.tree(tx, tz, 1.15 + Math.random() * 1.05, (palmy ? Math.random() < 0.6 : Math.random() < 0.2) ? "palm" : "tree"); // large trees
+
       }
     }
   }

@@ -142,6 +142,18 @@ export class Audio {
     setTimeout(() => this._tone(990, 0.16, "sine", 0.32), 90);
     setTimeout(() => this._tone(1320, 0.26, "sine", 0.3), 185);
   }
+  // looping vehicle engine — pitch rises with speed
+  startEngine() {
+    if (!this.ctx || this._eng) return;
+    const o = this.ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = 52;
+    const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 430;
+    const g = this.ctx.createGain(); g.gain.value = 0;
+    o.connect(lp); lp.connect(g); g.connect(this.master); o.start();
+    g.gain.linearRampToValueAtTime(0.13, this.ctx.currentTime + 0.3);
+    this._eng = { o, g };
+  }
+  setEngine(speed) { if (this._eng) this._eng.o.frequency.value = 48 + Math.abs(speed) * 4.5; }
+  stopEngine() { if (!this._eng) return; const e = this._eng; this._eng = null; e.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12); setTimeout(() => { try { e.o.stop(); } catch { /* already stopped */ } }, 350); }
   startRotor() {
     this._rotorWanted = true;
     if (!this.ctx || this._rotorSrc || this._rotor) return; // already running (or no ctx yet)

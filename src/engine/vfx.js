@@ -179,6 +179,9 @@ export class VFX {
   // glowing plasma-bolt trail
   plasmaTrail(point) { this._flash(point, 0.34, 0x4fb4ff); }
 
+  // kicked-up dust (vehicle wheels / tracks)
+  dust(point) { this._dustPuff(point, 0x9a8a62, 0.7); }
+
   // sci-fi plasma detonation: a blue/cyan energy fireball + shockwave + sparks
   energyBoom(point, scale = 1) {
     for (let i = 0; i < 7; i++) {

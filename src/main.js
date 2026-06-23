@@ -323,6 +323,7 @@ class Game {
     this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false;
     this.laser?.hide?.();
     this._carPrompt = false;
+    this.audio.startEngine?.();
     this.hud.notify("DRIVING — press E to exit");
   }
   _exitCar() {
@@ -330,6 +331,7 @@ class Game {
     this.camera.position.set(s.x, s.y + this.controller.eye, s.z);
     this.controller.feetY = s.y; this.controller.vy = 0; this.controller.onGround = true;
     this.driving = null;
+    this.audio.stopEngine?.();
     if (this.weapon._showViewmodel) this.weapon._showViewmodel(); else this.weapon.group.visible = true;
     this.hud.notify("ON FOOT");
   }
@@ -453,6 +455,11 @@ class Game {
     if (this.driving) {
       this.driving.update(dt, this.input);
       this.driving.chaseCamera(this.camera);
+      this.audio.setEngine?.(this.driving.speed);
+      if (Math.abs(this.driving.speed) > 7) { // tracks kick up dust at speed
+        const c = this.driving.pos, fx = Math.sin(this.driving.yaw), fz = Math.cos(this.driving.yaw);
+        this.vfx.dust(new THREE.Vector3(c.x - fx * 2.5 + (Math.random() - 0.5), this.driving.group.position.y + 0.3, c.z - fz * 2.5 + (Math.random() - 0.5)));
+      }
     } else {
       this.controller.update(dt, this.input);
       this.weapon.update(dt, this.controller.moving);
