@@ -17,7 +17,8 @@ export const arcfall = {
     b.setBounds({ minX: -205, maxX: 205, minZ: -205, maxZ: 205 });
     b.lake(-46, 20, 18, 1.5); b.lake(70, -64, 22, 1.6); b.lake(30, 90, 16, 1.4); // shallow wadeable lakes (carved first)
     b.islandTerrain({ size: 460 });   // hills → beach → sea → distant mountains
-    b.scatterTrees(95, 22, 195);      // forest cover (seated on the terrain)
+    b.scatterTrees(110, 22, 195);     // GLB forest (birch + palms), seated on the terrain
+    b.scatterRocks(45, 26, 195);      // GLB rocks (cover + dressing)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
     const arcs = [[0, -44], [44, -22], [-38, -26], [74, 22], [-68, 16], [32, 58],

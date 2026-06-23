@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "../engine/primitives.js";
 import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
+import { makeTree, makeRock } from "./content/nature.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,
@@ -453,21 +454,27 @@ export class LevelBuilder {
     this.gifts.push({ x, z, r: 1.8, group: g, box, halo, kind, taken: false });
   }
 
-  // a low-poly tree (trunk + stacked foliage); the trunk blocks movement
-  tree(x, z, s = 1) {
-    const g = new THREE.Group(); g.position.set(x, this._groundY(x, z), z);
-    const trunk = cyl(0.18 * s, 0.24 * s, 2.2 * s, 0x6b4a2e, 7, { roughness: 0.9 }); trunk.position.y = 1.1 * s; trunk.castShadow = true; g.add(trunk);
-    for (let i = 0; i < 3; i++) {
-      const r = (1.3 - i * 0.3) * s;
-      const f = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat([0x3f7d3a, 0x4f8f3f, 0x356b32][i % 3], { roughness: 1, flat: true }));
-      f.position.y = (2.2 + i * 0.9) * s; f.castShadow = true; g.add(f);
-    }
-    g.rotation.y = Math.random() * 6.28; this.scene.add(g);
-    this.collide(x, z, 0.6 * s, 0.6 * s, 1.4);
+  // a low-poly GLB tree (Quaternius birch/palm); the trunk blocks movement, seated on the terrain
+  tree(x, z, s = 1, kind = "tree") {
+    const g = makeTree(kind); if (!g) return;
+    g.position.set(x, this._groundY(x, z), z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
+    this.scene.add(g);
+    this.collide(x, z, 0.7 * s, 0.7 * s, 1.4);
+  }
+
+  // a low-poly GLB rock (cover / dressing), seated on the terrain
+  rock(x, z, s = 1) {
+    const g = makeRock(Math.floor(Math.random() * 2)); if (!g) return;
+    g.position.set(x, this._groundY(x, z), z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
+    this.scene.add(g);
+    this.collide(x, z, 1.3 * s, 1.3 * s, 1.0);
   }
 
   scatterTrees(n, rMin, rMax) {
-    for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.tree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 0.9); }
+    for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.tree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 0.7, Math.random() < 0.4 ? "palm" : "tree"); }
+  }
+  scatterRocks(n, rMin, rMax) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.rock(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 1.3); }
   }
 
   // ground elevation at (x,z) for the current level (0 if flat). Set by islandTerrain().
@@ -502,7 +509,7 @@ export class LevelBuilder {
     const c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
-      if (y < 0.7) c.copy(sand); else if (y > 8) c.copy(rock); else c.copy(grass).lerp(grassHi, Math.min(1, y / 7));
+      if (y < 0.8) c.copy(sand); else if (y > 12) c.copy(rock); else c.copy(grass).lerp(grassHi, Math.min(1, y / 9));
       colors.push(c.r, c.g, c.b);
     }
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
