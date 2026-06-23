@@ -63,7 +63,7 @@ export class Monster {
       this._play("run");
     } else { // bite on a cooldown
       this._play("attack", 0.12);
-      if ((this._atkCd -= dt) <= 0) { this._atkCd = 1.0; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 5)); }
+      if ((this._atkCd -= dt) <= 0) { this._atkCd = 1.0; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 5)); ctx.audio?.creature?.(); }
     }
     this.group.position.set(this.pos.x, groundY, this.pos.z);
   }

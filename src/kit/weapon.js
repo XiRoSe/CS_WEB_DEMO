@@ -173,9 +173,9 @@ export class Weapon {
   }
 
   canFirePlasma(t) { return this.mode === "plasma" && (t - this._lastPlasma) >= this.plasmaRate; }
-  firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.shoot?.(); }
+  firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.plasma?.(); }
   canFireArc(t) { return this.mode === "arc" && (t - this._lastArc) >= this.arcRate; }
-  fireArc(t) { this._lastArc = t; this.kick = 0.06; this.kickRot = 0.08; this.audio?.shoot?.(); }
+  fireArc(t) { this._lastArc = t; this.kick = 0.06; this.kickRot = 0.08; this.audio?.zap?.(); }
 
   canFireRocket(t) { return this.rockets > 0 && this._rocketLoaded; }
   fireRocket(t) {

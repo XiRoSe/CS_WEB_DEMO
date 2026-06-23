@@ -133,6 +133,15 @@ export class Audio {
     if (this.playBuf("heli_fire", 0.4, 0.95 + Math.random() * 0.1)) return;
     this._noiseBurst(0.08, 1800, 1, 0.2);
   }
+  // --- ARCFALL: synth sci-fi + creature + pickup sounds ---
+  plasma() { this._tone(560, 0.2, "sawtooth", 0.3, 150); this._noiseBurst(0.12, 1400, 1, 0.12, "bandpass"); }
+  zap() { this._noiseBurst(0.18, 3200, 0.6, 0.22, "bandpass"); this._tone(1000, 0.12, "square", 0.16, 2000); }
+  creature() { this._tone(120, 0.34, "sawtooth", 0.3, 64); this._noiseBurst(0.18, 360, 0.8, 0.14); } // growl/bite
+  arcGet() { // ascending recovered-arc chime
+    this._tone(660, 0.12, "sine", 0.32);
+    setTimeout(() => this._tone(990, 0.16, "sine", 0.32), 90);
+    setTimeout(() => this._tone(1320, 0.26, "sine", 0.3), 185);
+  }
   startRotor() {
     this._rotorWanted = true;
     if (!this.ctx || this._rotorSrc || this._rotor) return; // already running (or no ctx yet)

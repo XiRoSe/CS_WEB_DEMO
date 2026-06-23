@@ -22,7 +22,7 @@ export class CollectObjective {
       if (dx * dx + dz * dz < a.r * a.r) {
         a.taken = true; a.group.visible = false;
         this.collected++;
-        g.audio.hitmarker?.(true);
+        g.audio.arcGet?.();
         g.hud.notify(`✦ ARC RECOVERED · ${this.collected}/${this.total}`);
         g.hud.setCounter("Arcs", `${this.collected} / ${this.total}`);
         if (this.collected >= this.total) {
