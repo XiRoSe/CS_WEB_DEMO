@@ -9,7 +9,9 @@ import { Controller } from "./engine/controller.js";
 import { Weapon } from "./kit/weapon.js";
 import { VFX } from "./engine/vfx.js";
 import { TouchControls } from "./engine/touch.js";
+import { LaserSight } from "./engine/laser-sight.js";
 import { LevelBuilder } from "./kit/level-builder.js";
+import { Destructibles } from "./kit/destructibles.js";
 // game — this game's content + rules
 import { Combat } from "./game/combat.js";
 import { Helicopter, preloadHeli } from "./game/actors/helicopter.js";
@@ -22,6 +24,7 @@ import { Projectile, applyBlast } from "./engine/projectiles.js";
 import { preloadWeapons } from "./kit/content/weapons.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
+import { isMobileOrTablet, showDesktopOnlyScreen } from "./device.js";
 
 class Game {
   constructor() {
@@ -50,20 +53,16 @@ class Game {
     this.vfx = new VFX(this.scene);
     this.vfx.setCamera(this.camera);
 
-    // player laser sight: a soft glowing red beam from the muzzle to whatever it hits
-    this._laserRay = new THREE.Raycaster();
-    this._laserDir = new THREE.Vector3();
-    this._laserHit = new THREE.Vector3();
-    this._laserOrigin = new THREE.Vector3();
-    this._laserBack = new THREE.Vector3();
+    // player laser sight (a soft red aim beam); the game supplies its targets each frame
+    this.laser = new LaserSight(this.scene, this.camera);
     this._laserTargets = [];
-    this._laserUp = new THREE.Vector3(0, 1, 0);
-    const beamGeo = new THREE.CylinderGeometry(0.018, 0.018, 1, 6, 1, true);
-    beamGeo.translate(0, 0.5, 0); // base at origin, extends +Y so we can scale length directly
-    this.laserBeam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xff1a1a, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.laserBeam.material.userData.outlineParameters = { visible: false };
-    this.laserBeam.frustumCulled = false; this.laserBeam.visible = false;
-    this.scene.add(this.laserBeam);
+    // shootable barrels/tanks/vehicles (unit-damage explosions + cook-offs)
+    this.destructibles = new Destructibles({
+      scene: this.scene, level: this.level, vfx: this.vfx, audio: this.audio, hud: this.hud,
+      camera: this.camera, balance: this.cfg.balance,
+      enemies: () => this.combat.enemies,
+      hurtPlayer: (d) => this._onPlayerHit(d),
+    });
     this.touch = new TouchControls(this.input);
     this.heli = null;
     this._heliDelay = this.cfg.helicopter.spawnDelay;
@@ -154,8 +153,8 @@ class Game {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
       onKill: (count, left) => { this.hud.killFeed(this.cfg.messages.hostileDown); this.hud.setHostiles(left); this.voice.enemyDown(); },
       onHitmarker: (killed) => { this.shotsHit++; this.hud.hitmarker(killed); this.audio.hitmarker(killed); },
-      onExplosive: (rec, dmg) => { if (rec.hp != null) { rec.hp -= dmg; if (rec.hp <= 0) this._explodeBarrel(rec); } else this._explodeBarrel(rec); },
-      onVehicleHit: (rec, dmg) => { rec.hp -= dmg; if (rec.hp <= 0) this._explodeVehicle(rec); },
+      onExplosive: (rec, units) => this.destructibles.damageExplosive(rec, units),
+      onVehicleHit: (rec, units) => this.destructibles.damageVehicle(rec, units),
     });
     this.hud.setHostiles(this.combat.enemiesLeft);
     this.state = "start";
@@ -273,70 +272,6 @@ class Game {
     this.audio.playBuf?.("clipout", 0.4);
   }
 
-  // a shot fuel barrel cooks off: big boom, blast damage to nearby enemies, flings props,
-  // hurts the player if too close, and chain-detonates barrels packed right next to it.
-  _explodeBarrel(rec, depth = 0) {
-    if (rec.exploded) return;
-    rec.exploded = true;
-    const c = new THREE.Vector3(rec.x, rec.cy || 0.75, rec.z);
-    // remove the barrel/tank + its collider / dynamic / occluder so nothing lingers
-    this.scene.remove(rec.mesh);
-    const lvl = this.level;
-    const drop = (arr, item) => { if (arr) { const i = arr.indexOf(item); if (i >= 0) arr.splice(i, 1); } };
-    drop(lvl.colliders, rec.collider); drop(lvl.dynamics, rec.dyn); drop(lvl.solidMeshes, rec.mesh);
-    // boom (bigger for fuel tanks via rec.scale / rec.radius)
-    this.vfx.explosion(c, rec.scale || 0.9);
-    this.audio.explosion?.();
-    if (rec.scale > 1.2) this.hud._shake = Math.max(this.hud._shake || 0, 12);
-    const opts = { radius: rec.radius || 7, damage: rec.damage || 240, power: 13 };
-    applyBlast(c, opts, this.combat.enemies, null, lvl.dynamics); // heli takes only unit damage, handled elsewhere
-    // catch the player in the blast if they're standing too close
-    const pd = Math.hypot(this.camera.position.x - rec.x, this.camera.position.z - rec.z);
-    if (pd < opts.radius) this._onPlayerHit(Math.round(opts.damage * 0.22 * (1 - pd / opts.radius)));
-    // chain-react barrels/tanks packed right next to it (a staggered cook-off)
-    if (depth < 5 && lvl.explosives) {
-      for (const other of lvl.explosives) {
-        if (other.exploded) continue;
-        if (Math.hypot(other.x - rec.x, other.z - rec.z) < Math.max(3.0, opts.radius * 0.4)) {
-          setTimeout(() => this._explodeBarrel(other, depth + 1), 110 + Math.random() * 160);
-        }
-      }
-    }
-  }
-
-  // a vehicle takes sustained fire (or a rocket/grenade) then cooks off: a BIG explosion,
-  // the wreck is hurled into the air, tumbles down, and vanishes ~2s after it lands.
-  _explodeVehicle(rec) {
-    if (rec.exploded) return;
-    rec.exploded = true;
-    const c = new THREE.Vector3(rec.x, 1.1, rec.z);
-    const lvl = this.level;
-    // it no longer blocks movement or stops bullets once it's airborne wreckage
-    const drop = (arr, item) => { if (arr) { const i = arr.indexOf(item); if (i >= 0) arr.splice(i, 1); } };
-    drop(lvl.colliders, rec.collider); drop(lvl.solidMeshes, rec.mesh);
-    // bigger boom + heavier screen shake
-    this.vfx.explosion(c, 1.7);
-    this.audio.explosion?.();
-    this.hud._shake = Math.max(this.hud._shake || 0, 14);
-    const vb = this.cfg.balance.vehicle;
-    const opts = { radius: vb.blastRadius, damage: vb.blastDamage, power: vb.blastPower };
-    applyBlast(c, opts, this.combat.enemies, null, lvl.dynamics); // heli takes only unit damage, handled elsewhere
-    // launch the wreck itself into the air (override the heavy mass — this is its own blast)
-    if (rec.dyn) {
-      const d = rec.dyn;
-      d.rest = false; d.vanish = true; d.vanishDelay = 2; // vanish 2s after it settles
-      d.vel.set((Math.random() - 0.5) * 7, 13 + Math.random() * 5, (Math.random() - 0.5) * 7);
-      d.spin.set((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
-    }
-    // player caught in the (bigger) blast
-    const pd = Math.hypot(this.camera.position.x - rec.x, this.camera.position.z - rec.z);
-    if (pd < opts.radius) this._onPlayerHit(Math.round(opts.damage * 0.25 * (1 - pd / opts.radius)));
-    // the blast cooks off any fuel barrels nearby too
-    if (lvl.explosives) for (const ex of lvl.explosives) {
-      if (!ex.exploded && Math.hypot(ex.x - rec.x, ex.z - rec.z) < opts.radius) setTimeout(() => this._explodeBarrel(ex), 80 + Math.random() * 160);
-    }
-  }
-
   _fireRocket(t) {
     this.weapon.fireRocket(t);
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
@@ -383,14 +318,8 @@ class Game {
           const dx = this.heli.pos.x - c.x, dy = (this.heli.pos.y || 0) - c.y, dz = this.heli.pos.z - c.z;
           if (p._heliHit || dx * dx + dy * dy + dz * dz < (R + 2) * (R + 2)) this.heli.takeDamage(units);
         }
-        // barrels + fuel tanks caught in the radius take unit damage; cook off at 0
-        if (this.level.explosives) for (const ex of this.level.explosives) {
-          if (!ex.exploded && Math.hypot(ex.x - c.x, ex.z - c.z) < R) { ex.hp -= units; if (ex.hp <= 0) setTimeout(() => this._explodeBarrel(ex), 40 + Math.random() * 120); }
-        }
-        // vehicles caught in the radius take unit damage; blow up at 0
-        if (this.level.vehicles) for (const v of this.level.vehicles) {
-          if (!v.exploded && Math.hypot(v.x - c.x, v.z - c.z) < R + 1.5) { v.hp -= units; if (v.hp <= 0) this._explodeVehicle(v); }
-        }
+        // barrels / fuel tanks / vehicles caught in the radius take unit damage and cook off
+        this.destructibles.blastUnits(c, units, R);
         this.hud._shake = Math.max(this.hud._shake, p.scale > 0.7 ? 10 : 6);
         p.dispose();
         this._projectiles.splice(i, 1);
@@ -463,35 +392,19 @@ class Game {
 
   _updateLaser() {
     if (!this.combat) return;
-    if (this.weapon.mode === "launcher" || this.weapon.reloading) { this.laserBeam.visible = false; return; } // no laser on the launcher / mid-reload
-    // aim point = straight down the camera (crosshair)
-    const dir = this._laserDir; this.camera.getWorldDirection(dir);
-    this._laserRay.set(this.camera.position, dir);
-    this._laserRay.far = 90;
+    if (this.weapon.mode === "launcher" || this.weapon.reloading) { this.laser.hide(); return; } // no laser on the launcher / mid-reload
     const tg = this._laserTargets; tg.length = 0;
     for (const m of this.level.solidMeshes) tg.push(m);
     for (const e of this.combat.enemies) if (!e.dead) tg.push(e.hitbox);
     if (this.heli && !this.heli.dead) tg.push(this.heli.hitbox);
-    const hits = this._laserRay.intersectObjects(tg, true);
-    if (hits.length) this._laserHit.copy(hits[0].point);
-    else this._laserHit.copy(this.camera.position).addScaledVector(dir, 80);
-    // start the beam at the visible barrel tip — a point IN FRONT of the camera (the real muzzle
-    // node is flipped behind the camera by the viewmodel's 180° rotation, so we don't use it here)
-    const origin = this._laserOrigin.set(0.16, -0.14, -1.25);
-    this.camera.localToWorld(origin);
-    const len = origin.distanceTo(this._laserHit);
-    const beamDir = this._laserHit.clone().sub(origin).normalize();
-    this.laserBeam.position.copy(origin);
-    this.laserBeam.quaternion.setFromUnitVectors(this._laserUp, beamDir);
-    this.laserBeam.scale.set(1, len, 1);
-    this.laserBeam.visible = true;
+    this.laser.update(tg);
   }
 
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
     this.level.update(t); // wave the objective flag
-    this.laserBeam.visible = false; // re-shown each frame during play
+    this.laser.hide(); // re-shown each frame during play
     if (this.state === "intro") {
       this.intro.update(dt);
       this.combat.update(dt, t, this._introFar); // enemies patrol/idle normally, never detect the player yet
@@ -634,33 +547,7 @@ class Game {
   }
 }
 
-// --- Mobile gate -------------------------------------------------------------
-// The mobile/touch controls (touch.js) are kept intact, but for now the game is gated to
-// desktop/laptop (mouse + keyboard). Phones/tablets get a friendly "play on a computer" screen.
-function isMobileOrTablet() {
-  const ua = navigator.userAgent || "";
-  // Gate purely on the user-agent — pointer media queries falsely flag touchscreen LAPTOPS as
-  // mobile (their primary pointer reads as "coarse" even with a trackpad), which blocked desktops.
-  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Silk/i.test(ua)) return true;
-  // iPadOS 13+ reports a Mac user-agent but exposes multi-touch (real Macs report 0 touch points)
-  if (/Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 1) return true;
-  return false;
-}
-
-function showDesktopOnlyScreen() {
-  const d = document.createElement("div");
-  d.style.cssText =
-    "position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-    "text-align:center;padding:34px;background:#0a0e13;color:#e8eef2;font-family:'Rajdhani','Saira Condensed',system-ui,sans-serif;";
-  d.innerHTML =
-    '<div style="letter-spacing:.3em;text-transform:uppercase;font-size:12px;color:#8a9bb0;margin-bottom:16px;">Operation Briefing</div>' +
-    '<div style="font-size:30px;font-weight:700;letter-spacing:.03em;line-height:1.25;max-width:560px;">' +
-      'This operation runs on <span style="color:#f0a000;">desktop &amp; laptop</span> only — for now.</div>' +
-    '<div style="margin-top:18px;font-size:16px;color:#aab6c2;max-width:520px;line-height:1.55;">' +
-      'It needs a mouse and keyboard for proper aiming and controls. Mobile support is coming — please deploy from a computer. 🖥️</div>';
-  document.body.appendChild(d);
-}
-
+// Gate to desktop/laptop for now (see device.js); phones/tablets get a "play on a computer" screen.
 if (isMobileOrTablet()) {
   showDesktopOnlyScreen();
 } else {
