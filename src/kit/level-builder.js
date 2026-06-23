@@ -424,7 +424,7 @@ export class LevelBuilder {
   // No light (emissive + additive sprite) so 12 of them don't recompile shaders. Tracked for the collect objective.
   arc(x, z) {
     const C = 0x6fe0ff;
-    const g = new THREE.Group(); g.position.set(x, 1.5, z);
+    const g = new THREE.Group(); g.position.set(x, 1.5 + this._groundY(x, z), z);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.13, 12, 24),
       new THREE.MeshStandardMaterial({ color: C, emissive: C, emissiveIntensity: 1.5, roughness: 0.3, metalness: 0.5 }));
     const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0),
@@ -436,13 +436,13 @@ export class LevelBuilder {
     beam.position.y = 22; beam.frustumCulled = false;
     g.add(ring, core, halo, beam);
     this.scene.add(g);
-    this.arcs.push({ x, z, r: 2.6, group: g, ring, core, halo, taken: false });
+    this.arcs.push({ x, z, r: 2.6, baseY: g.position.y, group: g, ring, core, halo, taken: false });
   }
 
   // a loot gift crate (kind = "ammo" | "grenade" | "health"); collected on proximity by the runner.
   giftCrate(x, z, kind = "ammo") {
     const C = { ammo: 0xffce73, grenade: 0xd0552e, health: 0x4fd06a }[kind] || 0xffce73;
-    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const g = new THREE.Group(); g.position.set(x, this._groundY(x, z), z);
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat(C, { roughness: 0.5 })); box.position.y = 0.4; box.castShadow = true;
     const rib = mat(0xfff4e0, { roughness: 0.5 });
     const rx = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.16), rib); rx.position.y = 0.4;
@@ -455,7 +455,7 @@ export class LevelBuilder {
 
   // a low-poly tree (trunk + stacked foliage); the trunk blocks movement
   tree(x, z, s = 1) {
-    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const g = new THREE.Group(); g.position.set(x, this._groundY(x, z), z);
     const trunk = cyl(0.18 * s, 0.24 * s, 2.2 * s, 0x6b4a2e, 7, { roughness: 0.9 }); trunk.position.y = 1.1 * s; trunk.castShadow = true; g.add(trunk);
     for (let i = 0; i < 3; i++) {
       const r = (1.3 - i * 0.3) * s;
@@ -470,20 +470,70 @@ export class LevelBuilder {
     for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.tree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 0.9); }
   }
 
-  // grassy island ground ringed by water (for the daytime island level)
-  grassFloor(size = 220, surround = 2400) {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat(0x5c8a3a, { roughness: 1 }));
-    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; this.scene.add(ground);
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(surround, surround), noOutline(new THREE.MeshStandardMaterial({ color: 0x2f6fae, roughness: 0.25, metalness: 0.25 })));
-    water.rotation.x = -Math.PI / 2; water.position.y = -0.5; this.scene.add(water);
-    this.scatterDesert(size * 0.4, size * 0.9, 40, 60); // reuse the rock/bush scatter as island shrubs
+  // ground elevation at (x,z) for the current level (0 if flat). Set by islandTerrain().
+  _groundY(x, z) { return this.terrainHeight ? this.terrainHeight(x, z) : 0; }
+
+  // A sculpted island: a vertex-colored heightfield (grass hills → sandy beach at the shoreline) that
+  // rises out of a big sea, ringed by distant mountains. Exposes terrainHeight(x,z) so the player,
+  // actors and props all seat on the relief.
+  // a shallow lake you can wade into: carves a smooth bowl into the terrain + a wadeable water disc.
+  // Call BEFORE islandTerrain() so the heightfield mesh reflects the carve.
+  lake(x, z, r = 14, depth = 1.4) { (this._lakes ||= []).push({ x, z, r, depth }); }
+
+  islandTerrain({ size = 460, segs = 130, sea = 5000 } = {}) {
+    const R = size * 0.46; // shore radius
+    const lakes = this._lakes || [];
+    const h = (x, z) => {
+      const r = Math.hypot(x, z);
+      let y = (1 - r / R) * 11;                                  // dome: tall center → 0 at shore → underwater beyond
+      if (r < R) y += (Math.sin(x * 0.05) * Math.cos(z * 0.045) + Math.sin(x * 0.09 + 1.3) * 0.6 + Math.cos(z * 0.08 - 0.7) * 0.5) * 2.4 * (1 - r / R);
+      if (r > R - 12 && r < R + 4) y *= 0.45; // flatten the beach near the waterline
+      for (const L of lakes) { // carve smooth bowls
+        const d = Math.hypot(x - L.x, z - L.z);
+        if (d < L.r) y -= L.depth * (0.5 + 0.5 * Math.cos((d / L.r) * Math.PI));
+      }
+      return y;
+    };
+    this.terrainHeight = h;
+
+    const geo = new THREE.PlaneGeometry(size, size, segs, segs); geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, colors = [];
+    const grass = new THREE.Color(0x5aa83c), grassHi = new THREE.Color(0x82c25a), sand = new THREE.Color(0xddcb8c), rock = new THREE.Color(0x8c8578);
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
+      if (y < 0.7) c.copy(sand); else if (y > 8) c.copy(rock); else c.copy(grass).lerp(grassHi, Math.min(1, y / 7));
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
+    const land = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
+    land.material.vertexColors = true; land.receiveShadow = true; this.scene.add(land);
+
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(sea, sea),
+      noOutline(new THREE.MeshStandardMaterial({ color: 0x2c74b8, roughness: 0.12, metalness: 0.45, transparent: true, opacity: 0.9 })));
+    water.rotation.x = -Math.PI / 2; water.position.y = 0; this.scene.add(water); this._sea = water;
+
+    for (let i = 0; i < 16; i++) { // distant mountain ring
+      const a = i / 16 * Math.PI * 2 + 0.2, rr = size * 0.6 + Math.random() * 60;
+      const hgt = 34 + Math.random() * 46;
+      const m = new THREE.Mesh(new THREE.ConeGeometry(22 + Math.random() * 18, hgt, 6), mat(0x6f7d8e, { roughness: 1, flat: true }));
+      m.position.set(Math.cos(a) * rr, hgt / 2 - 5, Math.sin(a) * rr); this.scene.add(m);
+    }
+    for (const L of lakes) { // wadeable shallow-lake surfaces (sit just below the original ground)
+      const wy = h(L.x, L.z) + L.depth - 0.28;
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(L.r, 28),
+        noOutline(new THREE.MeshStandardMaterial({ color: 0x46b0d2, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.6 })));
+      disc.rotation.x = -Math.PI / 2; disc.position.set(L.x, wy, L.z); this.scene.add(disc);
+    }
+    return this;
   }
 
   update(t) {
     this._updateSpots(t);
+    if (this._sea) this._sea.position.y = Math.sin(t * 0.6) * 0.12; // gentle swell
     for (const a of this.arcs) {
       if (a.taken) continue;
-      a.group.position.y = 1.5 + Math.sin(t * 1.6 + a.x) * 0.18;
+      a.group.position.y = a.baseY + Math.sin(t * 1.6 + a.x) * 0.18;
       a.ring.rotation.y = t * 1.2; a.ring.rotation.z = t * 0.6; a.core.rotation.y = -t * 2;
       a.halo.material.opacity = 0.6 + Math.sin(t * 3) * 0.25;
     }

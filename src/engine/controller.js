@@ -72,12 +72,12 @@ export class Controller {
     return false;
   }
 
-  // highest surface directly beneath (x,z) we can stand on (0 = ground)
+  // highest surface directly beneath (x,z) we can stand on (terrain height, or a platform on top)
   _groundUnder(x, z) {
-    let g = 0;
+    let g = this.level.terrainHeight ? this.level.terrainHeight(x, z) : 0; // sculpted island terrain (flat levels: 0)
     for (const c of this.level.colliders) {
       if (x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ) {
-        const top = c.top ?? 3.4;
+        const top = (c.top ?? 3.4) + (c.baseY || 0);
         if (top > g) g = top;
       }
     }
