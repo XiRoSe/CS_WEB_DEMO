@@ -24,6 +24,7 @@ import { Projectile, applyBlast } from "./engine/projectiles.js";
 import { preloadWeapons } from "./kit/content/weapons.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
+import { makeObjective } from "./game/objectives/index.js";
 import { isMobileOrTablet, showDesktopOnlyScreen } from "./device.js";
 
 class Game {
@@ -70,38 +71,10 @@ class Game {
     this._heliSpawned = false;
     this._heliKilled = false;
 
-    // objective
+    // objective (exfil = clear all + reach the flag; defuse = crack the timed bomb code).
+    // The objective owns the win/lose CONDITIONS; the runner owns the state transitions + cinematics.
     this.objType = this.cfg.objective.type;
-    if (this.objType === "defuse") {
-      this.bombTime = this.cfg.objective.timeLimit;
-      this.codeLen = this.cfg.objective.codeLength || 3;
-      // A self-working "mentalist" lock: the player feeds in a personal number, but the operations
-      // are rigged so the secret cancels out and EVERYONE lands on our exact 3-digit code.
-      //   ((x * m) + m*N) / m - x  ==  N   for any x, any m.
-      const N = 100 + Math.floor(Math.random() * 900); // the real 3-digit code
-      this.bombCode = String(N);
-      this.codeLen = 3;
-      const m = 2 + Math.floor(Math.random() * 2); // 2 or 3
-      const personals = [
-        "the day of the month you were born",
-        "your age",
-        "your house number",
-        "the last two digits of your phone number",
-        "your lucky number",
-      ];
-      const who = personals[Math.floor(Math.random() * personals.length)];
-      this.bombHint =
-        `<b>NEURAL KEY · unique to you</b><br>` +
-        `① think of <b>${who}</b> (keep it secret)<br>` +
-        `② multiply it by ${m}<br>` +
-        `③ add ${m * N}<br>` +
-        `④ divide by ${m}<br>` +
-        `⑤ subtract the number you started with<br>` +
-        `▶ what remains is the 3-digit disarm code`;
-      this.maxTries = this.cfg.objective.maxTries || 3;
-      this.codeTries = 0;
-      this.defusing = false; this.defused = false; this.codeTyped = ""; this.codeFeedback = "";
-    }
+    this.objective = makeObjective(this.objType, this);
 
     this.health = this.cfg.player.maxHealth;
     this.grenades = this.cfg.player.grenades ?? 5;
@@ -160,9 +133,7 @@ class Game {
     this.state = "start";
     this.hud.showStart(() => this._deploy(), {
       title: this.levelDef.name,
-      brief: this.objType === "defuse"
-        ? "Infiltrate the base and disarm the bomb before it detonates."
-        : "Push to the extraction zone. Eliminate anyone in your way.",
+      brief: this.objective.brief(),
     });
   }
 
@@ -209,14 +180,7 @@ class Game {
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
-    if (this.objType === "defuse") {
-      this.hud.showTimer(true);
-      this.hud.setMissionTimer(this.bombTime);
-      this.hud.setObjective('Reach &amp; disarm the <span class="arrow">BOMB ◎</span>');
-      this.hud.setCounter("Eliminated", this.combat.killCount);
-    } else {
-      this.hud.setCounter("Hostiles", this.combat.enemiesLeft);
-    }
+    this.objective.onPlayStart();
     this.hud.setGrenades(this.grenades);
     this.touch.show();
     if (!this._deployed) { this._deployed = true; this.voice.deploy(); }
@@ -332,7 +296,7 @@ class Game {
     if (this.state === "detonate" || this.state === "lose") return;
     this.state = "detonate";
     this._detT = this.cfg.balance.detonation.duration; this._detBlast = 0; // long enough for the player's flight to play out
-    this.defusing = false; this.hud.hideDefuse(); this.hud.showTimer(false); this.hud.setCombatVisible(false);
+    this.hud.hideDefuse(); this.hud.showTimer(false); this.hud.setCombatVisible(false);
     this.controller.unlock(); this.audio.stopRotor();
     const b = this.level.bomb; this._bombPos = new THREE.Vector3(b.x, 1, b.z);
     // one ENORMOUS blast
@@ -348,47 +312,6 @@ class Game {
     this._camSpin = new THREE.Vector3(0.6 + Math.random() * 1.6, (Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 5); // wild tumble
   }
 
-  // bomb objective: countdown, proximity disarm panel, code entry, win/lose
-  _updateDefuse(dt, presses) {
-    this.bombTime -= dt;
-    this.hud.setMissionTimer(this.bombTime);
-    this.hud.setCounter("Eliminated", this.combat.killCount);
-    if (this.bombTime <= 0) { this._detonate(); return; }
-    if (this.defused) return;
-
-    const bmb = this.level.bomb;
-    const dx = this.camera.position.x - bmb.x, dz = this.camera.position.z - bmb.z;
-    const near = (dx * dx + dz * dz) < bmb.r * bmb.r;
-    if (near && !this.defusing) {
-      this.defusing = true; this.codeTyped = "";
-      this.codeFeedback = this.bombHint;
-      this.hud.showDefuse(this.codeLen); this.hud.updateDefuse("", this.codeFeedback);
-    } else if (!near && this.defusing) {
-      this.defusing = false; this.hud.hideDefuse();
-    }
-
-    if (this.defusing && presses.length) {
-      for (const k of presses) {
-        if (/^[0-9]$/.test(k)) { if (this.codeTyped.length < this.codeLen) this.codeTyped += k; }
-        else if (k === "backspace") this.codeTyped = this.codeTyped.slice(0, -1);
-        else if (k === "enter" && this.codeTyped.length === this.codeLen) {
-          let correct = 0;
-          for (let i = 0; i < this.codeLen; i++) if (this.codeTyped[i] === this.bombCode[i]) correct++;
-          if (correct === this.codeLen) {
-            const left = Math.max(0, this.bombTime), mm = Math.floor(left / 60), ss = Math.floor(left % 60);
-            this.hud.hideDefuse();
-            this._win({ disarmed: true, timeLeft: `${mm}:${String(ss).padStart(2, "0")}`, title: 'Bomb <span class="hz">Disarmed</span>' });
-            return;
-          }
-          this.codeTries++;
-          if (this.codeTries >= this.maxTries) { this.hud.hideDefuse(); this._detonate(); return; }
-          this.codeFeedback = `<b class="bad">✗ WRONG · ${this.codeTries}/${this.maxTries}</b><br>${this.bombHint}`;
-          this.codeTyped = "";
-        }
-      }
-      this.hud.updateDefuse(this.codeTyped, this.codeFeedback);
-    }
-  }
 
   _updateLaser() {
     if (!this.combat) return;
@@ -520,30 +443,12 @@ class Game {
       }
     }
 
-    const heliAlive = this.heli && !this.heli.dead;
-
     // HUD sync (ammo readout swaps to rockets in launcher mode)
     if (this.weapon.mode === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
     else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
 
-    if (this.objType === "defuse") {
-      // disarm-the-bomb objective (timed; doesn't require clearing the base)
-      this._updateDefuse(dt, presses);
-    } else {
-      // clear-and-extract objective
-      const cleared = this.combat.enemiesLeft === 0 && !heliAlive;
-      this.hud.setCounter("Hostiles", this.combat.enemiesLeft + (heliAlive ? 1 : 0));
-      if (cleared !== this._cleared) {
-        this._cleared = cleared;
-        this.hud.setObjective(cleared ? this.cfg.messages.objectiveCleared : this.cfg.messages.objective);
-      }
-      if (cleared) {
-        const e = this.level.exfil;
-        const dx = this.camera.position.x - e.x, dz = this.camera.position.z - e.z;
-        if (dx * dx + dz * dz < e.r * e.r) this._win();
-      }
-    }
+    this.objective.update(dt, t, presses);
   }
 }
 
