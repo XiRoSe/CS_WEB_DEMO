@@ -9,7 +9,7 @@ build your **own** FPS level or game on top of it fast.
 > bunkers, vehicles, fuel barrels and desert dressing on purpose — that's what makes it
 > batteries-included. If you want a different setting, you reskin the content, not the architecture.
 
-**Live demo:** https://cswebdemo-production.up.railway.app
+**Live demo:** https://nightops-first-fps.up.railway.app
 
 ---
 
