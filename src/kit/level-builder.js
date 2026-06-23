@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "./builders.js";
-import { makeVehicle } from "./vehicles.js";
-import { makeAmmo } from "./pickups.js";
+import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "../engine/primitives.js";
+import { makeVehicle } from "./content/vehicles.js";
+import { makeAmmo } from "./content/pickups.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,

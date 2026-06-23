@@ -1,4 +1,4 @@
-import { PropAsset } from "./actor.js";
+import { PropAsset } from "../../engine/assets.js";
 
 // Pickups for this game. Low-poly CC0 assault-rifle ammo box.
 const AMMO = new PropAsset("/models/ammo.glb", { length: 0.55 });

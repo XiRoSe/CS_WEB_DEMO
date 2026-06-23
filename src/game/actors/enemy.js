@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { COLORS, box, noOutline } from "../engine/builders.js";
-import { RiggedAsset } from "../engine/actor.js";
+import { COLORS, box, noOutline } from "../../engine/primitives.js";
+import { RiggedAsset } from "../../engine/assets.js";
 
 // the rigged soldier model, loaded once and shared across all enemies
 const SOLDIER = new RiggedAsset("/models/Soldier.glb", 1.8);

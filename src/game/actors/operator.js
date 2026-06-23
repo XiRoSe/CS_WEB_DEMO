@@ -1,4 +1,4 @@
-import { RiggedAsset } from "../engine/actor.js";
+import { RiggedAsset } from "../../engine/assets.js";
 
 // The player operator (black SWAT) — used for the intro insertion (third-person).
 const OPERATOR = new RiggedAsset("/models/SWAT.glb", 1.8);

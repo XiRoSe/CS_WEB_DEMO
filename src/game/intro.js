@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { COLORS, box, cyl, noOutline } from "../engine/builders.js";
-import { makeOperator } from "./operator.js";
+import { COLORS, box, cyl, noOutline } from "../engine/primitives.js";
+import { makeOperator } from "./actors/operator.js";
 
 // Third-person fast-rope insertion: a helicopter sweeps in over the compound with the
 // player fast-roping on a rope below it, then drops him at the spawn. Cuts to first-person

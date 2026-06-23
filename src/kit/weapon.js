@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { COLORS, box } from "./builders.js";
-import { makeLauncher } from "./weapons.js";
+import { COLORS, box } from "../engine/primitives.js";
+import { makeLauncher } from "./content/weapons.js";
 
 // First-person rifle: viewmodel, ammo, recoil spring, muzzle flash.
 export class Weapon {

@@ -1,4 +1,4 @@
-import { COLORS } from "../../engine/builders.js";
+import { COLORS } from "../../engine/primitives.js";
 
 // "Sand Viper" — a larger forward operating base: gated approach, motor pool, central HQ,
 // and a defended exfil at the rear. Bigger footprint, more guards (some tougher).

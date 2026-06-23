@@ -1,4 +1,4 @@
-import { PropAsset } from "./actor.js";
+import { PropAsset } from "../../engine/assets.js";
 
 // This game's vehicle catalog — low-poly CC0 models (Kenney car kit), scaled to real lengths
 // and tinted toward military olive/sand so they read as base vehicles, not toys.

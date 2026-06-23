@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Enemy } from "./enemy.js";
+import { Enemy } from "./actors/enemy.js";
 
 export class Combat {
   constructor(scene, camera, level, weapon, vfx, audio, hooks) {

@@ -1,4 +1,4 @@
-import { COLORS } from "../../engine/builders.js";
+import { COLORS } from "../../engine/primitives.js";
 
 // "Clear the Compound" — the original level: a small 3-zone walled compound.
 export const compound = {

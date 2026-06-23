@@ -6,20 +6,20 @@ import { Audio } from "./engine/audio.js";
 import { Voice } from "./engine/voice.js";
 import { HUD } from "./engine/hud.js";
 import { Controller } from "./engine/controller.js";
-import { Weapon } from "./engine/weapon.js";
+import { Weapon } from "./kit/weapon.js";
 import { VFX } from "./engine/vfx.js";
 import { TouchControls } from "./engine/touch.js";
-import { LevelBuilder } from "./engine/level-builder.js";
+import { LevelBuilder } from "./kit/level-builder.js";
 // game — this game's content + rules
 import { Combat } from "./game/combat.js";
-import { Helicopter, preloadHeli } from "./game/helicopter.js";
+import { Helicopter, preloadHeli } from "./game/actors/helicopter.js";
 import { Intro } from "./game/intro.js";
-import { preloadEnemies } from "./game/enemy.js";
-import { preloadOperator } from "./game/operator.js";
-import { preloadVehicles } from "./engine/vehicles.js";
-import { preloadPickups } from "./engine/pickups.js";
+import { preloadEnemies } from "./game/actors/enemy.js";
+import { preloadOperator } from "./game/actors/operator.js";
+import { preloadVehicles } from "./kit/content/vehicles.js";
+import { preloadPickups } from "./kit/content/pickups.js";
 import { Projectile, applyBlast } from "./engine/projectiles.js";
-import { preloadWeapons } from "./engine/weapons.js";
+import { preloadWeapons } from "./kit/content/weapons.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
 
