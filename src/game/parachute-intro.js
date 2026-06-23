@@ -19,20 +19,12 @@ export class ParachuteIntro {
     const inst = CREATURES.warrior.make();
     if (inst) {
       this.op = inst.model;
-      this.op.traverse((o) => { // brighten the near-black armor to heroic steel
-        if (!o.isMesh) return;
-        o.castShadow = true; o.material = o.material.clone();
-        const n = (o.material.name || "").toLowerCase();
-        if (n.includes("armor")) { o.material.color.set(0x707e8c); o.material.metalness = 0.8; o.material.roughness = 0.35; }
-        else if (n.includes("boot")) o.material.color.set(0x3a2c1c);
-      });
-      this.op.scale.multiplyScalar(1.2);
+      this.op.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       this.rig.add(this.op); this.rig.rotation.x = 0.14;
       this.mixer = new THREE.AnimationMixer(this.op);
       const a = inst.animations;
-      const idle = a.find((c) => /idle_sword/i.test(c.name)) || a.find((c) => /idle/i.test(c.name)) || a[0];
+      const idle = a.find((c) => c.name === "Idle") || a.find((c) => /idle/i.test(c.name)) || a[0];
       if (idle) this.mixer.clipAction(idle).play();
-      this._addViking(); // helmet + cape → a heroic viking warrior
     }
 
     // colorful canopy + risers down to the harness
