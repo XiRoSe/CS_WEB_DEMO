@@ -12,6 +12,11 @@ build your **own** FPS level or game on top of it fast.
 
 **Live demo:** https://nightops-first-fps.up.railway.app
 
+> **Two games ship on the same engine** — proof the kit generalizes:
+> - **NightOps** (`?level=desert-base`) — a night military raid: clear the base / defuse the bomb.
+> - **The Lost Arcs** (`?level=arc-island`) — a *daytime* island survival hunt: **parachute** in and
+>   recover the **12 lost arcs** while fighting monsters, raiders and a **giant robot**.
+
 ---
 
 ## What's in the box
@@ -108,7 +113,7 @@ register it in `levels/index.js` → lay out your map with the `LevelBuilder` ca
 - **Add CI** — paste the workflow from [CONTRIBUTING.md](CONTRIBUTING.md) into `.github/workflows/ci.yml`
   (via the GitHub web UI) to run lint + build on every PR.
 - **A `npm test` smoke harness** — formalize the `window.__game` checks (LOS, shot counts, code solves).
-- **More example levels / a non-military theme** to show the kit generalizes.
+- **Grow "The Lost Arcs"** — more weapons/monsters, a robot boss fight, biomes, day/night cycle.
 - **Re-enable mobile** — the touch controls (`engine/touch.js`) are intact, just gated off; see
   [docs/BUILDING.md](docs/BUILDING.md#re-enabling-mobile).
 - Known nit: a few enemies can settle slightly into the ground on death (cosmetic).

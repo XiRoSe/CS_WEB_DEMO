@@ -1,5 +1,14 @@
 import * as THREE from "three";
 import { Enemy } from "./actors/enemy.js";
+import { Monster } from "./actors/monster.js";
+import { Robot } from "./actors/robot.js";
+
+// spawn the right actor for a spawn spec's `kind` (default: a rifle soldier)
+function makeActor(scene, spawn, level) {
+  if (spawn.kind === "monster") return new Monster(scene, spawn, level);
+  if (spawn.kind === "robot") return new Robot(scene, spawn, level);
+  return new Enemy(scene, spawn, level);
+}
 
 export class Combat {
   constructor(scene, camera, level, weapon, vfx, audio, hooks) {
@@ -13,7 +22,7 @@ export class Combat {
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = 200;
 
-    this.enemies = level.enemySpawns.map((s) => new Enemy(scene, s, level));
+    this.enemies = level.enemySpawns.map((s) => makeActor(scene, s, level));
     this.killCount = 0;
     this.totalEnemies = this.enemies.length;
 

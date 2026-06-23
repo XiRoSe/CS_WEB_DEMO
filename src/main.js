@@ -16,6 +16,7 @@ import { Destructibles } from "./kit/destructibles.js";
 import { Combat } from "./game/combat.js";
 import { Helicopter, preloadHeli } from "./game/actors/helicopter.js";
 import { Intro } from "./game/intro.js";
+import { ParachuteIntro } from "./game/parachute-intro.js";
 import { preloadEnemies } from "./game/actors/enemy.js";
 import { preloadOperator } from "./game/actors/operator.js";
 import { preloadVehicles } from "./kit/content/vehicles.js";
@@ -44,8 +45,8 @@ class Game {
     this.scene.fog = new THREE.Fog(this.cfg.scene.fog.color, this.cfg.scene.fog.near, this.cfg.scene.fog.far);
     this.camera = new THREE.PerspectiveCamera(this.cfg.scene.fov, window.innerWidth / window.innerHeight, 0.1, 2000);
     this.scene.add(this.camera);
-    this.engine.setupNight(this.scene);
-    this.engine.addLights(this.scene);
+    if (this.cfg.scene.sky === "day") { this.engine.setupDay(this.scene); this.engine.addDayLights(this.scene); }
+    else { this.engine.setupNight(this.scene); this.engine.addLights(this.scene); }
 
     this.level = new LevelBuilder(this.scene, this.cfg.balance); // built in _boot, once assets are loaded
     this.controller = new Controller(this.camera, this.engine.renderer.domElement, this.level);
@@ -151,9 +152,12 @@ class Game {
     this.state = "intro";
     this.hud.hideOverlay();
     this.hud.setCombatVisible(false);
-    this.weapon.group.visible = false; // hands on the rope, not the gun
-    this.audio.startRotor();
-    this.intro = new Intro(this.scene, this.camera, this.level.playerSpawn);
+    this.weapon.group.visible = false; // hands on the rope/canopy, not the gun
+    const parachute = this.cfg.intro.style === "parachute";
+    if (!parachute) this.audio.startRotor();
+    this.intro = parachute
+      ? new ParachuteIntro(this.scene, this.camera, this.level.playerSpawn)
+      : new Intro(this.scene, this.camera, this.level.playerSpawn);
     this.intro.start();
     this.hud.killFeed(this.cfg.messages.deployHint);
     this._introT = 0;
@@ -409,6 +413,21 @@ class Game {
           this.weapon.reserve += p.rounds;
           this.audio.playBuf?.("clipin", 0.6);
           this.hud.notify(`+${p.rounds} ROUNDS · MAGAZINE`);
+        }
+      }
+    }
+
+    // gift crates — walk over a loot crate for ammo / grenades / health
+    if (this.level.gifts) {
+      for (const gf of this.level.gifts) {
+        if (gf.taken) continue;
+        const dx = this.camera.position.x - gf.x, dz = this.camera.position.z - gf.z;
+        if (dx * dx + dz * dz < gf.r * gf.r) {
+          gf.taken = true; gf.group.visible = false;
+          this.audio.playBuf?.("clipin", 0.6);
+          if (gf.kind === "grenade") { this.grenades += 2; this.hud.setGrenades(this.grenades); this.hud.notify("+2 GRENADES · GIFT"); }
+          else if (gf.kind === "health") { this.health = Math.min(this.cfg.player.maxHealth, this.health + 40); this.hud.notify("+40 HEALTH · GIFT"); }
+          else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
         }
       }
     }

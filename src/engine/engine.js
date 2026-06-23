@@ -101,6 +101,49 @@ export class Engine {
     mkStars(90, 4.5, 0.95);   // a few bright ones
   }
 
+  // Bright daytime sky (blue gradient + soft clouds + sun) — also the IBL/reflection source.
+  setupDay(scene) {
+    const W = 2048, H = 1024;
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d");
+    const g = x.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#2f6fd0"); g.addColorStop(0.5, "#7fb0ea"); g.addColorStop(0.82, "#bfe0f4"); g.addColorStop(1, "#dfeede");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 30; i++) { // soft clouds in the upper sky
+      const cx = Math.random() * W, cy = Math.random() * H * 0.42, r = 26 + Math.random() * 90;
+      const cg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      cg.addColorStop(0, "rgba(255,255,255,0.65)"); cg.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = cg; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+    }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.background = tex;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    scene.environment = pmrem.fromEquirectangular(tex).texture;
+    scene.environmentIntensity = 1.0;
+    this.sunDir = new THREE.Vector3(0.5, 0.82, 0.32).normalize();
+    const mc = document.createElement("canvas"); mc.width = mc.height = 256; const m = mc.getContext("2d");
+    const halo = m.createRadialGradient(128, 128, 8, 128, 128, 128);
+    halo.addColorStop(0, "rgba(255,251,232,1)"); halo.addColorStop(0.28, "rgba(255,245,205,0.55)"); halo.addColorStop(1, "rgba(255,245,205,0)");
+    m.fillStyle = halo; m.fillRect(0, 0, 256, 256);
+    const st = new THREE.CanvasTexture(mc); st.colorSpace = THREE.SRGBColorSpace;
+    const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: st, transparent: true, depthWrite: false, fog: false }));
+    sun.position.copy(this.sunDir).multiplyScalar(500); sun.scale.setScalar(170); scene.add(sun);
+  }
+
+  // bright sun-lit lighting for the daytime island
+  addDayLights(scene) {
+    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x5a7a44, 0.95));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+    const sun = new THREE.DirectionalLight(0xfff2d6, 2.3);
+    sun.position.copy(this.sunDir || new THREE.Vector3(0.5, 0.82, 0.32)).multiplyScalar(90);
+    sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+    const s = sun.shadow.camera; s.near = 1; s.far = 220; s.left = -70; s.right = 70; s.top = 70; s.bottom = -70;
+    sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.06;
+    scene.add(sun, sun.target);
+    return sun;
+  }
+
   addLights(scene) {
     const hemi = new THREE.HemisphereLight(0x3b4a68, 0x0a0c12, 0.62);
     scene.add(hemi);

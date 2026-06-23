@@ -18,6 +18,8 @@ export class LevelBuilder {
     this.solidMeshes = []; // occluders for bullet raycasts (walls, crates, buildings…)
     this.explosives = [];  // shootable fuel barrels { mesh, x, z, exploded } that blow up when hit
     this.vehicles = [];    // shootable vehicles { mesh, x, z, hp, exploded } — tougher, launch + wreck
+    this.arcs = [];        // collectible "lost arc" relics { x, z, r, group, taken } (the collect objective)
+    this.gifts = [];       // loot crates { x, z, r, group, kind, taken } — grant ammo/grenades/health
     this.enemySpawns = []; // { x, z, [y], patrol:[{x,z}], [hp], [speed] }
     this.spots = [];       // floodlights (for the sweep + beam update)
     this.playerSpawn = new THREE.Vector3(0, 0, 16);
@@ -406,8 +408,89 @@ export class LevelBuilder {
     }
   }
 
+  // ---- island content (the "lost arcs" game) ----
+
+  _glowTex() {
+    if (this._gtex) return this._gtex;
+    const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.4, "rgba(255,255,255,0.5)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    this._gtex = new THREE.CanvasTexture(c); this._gtex.colorSpace = THREE.SRGBColorSpace;
+    return this._gtex;
+  }
+
+  // a glowing "lost arc" relic: floating spinning ring + core + halo + a sky beam so it's findable.
+  // No light (emissive + additive sprite) so 12 of them don't recompile shaders. Tracked for the collect objective.
+  arc(x, z) {
+    const C = 0x6fe0ff;
+    const g = new THREE.Group(); g.position.set(x, 1.5, z);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.13, 12, 24),
+      new THREE.MeshStandardMaterial({ color: C, emissive: C, emissiveIntensity: 1.5, roughness: 0.3, metalness: 0.5 }));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: C, emissiveIntensity: 2.2, roughness: 0.2 }));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    halo.scale.setScalar(3.6);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.05, 44, 8, 1, true),
+      noOutline(new THREE.MeshBasicMaterial({ color: C, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
+    beam.position.y = 22; beam.frustumCulled = false;
+    g.add(ring, core, halo, beam);
+    this.scene.add(g);
+    this.arcs.push({ x, z, r: 2.6, group: g, ring, core, halo, taken: false });
+  }
+
+  // a loot gift crate (kind = "ammo" | "grenade" | "health"); collected on proximity by the runner.
+  giftCrate(x, z, kind = "ammo") {
+    const C = { ammo: 0xffce73, grenade: 0xd0552e, health: 0x4fd06a }[kind] || 0xffce73;
+    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat(C, { roughness: 0.5 })); box.position.y = 0.4; box.castShadow = true;
+    const rib = mat(0xfff4e0, { roughness: 0.5 });
+    const rx = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.16), rib); rx.position.y = 0.4;
+    const rz = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.86, 0.86), rib); rz.position.y = 0.4;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); halo.scale.setScalar(2.2); halo.position.y = 0.5;
+    g.add(box, rx, rz, halo);
+    this.scene.add(g);
+    this.gifts.push({ x, z, r: 1.8, group: g, box, halo, kind, taken: false });
+  }
+
+  // a low-poly tree (trunk + stacked foliage); the trunk blocks movement
+  tree(x, z, s = 1) {
+    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const trunk = cyl(0.18 * s, 0.24 * s, 2.2 * s, 0x6b4a2e, 7, { roughness: 0.9 }); trunk.position.y = 1.1 * s; trunk.castShadow = true; g.add(trunk);
+    for (let i = 0; i < 3; i++) {
+      const r = (1.3 - i * 0.3) * s;
+      const f = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat([0x3f7d3a, 0x4f8f3f, 0x356b32][i % 3], { roughness: 1, flat: true }));
+      f.position.y = (2.2 + i * 0.9) * s; f.castShadow = true; g.add(f);
+    }
+    g.rotation.y = Math.random() * 6.28; this.scene.add(g);
+    this.collide(x, z, 0.6 * s, 0.6 * s, 1.4);
+  }
+
+  scatterTrees(n, rMin, rMax) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.tree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 0.9); }
+  }
+
+  // grassy island ground ringed by water (for the daytime island level)
+  grassFloor(size = 220, surround = 2400) {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat(0x5c8a3a, { roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; this.scene.add(ground);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(surround, surround), noOutline(new THREE.MeshStandardMaterial({ color: 0x2f6fae, roughness: 0.25, metalness: 0.25 })));
+    water.rotation.x = -Math.PI / 2; water.position.y = -0.5; this.scene.add(water);
+    this.scatterDesert(size * 0.4, size * 0.9, 40, 60); // reuse the rock/bush scatter as island shrubs
+  }
+
   update(t) {
     this._updateSpots(t);
+    for (const a of this.arcs) {
+      if (a.taken) continue;
+      a.group.position.y = 1.5 + Math.sin(t * 1.6 + a.x) * 0.18;
+      a.ring.rotation.y = t * 1.2; a.ring.rotation.z = t * 0.6; a.core.rotation.y = -t * 2;
+      a.halo.material.opacity = 0.6 + Math.sin(t * 3) * 0.25;
+    }
+    for (const gf of this.gifts) {
+      if (gf.taken) continue;
+      gf.box.rotation.y = t * 0.8; gf.halo.material.opacity = 0.5 + Math.sin(t * 3) * 0.2;
+    }
     if (this._bombLed) this._bombLed.visible = Math.sin(t * 6) > -0.3; // blinking charge indicator
     if (this.pickups) for (const p of this.pickups) {
       if (p.taken) continue;
