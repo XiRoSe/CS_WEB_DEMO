@@ -20,6 +20,7 @@ export const arcfall = {
     b.scatterTrees(110, 22, 195);     // GLB forest (birch + palms), seated on the terrain
     b.scatterRocks(45, 26, 195);      // GLB rocks (cover + dressing)
     b.lookout(28, -46); b.lookout(-58, 30); // climbable lookouts — high ground to spot arcs + snipe
+    b.car(14, 20, "suv"); b.car(-30, -8, "truck"); // driveable cars near the drop (press E)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
     const arcs = [[0, -44], [44, -22], [-38, -26], [74, 22], [-68, 16], [32, 58],

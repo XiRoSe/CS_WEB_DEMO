@@ -3,6 +3,7 @@ import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, ma
 import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
 import { makeTree, makeRock } from "./content/nature.js";
+import { Car } from "./car.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
 // methods on a builder instance to lay out its map; the builder accumulates colliders, occluders,
@@ -514,6 +515,9 @@ export class LevelBuilder {
 
   // ground elevation at (x,z) for the current level (0 if flat). Set by islandTerrain().
   _groundY(x, z) { return this.terrainHeight ? this.terrainHeight(x, z) : 0; }
+
+  // a driveable car (press E to get in); collected into level.cars for the game loop to drive
+  car(x, z, type) { (this.cars ||= []).push(new Car(this.scene, x, z, this, type)); }
 
   // A sculpted island: a vertex-colored heightfield (grass hills → sandy beach at the shoreline) that
   // rises out of a big sea, ringed by distant mountains. Exposes terrainHeight(x,z) so the player,

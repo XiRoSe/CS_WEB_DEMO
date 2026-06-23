@@ -318,6 +318,22 @@ class Game {
     }
   }
 
+  _enterCar(car) {
+    this.driving = car;
+    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false;
+    this.laser?.hide?.();
+    this._carPrompt = false;
+    this.hud.notify("DRIVING — press E to exit");
+  }
+  _exitCar() {
+    const s = this.driving.exitSpot();
+    this.camera.position.set(s.x, s.y + this.controller.eye, s.z);
+    this.controller.feetY = s.y; this.controller.vy = 0; this.controller.onGround = true;
+    this.driving = null;
+    if (this.weapon._showViewmodel) this.weapon._showViewmodel(); else this.weapon.group.visible = true;
+    this.hud.notify("ON FOOT");
+  }
+
   _updateProjectiles(dt) {
     for (let i = this._projectiles.length - 1; i >= 0; i--) {
       const p = this._projectiles[i];
@@ -423,39 +439,47 @@ class Game {
     }
     if (this.state !== "play") { this.input.drainPresses(); return; }
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
-
-    this.controller.update(dt, this.input);
-    this.weapon.update(dt, this.controller.moving);
-    this._updateLaser();
-
-    // fire — mouse or touch FIRE button (per weapon mode)
-    const firing = this.input.mouseDown || this.input.touch.fire;
-    const mode = this.weapon.mode;
-    if (mode === "launcher") {
-      if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t);
-    } else if (mode === "plasma") {
-      if (firing && this.weapon.canFirePlasma(t)) this._firePlasma(t);
-    } else if (mode === "arc") {
-      if (firing && this.weapon.canFireArc(t)) this._fireArc(t);
-    } else if (firing && this.weapon.canFire(t)) {
-      this.shotsFired++;
-      this.combat.tryShoot(t);
-      this.hud.bloom();
-      this._fovKick = Math.min(this._fovKick + 0.8, 3.5);
-    }
-    // recoil FOV punch recovery
-    this._fovKick *= Math.pow(0.0009, dt);
-    const fov = this.baseFov + this._fovKick;
-    if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
-    // reload (+ keys reused by the bomb code entry below)
     const presses = this.input.drainPresses();
-    if (presses.includes("r")) this.weapon.reload();
-    // grenade (right-click)
-    if (presses.includes("rmb") && this.grenades > 0) this._throwGrenade();
-    // swap rifle <-> missile launcher (Q)
-    if (presses.includes("q")) this.hud.setWeaponName(this._weaponName(this.weapon.toggle()));
 
-    this.combat.update(dt, t, this.camera.position);
+    // enter / exit a driveable car with E
+    if (presses.includes("e")) {
+      if (this.driving) this._exitCar();
+      else if (this.level.cars) {
+        const c = this.level.cars.find((v) => (v.pos.x - this.camera.position.x) ** 2 + (v.pos.z - this.camera.position.z) ** 2 < (v.r + 1.5) ** 2);
+        if (c) this._enterCar(c);
+      }
+    }
+
+    if (this.driving) {
+      this.driving.update(dt, this.input);
+      this.driving.chaseCamera(this.camera);
+    } else {
+      this.controller.update(dt, this.input);
+      this.weapon.update(dt, this.controller.moving);
+      this._updateLaser();
+      // fire — mouse or touch FIRE button (per weapon mode)
+      const firing = this.input.mouseDown || this.input.touch.fire;
+      const mode = this.weapon.mode;
+      if (mode === "launcher") { if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t); }
+      else if (mode === "plasma") { if (firing && this.weapon.canFirePlasma(t)) this._firePlasma(t); }
+      else if (mode === "arc") { if (firing && this.weapon.canFireArc(t)) this._fireArc(t); }
+      else if (firing && this.weapon.canFire(t)) { this.shotsFired++; this.combat.tryShoot(t); this.hud.bloom(); this._fovKick = Math.min(this._fovKick + 0.8, 3.5); }
+      // recoil FOV punch recovery
+      this._fovKick *= Math.pow(0.0009, dt);
+      const fov = this.baseFov + this._fovKick;
+      if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+      if (presses.includes("r")) this.weapon.reload();
+      if (presses.includes("rmb") && this.grenades > 0) this._throwGrenade();
+      if (presses.includes("q")) this.hud.setWeaponName(this._weaponName(this.weapon.toggle()));
+      if (this.level.cars) { // "press E to drive" prompt when near a car
+        const near = this.level.cars.some((v) => (v.pos.x - this.camera.position.x) ** 2 + (v.pos.z - this.camera.position.z) ** 2 < (v.r + 1.8) ** 2);
+        if (near && !this._carPrompt) { this.hud.showPrompt("Press <b>E</b> to drive", 1.4); this._carPrompt = true; }
+        else if (!near) this._carPrompt = false;
+      }
+    }
+
+    const pp = this.driving ? this.driving.pos : this.camera.position; // "player position" for combat/pickups
+    this.combat.update(dt, t, pp);
     this._updateProjectiles(dt);
     this.level.updateDynamics(dt); // explosion-flung props (barrels, etc.)
 
@@ -463,7 +487,7 @@ class Game {
     if (this.level.pickups) {
       for (const p of this.level.pickups) {
         if (p.taken) continue;
-        const dx = this.camera.position.x - p.x, dz = this.camera.position.z - p.z;
+        const dx = pp.x - p.x, dz = pp.z - p.z;
         if (dx * dx + dz * dz < p.r * p.r) {
           // hide the box + glow, but leave the (now-dark) light in the scene: toggling a light's
           // visibility changes the scene light count and recompiles every shader (a multi-second freeze).
@@ -479,7 +503,7 @@ class Game {
     if (this.level.gifts) {
       for (const gf of this.level.gifts) {
         if (gf.taken) continue;
-        const dx = this.camera.position.x - gf.x, dz = this.camera.position.z - gf.z;
+        const dx = pp.x - gf.x, dz = pp.z - gf.z;
         if (dx * dx + dz * dz < gf.r * gf.r) {
           gf.taken = true; gf.group.visible = false;
           this.audio.playBuf?.("clipin", 0.6);
