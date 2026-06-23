@@ -47,4 +47,4 @@ const server = createServer(async (req, res) => {
     res.end("server error");
   }
 });
-server.listen(PORT, () => console.log(`CS_WEB_DEMO serving dist/ on :${PORT}`));
+server.listen(PORT, () => console.log(`NightOps FPS Kit serving dist/ on :${PORT}`));

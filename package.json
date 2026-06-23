@@ -1,5 +1,5 @@
 {
-  "name": "cod-web",
+  "name": "nightops-fps-kit",
   "private": true,
   "version": "0.1.0",
   "description": "NightOps FPS Kit — a hackable Three.js + Vite first-person-shooter starter kit (night military shooter, level toolkit, destructibles, AI).",
