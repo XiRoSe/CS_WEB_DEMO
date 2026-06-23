@@ -109,14 +109,15 @@ export class Engine {
     const g = x.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#2f6fd0"); g.addColorStop(0.5, "#7fb0ea"); g.addColorStop(0.82, "#bfe0f4"); g.addColorStop(1, "#dfeede");
     x.fillStyle = g; x.fillRect(0, 0, W, H);
-    // big fluffy clouds (clusters of soft puffs) across the upper sky
-    for (let i = 0; i < 16; i++) {
-      const bx = Math.random() * W, by = 30 + Math.random() * H * 0.46, n = 4 + Math.floor(Math.random() * 5), s = 0.7 + Math.random() * 1.1;
-      for (let j = 0; j < n; j++) {
-        const cx = bx + (Math.random() - 0.5) * 220 * s, cy = by + (Math.random() - 0.5) * 70 * s, r = (44 + Math.random() * 120) * s;
-        const cg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-        cg.addColorStop(0, "rgba(255,255,255,0.72)"); cg.addColorStop(0.55, "rgba(255,255,255,0.22)"); cg.addColorStop(1, "rgba(255,255,255,0)");
-        x.fillStyle = cg; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+    // soft, wide, flat cloud wisps high in the sky (gentle — not blobby)
+    for (let i = 0; i < 9; i++) {
+      const cx = Math.random() * W, cy = 36 + Math.random() * H * 0.32, puffs = 5 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < puffs; j++) {
+        const px = cx + (j - puffs / 2) * (44 + Math.random() * 28), py = cy + (Math.random() - 0.5) * 22, rx = 78 + Math.random() * 90, ry = rx * 0.42;
+        const cg = x.createRadialGradient(px, py, 0, px, py, rx);
+        cg.addColorStop(0, "rgba(255,255,255,0.42)"); cg.addColorStop(0.65, "rgba(255,255,255,0.12)"); cg.addColorStop(1, "rgba(255,255,255,0)");
+        x.save(); x.translate(px, py); x.scale(1, ry / rx); x.translate(-px, -py);
+        x.fillStyle = cg; x.beginPath(); x.arc(px, py, rx, 0, 7); x.fill(); x.restore();
       }
     }
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;

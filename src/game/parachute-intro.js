@@ -19,19 +19,20 @@ export class ParachuteIntro {
     const inst = CREATURES.warrior.make();
     if (inst) {
       this.op = inst.model;
-      this.op.traverse((o) => { // brighten the near-black armor to heroic steel so he reads as a strong warrior
+      this.op.traverse((o) => { // brighten the near-black armor to heroic steel
         if (!o.isMesh) return;
         o.castShadow = true; o.material = o.material.clone();
         const n = (o.material.name || "").toLowerCase();
-        if (n.includes("armor")) { o.material.color.set(0x6f7f8c); o.material.metalness = 0.75; o.material.roughness = 0.38; }
+        if (n.includes("armor")) { o.material.color.set(0x707e8c); o.material.metalness = 0.8; o.material.roughness = 0.35; }
         else if (n.includes("boot")) o.material.color.set(0x3a2c1c);
       });
-      this.op.scale.multiplyScalar(1.15);
+      this.op.scale.multiplyScalar(1.2);
       this.rig.add(this.op); this.rig.rotation.x = 0.14;
       this.mixer = new THREE.AnimationMixer(this.op);
       const a = inst.animations;
-      const idle = a.find((c) => /idle_sword/i.test(c.name)) || a.find((c) => /idle/i.test(c.name)) || a[0]; // sword stance = clearly a warrior
+      const idle = a.find((c) => /idle_sword/i.test(c.name)) || a.find((c) => /idle/i.test(c.name)) || a[0];
       if (idle) this.mixer.clipAction(idle).play();
+      this._addViking(); // helmet + cape → a heroic viking warrior
     }
 
     // colorful canopy + risers down to the harness
@@ -58,6 +59,23 @@ export class ParachuteIntro {
       this.group.add(line);
     }
     this._look = new THREE.Vector3();
+  }
+
+  // a horned viking helmet + a red cape, placed on the rig at the warrior's head/back (world scale, reliable)
+  _addViking() {
+    const steel = new THREE.MeshStandardMaterial({ color: 0x9aa6b2, metalness: 0.8, roughness: 0.35 });
+    const horn = new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.6 });
+    const helm = new THREE.Group();
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.56), steel);
+    const brim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 8, 18), steel); brim.rotation.x = Math.PI / 2;
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.05), steel); nose.position.set(0, -0.14, 0.33);
+    const hornGeo = new THREE.ConeGeometry(0.08, 0.42, 10);
+    const hL = new THREE.Mesh(hornGeo, horn); hL.position.set(-0.32, 0.18, 0); hL.rotation.z = 0.7;
+    const hR = new THREE.Mesh(hornGeo, horn); hR.position.set(0.32, 0.18, 0); hR.rotation.z = -0.7;
+    helm.add(dome, brim, nose, hL, hR); helm.position.set(0, 2.18, 0.02); this.rig.add(helm); this._helm = helm;
+    const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 1.5),
+      new THREE.MeshStandardMaterial({ color: 0xb02a2a, roughness: 0.85, side: THREE.DoubleSide }));
+    cape.position.set(0, 1.35, -0.24); cape.rotation.x = -0.14; this.rig.add(cape);
   }
 
   start() {}

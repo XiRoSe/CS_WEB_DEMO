@@ -422,7 +422,7 @@ export class LevelBuilder {
     return this._gtex;
   }
 
-  // a glowing "lost arc" relic: floating spinning ring + core + halo + a sky beam so it's findable.
+  // a glowing "lost arc" relic: floating spinning ring + core + a soft glow halo around it.
   // No light (emissive + additive sprite) so 12 of them don't recompile shaders. Tracked for the collect objective.
   arc(x, z) {
     const C = 0x6fe0ff;
@@ -433,10 +433,7 @@ export class LevelBuilder {
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: C, emissiveIntensity: 2.2, roughness: 0.2 }));
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     halo.scale.setScalar(3.6);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.05, 44, 8, 1, true),
-      noOutline(new THREE.MeshBasicMaterial({ color: C, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
-    beam.position.y = 22; beam.frustumCulled = false;
-    g.add(ring, core, halo, beam);
+    g.add(ring, core, halo);
     this.scene.add(g);
     this.arcs.push({ x, z, r: 2.6, baseY: g.position.y, group: g, ring, core, halo, taken: false });
   }
@@ -512,12 +509,13 @@ export class LevelBuilder {
     }
     const roof = box(W + 4, 1.1, W + 4, stoneDark, { roughness: 0.9 }); roof.position.set(x, gy + baseH + colH + 0.55, z); roof.castShadow = true; this.scene.add(roof);
     const cap = box(W + 1, 0.7, W + 1, stone, { roughness: 0.9 }); cap.position.set(x, gy + baseH + colH + 1.4, z); this.scene.add(cap);
-    // grand front staircase (+z) that RISES toward the temple, its top step meeting the floor edge
+    // grand front staircase (+z): each step is a SOLID block from below-ground up to its tread height,
+    // so the stair sits on the terrain (no floating) and rises to meet the floor edge.
     const steps = Math.ceil(baseH / 0.3), floorEdge = z + (W + 2) / 2;
     for (let i = 1; i <= steps; i++) {
-      const sy = i * 0.3, sz = floorEdge + (steps - i) * 0.72 + 0.3; // high steps near the base, low steps farthest out
-      const st = box(W * 0.55, 0.24, 0.95, stone, { roughness: 0.92 });
-      st.position.set(x, gy + sy - 0.12, sz); this.scene.add(st);
+      const sy = i * 0.3, sz = floorEdge + (steps - i) * 0.72 + 0.4, H = sy + 3; // buried base, tread at gy+sy
+      const st = box(W * 0.55, H, 0.95, stone, { roughness: 0.92 });
+      st.position.set(x, gy + sy - H / 2, sz); this.scene.add(st);
       const sc = this.collide(x, sz, W * 0.55, 0.95, sy); sc.baseY = gy;
     }
     // glowing centerpiece on the floor inside (emissive obelisk + halo, no per-object light)
@@ -613,14 +611,22 @@ export class LevelBuilder {
     const land = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
     land.material.vertexColors = true; land.receiveShadow = true; this.scene.add(land);
 
-    // sea — segmented for animated waves, tropical color, reflective; + a foam ring at the shoreline
-    const waterGeo = new THREE.PlaneGeometry(sea, sea, 64, 64); waterGeo.rotateX(-Math.PI / 2);
-    const water = new THREE.Mesh(waterGeo, noOutline(new THREE.MeshStandardMaterial({ color: 0x1f8fb8, roughness: 0.06, metalness: 0.55, transparent: true, opacity: 0.92 })));
-    water.position.y = 0; this.scene.add(water); this._sea = water;
-    this._seaPos = waterGeo.attributes.position; this._seaBaseY = Float32Array.from(this._seaPos.array.filter((_, i) => i % 3 === 1));
-    const foam = new THREE.Mesh(new THREE.RingGeometry(R - 3, R + 5, 96),
-      noOutline(new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.45, side: THREE.DoubleSide })));
-    foam.rotation.x = -Math.PI / 2; foam.position.y = 0.25; this.scene.add(foam);
+    // sea — stylized low-poly water: flat-shaded facets, a shallow-turquoise → deep-blue gradient, animated
+    // wave swell (in update), and a foam ring at the shoreline.
+    const waterGeo = new THREE.PlaneGeometry(sea, sea, 72, 72); waterGeo.rotateX(-Math.PI / 2);
+    const wpos = waterGeo.attributes.position, wcol = [], wc = new THREE.Color();
+    const shallow = new THREE.Color(0x7ad9cf), midSea = new THREE.Color(0x2aa3cc), deep = new THREE.Color(0x12598f);
+    for (let i = 0; i < wpos.count; i++) {
+      const r = Math.hypot(wpos.getX(i), wpos.getZ(i)), t = Math.min(1, Math.max(0, (r - R) / (R * 1.7)));
+      wc.copy(t < 0.5 ? shallow.clone().lerp(midSea, t * 2) : midSea.clone().lerp(deep, (t - 0.5) * 2));
+      wcol.push(wc.r, wc.g, wc.b);
+    }
+    waterGeo.setAttribute("color", new THREE.Float32BufferAttribute(wcol, 3));
+    const water = new THREE.Mesh(waterGeo, noOutline(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.32, transparent: true, opacity: 0.95, flatShading: true })));
+    water.position.y = 0; this.scene.add(water); this._sea = water; this._seaPos = wpos;
+    const foam = new THREE.Mesh(new THREE.RingGeometry(R - 4, R + 6, 110),
+      noOutline(new THREE.MeshBasicMaterial({ color: 0xf2fbff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })));
+    foam.rotation.x = -Math.PI / 2; foam.position.y = 0.3; this.scene.add(foam);
 
     // distant mountain range: dense OVERLAPPING craggy peaks (leaning apexes) that merge into a continuous
     // silhouette — near rocky band + far big hazy snow band for depth.
@@ -652,8 +658,8 @@ export class LevelBuilder {
       const m = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
       m.material.vertexColors = true; m.material.side = THREE.DoubleSide; this.scene.add(m); // double-sided so flanks are lit regardless of winding
     };
-    mountainRing(size * 0.62, 62, 60, 0x808a78, true, 1.7);   // near range
-    mountainRing(size * 1.05, 150, 135, 0xa6b2bf, true, 4.3); // far, bigger, hazier range
+    // a single faint, low, distant range — just a hint of far land so the island is ringed mostly by open sea
+    mountainRing(size * 1.3, 130, 58, 0xb2bcc8, true, 4.3);
     for (const L of lakes) { // wadeable shallow-lake surfaces (sit just below the original ground)
       const wy = h(L.x, L.z) + L.depth - 0.28;
       const disc = new THREE.Mesh(new THREE.CircleGeometry(L.r, 28),
@@ -665,9 +671,12 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
-    if (this._seaPos) { // rolling wave swell
+    if (this._seaPos) { // rolling, faceted wave swell
       const p = this._seaPos;
-      for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, Math.sin(x * 0.03 + t * 1.2) * 0.7 + Math.cos(z * 0.035 + t * 0.9) * 0.7); }
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i);
+        p.setY(i, Math.sin(x * 0.045 + t * 1.3) * 0.6 + Math.cos(z * 0.04 + t * 1.0) * 0.6 + Math.sin((x + z) * 0.08 + t * 1.9) * 0.3);
+      }
       p.needsUpdate = true; this._sea.geometry.computeVertexNormals();
     }
     for (const a of this.arcs) {
