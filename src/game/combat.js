@@ -6,7 +6,7 @@ import { Robot } from "./actors/robot.js";
 // spawn the right actor for a spawn spec's `kind` (default: a rifle soldier)
 function makeActor(scene, spawn, level) {
   if (spawn.kind === "monster" || spawn.kind === "spider" || spawn.kind === "trex") return new Monster(scene, spawn, level);
-  if (spawn.kind === "robot") return new Robot(scene, spawn, level);
+  if (spawn.kind === "robot" || spawn.kind === "sentry" || spawn.kind === "drone" || spawn.kind === "heavy") return new Robot(scene, spawn, level);
   return new Enemy(scene, spawn, level);
 }
 

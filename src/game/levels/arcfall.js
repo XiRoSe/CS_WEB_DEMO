@@ -38,6 +38,12 @@ export const arcfall = {
     const spiders = [[-92, -32], [82, -72], [-32, 98], [112, -12]];           // 4 spiders elsewhere
     for (const [x, z] of spiders) b.enemy({ kind: "spider", x, z });
     b.enemy({ kind: "trex", x: -122, z: 70 });   // T-Rex mini-boss roaming the far side
+    // robots — ranged, non-dino: walking gun-bots, hovering drones, a heavy, and the giant mech
+    const sentries = [[70, 10], [-40, -60], [20, -90]];
+    for (const [x, z] of sentries) b.enemy({ kind: "sentry", x, z });
+    const drones = [[-20, 64], [86, -20]];
+    for (const [x, z] of drones) b.enemy({ kind: "drone", x, z });
+    b.enemy({ kind: "heavy", x: -96, z: 30 });   // tanky gun-bot
     b.enemy({ kind: "robot", x: 126, z: 56 });   // giant mech guarding a far arc
   },
 };

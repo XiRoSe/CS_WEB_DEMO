@@ -555,8 +555,9 @@ export class LevelBuilder {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
       const slope = Math.hypot(h(x + 2, z) - h(x - 2, z), h(x, z + 2) - h(x, z - 2)) / 4; // local steepness
+      const snowLine = 25 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 9; // uneven, natural snow boundary
       if (y < 1.0) c.copy(sand);
-      else if (y > 26) c.copy(rock).lerp(snow, Math.min(1, (y - 26) / 9)); // snowy mountain peaks
+      else if (y > snowLine) c.copy(rock).lerp(snow, Math.min(1, (y - snowLine) / 6)); // snowy peaks (irregular line)
       else if (slope > 0.9 && y > 2) c.copy(rock);                        // steep cliff faces
       else if (y > 14) c.copy(gDry).lerp(rock, Math.min(1, (y - 14) / 12)); // rocky alpine high ground
       else {
@@ -583,17 +584,24 @@ export class LevelBuilder {
 
     // distant mountain range: dense OVERLAPPING craggy peaks (leaning apexes) that merge into a continuous
     // silhouette — near rocky band + far big hazy snow band for depth.
-    const mkMountain = (mx, mz, hgt, rad, segn, snowCap, col) => {
+    const mkMountain = (mx, mz, hgt, rad, segn, snowy, col) => {
       const g = new THREE.Group();
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(rad, hgt, segn), mat(col, { roughness: 1, flat: true }));
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(rad, hgt, segn), mat(0xffffff, { roughness: 1, flat: true }));
       const p = cone.geometry.attributes.position, ax = (Math.random() - 0.5) * rad * 0.6, az = (Math.random() - 0.5) * rad * 0.6;
+      const colors = [], cRock = new THREE.Color(col), cSnow = new THREE.Color(0xf2f6f8);
+      const line = snowy ? hgt * 0.18 : hgt * 9; // local-y where snow begins (no snow if not snowy)
       for (let k = 0; k < p.count; k++) {
-        const yy = p.getY(k);
-        if (yy > hgt * 0.3) { p.setX(k, p.getX(k) + ax * (yy / hgt)); p.setZ(k, p.getZ(k) + az * (yy / hgt)); }       // lean the apex
-        else { p.setX(k, p.getX(k) * (0.85 + Math.random() * 0.5)); p.setZ(k, p.getZ(k) * (0.85 + Math.random() * 0.5)); } // craggy base
+        const lx = p.getX(k), ly = p.getY(k), lz = p.getZ(k);
+        if (ly > hgt * 0.3) { p.setX(k, lx + ax * (ly / hgt)); p.setZ(k, lz + az * (ly / hgt)); }              // lean the apex
+        else { p.setX(k, lx * (0.85 + Math.random() * 0.5)); p.setZ(k, lz * (0.85 + Math.random() * 0.5)); }  // craggy base
+        const wob = (Math.sin(lx * 0.5 + az) + Math.sin(lz * 0.6 - ax)) * hgt * 0.07;                          // jagged, uneven snowline
+        const t = Math.max(0, Math.min(1, (ly - line - wob) / (hgt * 0.08)));
+        const cc = cRock.clone().lerp(cSnow, t);
+        colors.push(cc.r, cc.g, cc.b);
       }
-      cone.geometry.computeVertexNormals(); g.add(cone);
-      if (snowCap) { const cap = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.5, hgt * 0.36, segn), mat(0xeef3f6, { roughness: 0.9, flat: true })); cap.position.set(ax * 0.6, hgt * 0.32, az * 0.6); g.add(cap); }
+      cone.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      cone.geometry.computeVertexNormals();
+      cone.material.vertexColors = true; g.add(cone);
       g.position.set(mx, hgt / 2 - 6, mz); this.scene.add(g);
     };
     for (let i = 0; i < 40; i++) { // near band — dense, overlapping
