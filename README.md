@@ -5,9 +5,10 @@ A small, hackable **first-person-shooter starter kit** for the web — built wit
 complete, polished night military shooter and a clean toolkit so you (and your AI pair) can
 build your **own** FPS level or game on top of it fast.
 
-> **It's a *game-specific* kit, not a generic engine.** The toolkit knows about walls, towers,
-> bunkers, vehicles, fuel barrels and desert dressing on purpose — that's what makes it
-> batteries-included. If you want a different setting, you reskin the content, not the architecture.
+> **A themed kit, not a blank engine — with two honest reuse tiers.** `engine/` is generic FPS
+> infrastructure; `kit/` is a batteries-included *military-FPS toolkit* built on it (it knows about
+> walls, towers, vehicles, fuel barrels on purpose); `game/` is one shipped game. Reuse just the
+> engine, or the whole kit, or fork the game — see [Architecture](#architecture-at-a-glance).
 
 **Live demo:** https://nightops-first-fps.up.railway.app
 
@@ -63,15 +64,54 @@ npm start          # serves dist/ on $PORT (default 8080) via server.js
 
 Deploys as a static site behind a tiny Node server (`server.js`). The live demo runs on Railway.
 
+## Architecture at a glance
+
+Three tiers, flat and framework-free (~4.4k lines). The arrows show what may import what — a lint rule
+(`npm run lint`) enforces it, so the layers can't rot into each other:
+
+```
+engine/  ← generic, content-agnostic FPS systems
+   ▲       render • controller • input • weapon viewmodel • projectiles+blast • vfx • hud • audio • assets
+   │
+kit/     ← the military-FPS TOOLKIT (uses engine, never game)
+   ▲       level-builder (walls/towers/vehicles/barrels…) • destructibles • content/ (model catalogs)
+   │
+game/    ← THIS game only (uses engine + kit)
+           config+balance • combat • actors/ (enemy, helicopter) • objectives/ (defuse, exfil) • levels/
+
+main.js  ← the runner: wires the tiers, owns the state machine + per-frame loop
+```
+
+**The rule:** `engine/` imports nothing from `kit/` or `game/`; `kit/` may use `engine/`; `game/`
+may use both. That's why there are two clean reuse tiers — take just `engine/`, or the whole `kit/`.
+
+- **Tuning is data** — all gameplay numbers live in `game/config.js` → `balance` (HP, damage, the
+  unit scale, blast radii, timings). Levels override per-section via `mergeConfig`.
+- **Content is data** — a level is a module `{ id, name, config?, build(b) }`; an objective and a
+  weapon are small modules behind a registry. Adding them doesn't touch the runner.
+
 ## Build your own
 
-- **[docs/BUILDING.md](docs/BUILDING.md)** — the hands-on guide: the `LevelBuilder` API, adding &
-  registering a level, retuning via `config.js`, objectives, and adding weapons / enemies / destructibles.
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — the map: what every module does and the one rule that
-  keeps it clean.
-- **[AGENTS.md](AGENTS.md)** — read this if you're building with **Claude / an AI agent**. It hands
-  your agent the conventions, the dev hooks, and the in-browser verification workflow so it doesn't
-  have to rediscover them.
+**Recommended path:** clone → `npm run dev` → copy `src/game/levels/compound.js` to a new module and
+register it in `levels/index.js` → lay out your map with the `LevelBuilder` calls → retune
+`config.balance` → (optionally) add an objective or weapon module. Then `npm run lint && npm run build`.
+
+- **[docs/BUILDING.md](docs/BUILDING.md)** — the hands-on guide: the `LevelBuilder` API cheat-sheet,
+  adding & registering a level, retuning, objectives, weapons, enemies, destructibles, assets.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — the full module map + the dependency rule.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — the boundary rule, where-things-go table, house style, CI.
+- **[AGENTS.md](AGENTS.md)** — building with **Claude / an AI agent**? This hands your agent the
+  conventions, the `window.__game` dev hooks, and the in-browser verification workflow.
+
+## Roadmap / follow-ups
+
+- **Add CI** — paste the workflow from [CONTRIBUTING.md](CONTRIBUTING.md) into `.github/workflows/ci.yml`
+  (via the GitHub web UI) to run lint + build on every PR.
+- **A `npm test` smoke harness** — formalize the `window.__game` checks (LOS, shot counts, code solves).
+- **More example levels / a non-military theme** to show the kit generalizes.
+- **Re-enable mobile** — the touch controls (`engine/touch.js`) are intact, just gated off; see
+  [docs/BUILDING.md](docs/BUILDING.md#re-enabling-mobile).
+- Known nit: a few enemies can settle slightly into the ground on death (cosmetic).
 
 ## Tech
 
