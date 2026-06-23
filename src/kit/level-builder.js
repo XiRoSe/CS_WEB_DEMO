@@ -671,13 +671,13 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
-    if (this._seaPos) { // rolling, faceted wave swell
+    if (this._seaPos) { // rolling, faceted wave swell (flatShading derives normals in-shader — no recompute)
       const p = this._seaPos;
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), z = p.getZ(i);
-        p.setY(i, Math.sin(x * 0.045 + t * 1.3) * 0.6 + Math.cos(z * 0.04 + t * 1.0) * 0.6 + Math.sin((x + z) * 0.08 + t * 1.9) * 0.3);
+        p.setY(i, Math.sin(x * 0.045 + t * 1.3) * 0.7 + Math.cos(z * 0.04 + t * 1.0) * 0.7 + Math.sin((x + z) * 0.09 + t * 2.0) * 0.4);
       }
-      p.needsUpdate = true; this._sea.geometry.computeVertexNormals();
+      p.needsUpdate = true;
     }
     for (const a of this.arcs) {
       if (a.taken) continue;

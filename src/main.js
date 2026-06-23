@@ -19,7 +19,7 @@ import { Intro } from "./game/intro.js";
 import { ParachuteIntro } from "./game/parachute-intro.js";
 import { preloadEnemies } from "./game/actors/enemy.js";
 import { preloadOperator } from "./game/actors/operator.js";
-import { preloadCreatures } from "./game/actors/creature-assets.js";
+import { preloadCreatures, preloadHeroes, HEROES, HERO_LIST } from "./game/actors/creature-assets.js";
 import { preloadNature } from "./kit/content/nature.js";
 import { preloadVehicles } from "./kit/content/vehicles.js";
 import { preloadPickups } from "./kit/content/pickups.js";
@@ -105,7 +105,7 @@ class Game {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
     // load models progressively (async, off the main thread) with a progress readout
-    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature()];
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadHeroes()];
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);
@@ -113,13 +113,10 @@ class Game {
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
     const sp = this.level.playerSpawn;
-    if (this.level.terrainHeight && this.cfg.intro && this.cfg.intro.style === "parachute") {
-      // start screen: an aerial vantage over the drop zone (else the camera sits buried under the hill)
-      const gy = this.level.terrainHeight(sp.x, sp.z);
-      this.camera.position.set(sp.x - 26, gy + 72, sp.z - 26); this.camera.lookAt(sp.x, gy + 6, sp.z);
-    } else {
-      this.camera.position.set(sp.x, this.controller.eye, sp.z);
-    }
+    this.hero = "barbarian";
+    this._heroLobby = HEROES[this.hero] && this.cfg.intro && this.cfg.intro.style === "parachute";
+    if (this._heroLobby) this._setupLobby(); // hero-select lobby on the start screen
+    else this.camera.position.set(sp.x, this.controller.eye, sp.z);
     // A persistent gunship searchlight, added to the scene ONCE (intensity 0 when idle). The heli
     // reuses it, so the scene's light count never changes between spawns -> no shader recompile hitch.
     this.heliLight = new THREE.SpotLight(0xfff4d2, 0, 140, 0.5, 0.5, 1.0); this.heliLight.castShadow = false;
@@ -141,11 +138,43 @@ class Game {
     });
     this.hud.setHostiles(this.combat.enemiesLeft);
     this.state = "start";
-    this.hud.showStart(() => this._deploy(), {
-      title: this.levelDef.name,
-      brief: this.objective.brief(),
-    });
+    if (this._heroLobby) this._showHeroSelect();
+    else this.hud.showStart(() => this._deploy(), { title: this.levelDef.name, brief: this.objective.brief() });
   }
+
+  // screen 1: pick a hero (hero framed close); screen 2: deploy (camera pulls back)
+  _showHeroSelect() {
+    this._lobbyFrame("select");
+    this.hud.showHeroSelect(() => this._showDeploy(), { heroes: HERO_LIST, selected: this.hero, onHero: (id) => this._setLobbyHero(id) });
+  }
+  _showDeploy() {
+    this._lobbyFrame("deploy");
+    this.hud.showStart(() => this._deploy(), { title: this.levelDef.name, brief: this.objective.brief() });
+  }
+  _lobbyFrame(mode) {
+    const sp = this.level.playerSpawn, gy = this._lobbyGY || 0;
+    if (mode === "select") { this.camera.position.set(sp.x + 0.9, gy + 1.85, sp.z + 4.4); this.camera.lookAt(sp.x, gy + 1.15, sp.z); }
+    else { this.camera.position.set(sp.x + 1.4, gy + 2.5, sp.z + 7); this.camera.lookAt(sp.x, gy + 1.0, sp.z); }
+  }
+
+  _setupLobby() {
+    const sp = this.level.playerSpawn;
+    this._lobbyGY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
+    this._lobby = new THREE.Group(); this._lobby.position.set(sp.x, this._lobbyGY, sp.z); this.scene.add(this._lobby);
+    this._setLobbyHero(this.hero);
+  }
+  _setLobbyHero(id) {
+    this.hero = id;
+    if (!this._lobby) return;
+    if (this._lobbyHero) { this._lobby.remove(this._lobbyHero); this._lobbyHero = null; this._lobbyMixer = null; }
+    const inst = HEROES[id] && HEROES[id].make(); if (!inst) return;
+    inst.model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this._lobby.add(inst.model); this._lobbyHero = inst.model;
+    this._lobbyMixer = new THREE.AnimationMixer(inst.model);
+    const idle = inst.animations.find((c) => c.name === "Idle") || inst.animations.find((c) => /idle/i.test(c.name)) || inst.animations[0];
+    if (idle) this._lobbyMixer.clipAction(idle).play();
+  }
+  _disposeLobby() { if (this._lobby) { this.scene.remove(this._lobby); this._lobby = null; this._lobbyHero = null; this._lobbyMixer = null; } }
 
   // Mobile (a finger tapped Deploy -> touch active) starts directly; desktop uses pointer lock.
   _deploy() {
@@ -159,6 +188,7 @@ class Game {
     if (this.state === "intro" || this._introDone) return;
     if (!this.cfg.intro.enabled) { this._introDone = true; this._startPlay(); return; }
     this.state = "intro";
+    this._disposeLobby();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(false);
     this.weapon.group.visible = false; // hands on the rope/canopy, not the gun
@@ -167,7 +197,7 @@ class Game {
     const sp = this.level.playerSpawn;
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     this.intro = parachute
-      ? new ParachuteIntro(this.scene, this.camera, sp, groundY)
+      ? new ParachuteIntro(this.scene, this.camera, sp, groundY, this.hero)
       : new Intro(this.scene, this.camera, sp);
     this.intro.start();
     this.hud.killFeed(this.cfg.messages.deployHint);
@@ -203,7 +233,7 @@ class Game {
   }
 
   _onPlayerHit(dmg) {
-    if (this.state !== "play") return;
+    if (this.state !== "play" || this.driving) return; // safe inside a vehicle
     this.health -= dmg;
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
     this.hud.damageFlash();
@@ -319,7 +349,7 @@ class Game {
   }
 
   _enterCar(car) {
-    this.driving = car;
+    this.driving = car; car._cam = null; // snap the chase cam fresh on entry
     this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false;
     this.laser?.hide?.();
     this._carPrompt = false;
@@ -439,6 +469,7 @@ class Game {
       if (this._detT <= 0) this._lose("The bomb detonated", 'Mission <span class="hz">Failed</span>');
       return;
     }
+    if (this.state === "start" && this._lobby) { this._lobby.rotation.y += dt * 0.5; if (this._lobbyMixer) this._lobbyMixer.update(dt); } // turntable hero preview
     if (this.state !== "play") { this.input.drainPresses(); return; }
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
     const presses = this.input.drainPresses();
@@ -454,7 +485,7 @@ class Game {
 
     if (this.driving) {
       this.driving.update(dt, this.input);
-      this.driving.chaseCamera(this.camera);
+      this.driving.chaseCamera(this.camera, dt);
       this.audio.setEngine?.(this.driving.speed);
       if (Math.abs(this.driving.speed) > 7) { // tracks kick up dust at speed
         const c = this.driving.pos, fx = Math.sin(this.driving.yaw), fz = Math.cos(this.driving.yaw);

@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import { noOutline } from "../engine/primitives.js";
-import { CREATURES } from "./actors/creature-assets.js";
+import { HEROES } from "./actors/creature-assets.js";
 
 // Third-person parachute insertion: a behind-the-back camera follows a strong warrior descending under
 // a canopy, all the way down until he lands on the ground, the canopy collapsing — then it cuts to
 // first-person. Same interface as Intro ({ start(), update(dt), done, dispose() }).
 export class ParachuteIntro {
-  constructor(scene, camera, spawn, groundY = 0) {
+  constructor(scene, camera, spawn, groundY = 0, heroId = "barbarian") {
     this.scene = scene; this.camera = camera;
     this.spawn = new THREE.Vector3(spawn.x, groundY, spawn.z);
     this.t = 0; this.dur = 8.0; this.hold = 0; this.done = false; this.startY = 150;
@@ -16,7 +16,7 @@ export class ParachuteIntro {
 
     // the warrior avatar (animated), gripping the harness; plays Idle through the descent
     this.rig = new THREE.Group(); this.group.add(this.rig);
-    const inst = CREATURES.warrior.make();
+    const inst = (HEROES[heroId] || HEROES.barbarian).make();
     if (inst) {
       this.op = inst.model;
       this.op.traverse((o) => { if (o.isMesh) o.castShadow = true; });

@@ -147,13 +147,42 @@ export class HUD {
   showStart(onDeploy, opts = {}) {
     const title = opts.title || "Clear the Compound";
     const brief = opts.brief || "Push to the extraction zone. Eliminate anyone in your way.";
+    const heroes = opts.heroes || null;
+    const card = (h) => `<button class="herocard" data-hero="${h.id}" style="padding:11px 20px;border:2px solid ${h.id === opts.selected ? "#f0a500" : "#3a4250"};background:${h.id === opts.selected ? "rgba(240,165,0,0.22)" : "rgba(16,20,26,0.6)"};color:#e6edf4;border-radius:9px;font:inherit;letter-spacing:2px;text-transform:uppercase;cursor:pointer">${h.label}</button>`;
+    const heroRow = heroes ? `<div class="sub" style="margin-top:6px">Choose your hero</div><div class="heroes" style="display:flex;gap:10px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap">${heroes.map(card).join("")}</div>` : "";
     const o = this._overlay(`
       <div class="sub">Tactical Operations · Solo Deployment</div>
       <h1 class="mil-title">${title}</h1>
+      ${heroRow}
       <button class="cta" id="deploy">▶ Click to Deploy</button>
-      <div class="controls"><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>C</kbd> duck &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
+      <div class="controls"><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>C</kbd> duck &nbsp; <kbd>E</kbd> drive &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
       ${brief}</div>`);
     o.querySelector("#deploy").addEventListener("click", () => onDeploy());
+    if (heroes) o.querySelectorAll(".herocard").forEach((b) => b.addEventListener("click", () => {
+      o.querySelectorAll(".herocard").forEach((x) => { x.style.border = "2px solid #3a4250"; x.style.background = "rgba(16,20,26,0.6)"; });
+      b.style.border = "2px solid #f0a500"; b.style.background = "rgba(240,165,0,0.22)";
+      opts.onHero && opts.onHero(b.dataset.hero);
+    }));
+  }
+  // First screen: a dedicated hero-select (turntable preview is rendered behind by the game). Big hero
+  // name + class tagline update as you pick; Confirm advances to the deploy screen.
+  showHeroSelect(onConfirm, opts = {}) {
+    const heroes = opts.heroes || [], cur = heroes.find((h) => h.id === opts.selected) || heroes[0] || { label: "", tag: "" };
+    const card = (h) => `<button class="herocard" data-hero="${h.id}" data-label="${h.label}" data-tag="${h.tag || ""}" style="padding:13px 26px;border:2px solid ${h.id === opts.selected ? "#f0a500" : "#3a4250"};background:${h.id === opts.selected ? "rgba(240,165,0,0.22)" : "rgba(12,16,22,0.55)"};color:#e6edf4;border-radius:10px;font:inherit;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .12s">${h.label}</button>`;
+    const o = this._overlay(`
+      <div class="sub">Choose Your Hero</div>
+      <h1 class="mil-title" id="heroName" style="margin:2px 0 0">${cur.label}</h1>
+      <div class="sub" id="heroTag" style="color:#f0c873;letter-spacing:3px;margin-bottom:16px">${cur.tag || ""}</div>
+      <div class="heroes" style="display:flex;gap:12px;justify-content:center;margin:6px 0 18px;flex-wrap:wrap">${heroes.map(card).join("")}</div>
+      <button class="cta" id="confirm">▶ Confirm</button>`);
+    o.querySelector("#confirm").addEventListener("click", () => onConfirm());
+    const name = o.querySelector("#heroName"), tag = o.querySelector("#heroTag");
+    o.querySelectorAll(".herocard").forEach((b) => b.addEventListener("click", () => {
+      o.querySelectorAll(".herocard").forEach((x) => { x.style.border = "2px solid #3a4250"; x.style.background = "rgba(12,16,22,0.55)"; });
+      b.style.border = "2px solid #f0a500"; b.style.background = "rgba(240,165,0,0.22)";
+      name.textContent = b.dataset.label; tag.textContent = b.dataset.tag;
+      opts.onHero && opts.onHero(b.dataset.hero);
+    }));
   }
   showPause(onResume) {
     const o = this._overlay(`<div class="sub">Paused</div><h1 class="mil-title">Stand <span class="hz">By</span></h1>

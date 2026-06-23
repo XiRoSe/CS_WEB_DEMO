@@ -10,7 +10,7 @@ export class Car {
     this.pos = new THREE.Vector3(x, 0, z);
     this.yaw = Math.random() * Math.PI * 2; this.speed = 0;
     this.r = 3.2;                 // enter/interact radius
-    this.maxSpeed = 46; this.maxRev = 12;   // fast sports car
+    this.maxSpeed = 40; this.maxRev = 11;   // fast sports car
     this._tmp = new THREE.Vector3(); this._look = new THREE.Vector3();
     this.scene.add(this.group);
     this.seat();
@@ -29,26 +29,34 @@ export class Car {
   }
 
   update(dt, input) {
-    const accel = input.isDown("w", "arrowup") ? 1 : input.isDown("s", "arrowdown") ? -1 : 0;
+    const fwd = input.isDown("w", "arrowup"), back = input.isDown("s", "arrowdown");
     const steer = (input.isDown("a", "arrowleft") ? 1 : 0) - (input.isDown("d", "arrowright") ? 1 : 0);
-    this.speed += accel * 30 * dt;
-    this.speed *= accel ? 1 : 0.96;                          // coast/brake drag
+    // accelerate / brake / reverse
+    if (fwd) this.speed += 28 * dt;
+    else if (back) this.speed -= (this.speed > 0.6 ? 52 : 20) * dt;   // firm brake when rolling forward, else reverse
+    else this.speed -= this.speed * Math.min(1, 1.3 * dt);            // coast drag
     this.speed = Math.max(-this.maxRev, Math.min(this.maxSpeed, this.speed));
-    if (Math.abs(this.speed) < 0.05) this.speed = 0;
-    this.yaw += steer * 2.0 * dt * Math.max(-1, Math.min(1, this.speed / 9)); // steering scales with speed (and reverses in reverse)
+    if (!fwd && !back && Math.abs(this.speed) < 0.2) this.speed = 0;
+    // steering scales with speed (and naturally reverses when backing up)
+    const grip = Math.max(-1, Math.min(1, this.speed / 10));
+    this.yaw += steer * 1.7 * dt * grip;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), d = this.speed * dt;
     const nx = this.pos.x + fx * d, nz = this.pos.z + fz * d;
-    if (!this._blocked(nx, this.pos.z)) this.pos.x = nx; else this.speed *= 0.3;
-    if (!this._blocked(this.pos.x, nz)) this.pos.z = nz; else this.speed *= 0.3;
+    if (!this._blocked(nx, this.pos.z)) this.pos.x = nx; else this.speed *= 0.25;
+    if (!this._blocked(this.pos.x, nz)) this.pos.z = nz; else this.speed *= 0.25;
     const b = this.level.bounds;
     if (b) { this.pos.x = Math.max(b.minX, Math.min(b.maxX, this.pos.x)); this.pos.z = Math.max(b.minZ, Math.min(b.maxZ, this.pos.z)); }
     this.seat();
   }
 
-  // behind-and-above chase camera
-  chaseCamera(camera) {
+  // smoothed behind-and-above chase camera (lags slightly for a nicer feel)
+  chaseCamera(camera, dt = 0.016) {
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), gy = this.group.position.y;
-    camera.position.set(this.pos.x - fx * 9, gy + 4.5, this.pos.z - fz * 9);
+    const tx = this.pos.x - fx * 9, ty = gy + 4.5, tz = this.pos.z - fz * 9;
+    if (!this._cam) this._cam = new THREE.Vector3(tx, ty, tz);
+    const k = 1 - Math.pow(0.0008, dt); // exponential smoothing toward the target
+    this._cam.x += (tx - this._cam.x) * k; this._cam.y += (ty - this._cam.y) * k; this._cam.z += (tz - this._cam.z) * k;
+    camera.position.copy(this._cam);
     this._look.set(this.pos.x + fx * 6, gy + 1.6, this.pos.z + fz * 6);
     camera.lookAt(this._look);
   }

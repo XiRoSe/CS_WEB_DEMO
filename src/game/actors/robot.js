@@ -22,6 +22,7 @@ export class Robot {
     this.speed = spawn.speed || cfg.speed;
     this.fly = cfg.fly;
     this.dead = false; this.counted = false; this.removable = false;
+    this.aggro = false; this.aggroRange = spawn.aggro || cfg.range + 12; // idle until the player approaches
     this.yaw = 0; this._fireCd = 1.5 + Math.random(); this._deathT = 0; this._needBoom = false; this._cur = null; this._curAction = null; this._fallV = 0;
     this._muzzle = new THREE.Vector3(); this._tmp = new THREE.Vector3();
 
@@ -70,6 +71,10 @@ export class Robot {
     }
     const flyY = groundY + this.fly;
     const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
+    if (!this.aggro) { // hold position until the player approaches
+      if (d <= this.aggroRange) this.aggro = true;
+      else { this._play("idle"); this.group.position.set(this.pos.x, flyY, this.pos.z); return; }
+    }
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
     if (d > this.cfg.range) { // close in
       const step = this.speed * dt;

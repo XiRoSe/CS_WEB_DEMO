@@ -14,6 +14,7 @@ export class Monster {
     this.melee = this.kind === "trex" ? 24 : this.kind === "spider" ? 9 : 11;
     this.reach = this.kind === "trex" ? 5.0 : 2.6;
     this.dead = false; this.counted = false; this.removable = false;
+    this.aggro = false; this.aggroRange = spawn.aggro || 12; // idle until the player gets close
     this.yaw = 0; this._atkCd = 0; this._deathT = 0; this._cur = null; this._curAction = null;
 
     this.group = new THREE.Group(); this.group.position.copy(this.pos); this.scene.add(this.group);
@@ -56,6 +57,10 @@ export class Monster {
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
     if (this.dead) { this.group.position.y = groundY; if ((this._deathT -= dt) <= 0) this.removable = true; return; }
     const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
+    if (!this.aggro) { // wait until the player comes near, then lock on
+      if (d <= this.aggroRange) this.aggro = true;
+      else { this._play("idle"); this.group.position.set(this.pos.x, groundY, this.pos.z); return; }
+    }
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
     if (d > this.reach) { // charge
       const step = this.speed * dt;
