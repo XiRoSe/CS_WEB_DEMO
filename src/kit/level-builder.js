@@ -493,8 +493,20 @@ export class LevelBuilder {
     return { x, z, top: gy + H };
   }
 
+  // clustered forests with clearings between (rather than a uniform sprinkle)
   scatterTrees(n, rMin, rMax) {
-    for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.tree(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 0.7, Math.random() < 0.4 ? "palm" : "tree"); }
+    const clusters = 8;
+    for (let cI = 0; cI < clusters; cI++) {
+      const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin);
+      const cx = Math.cos(a) * r, cz = Math.sin(a) * r, palmy = Math.hypot(cx, cz) > rMax * 0.82; // palms toward the shore
+      const cn = Math.round(n / clusters * (0.6 + Math.random() * 0.8)), spread = 18 + Math.random() * 26;
+      for (let i = 0; i < cn; i++) {
+        const aa = Math.random() * 6.28, rr = Math.pow(Math.random(), 0.7) * spread;
+        const tx = cx + Math.cos(aa) * rr, tz = cz + Math.sin(aa) * rr;
+        if (Math.hypot(tx, tz) > rMax + 12) continue;
+        this.tree(tx, tz, 0.8 + Math.random() * 0.9, (palmy ? Math.random() < 0.6 : Math.random() < 0.2) ? "palm" : "tree");
+      }
+    }
   }
   scatterRocks(n, rMin, rMax) {
     for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, r = rMin + Math.random() * (rMax - rMin); this.rock(Math.cos(a) * r, Math.sin(a) * r, 0.8 + Math.random() * 1.3); }
@@ -510,29 +522,47 @@ export class LevelBuilder {
   // Call BEFORE islandTerrain() so the heightfield mesh reflects the carve.
   lake(x, z, r = 14, depth = 1.4) { (this._lakes ||= []).push({ x, z, r, depth }); }
 
-  islandTerrain({ size = 460, segs = 130, sea = 5000 } = {}) {
+  islandTerrain({ size = 460, segs = 170, sea = 5000 } = {}) {
     const R = size * 0.46; // shore radius
     const lakes = this._lakes || [];
+    // smooth value-noise → fbm, for organic relief + ground variety
+    const hash = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
+    const vnoise = (x, z) => {
+      const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+      const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+      return hash(xi, zi) * (1 - u) * (1 - v) + hash(xi + 1, zi) * u * (1 - v) + hash(xi, zi + 1) * (1 - u) * v + hash(xi + 1, zi + 1) * u * v;
+    };
+    const fbm = (x, z) => vnoise(x, z) * 0.55 + vnoise(x * 2.1 + 5, z * 2.1 + 9) * 0.3 + vnoise(x * 4.3 + 11, z * 4.3 + 3) * 0.15;
+    const hills = [{ x: -64, z: -44, h: 11, r: 58 }, { x: 78, z: 56, h: 8, r: 50 }, { x: 34, z: -96, h: 7, r: 42 }, { x: -100, z: 48, h: 9, r: 46 }];
     const h = (x, z) => {
       const r = Math.hypot(x, z);
-      let y = (1 - r / R) * 11;                                  // dome: tall center → 0 at shore → underwater beyond
-      if (r < R) y += (Math.sin(x * 0.05) * Math.cos(z * 0.045) + Math.sin(x * 0.09 + 1.3) * 0.6 + Math.cos(z * 0.08 - 0.7) * 0.5) * 2.4 * (1 - r / R);
-      if (r > R - 12 && r < R + 4) y *= 0.45; // flatten the beach near the waterline
-      for (const L of lakes) { // carve smooth bowls
-        const d = Math.hypot(x - L.x, z - L.z);
-        if (d < L.r) y -= L.depth * (0.5 + 0.5 * Math.cos((d / L.r) * Math.PI));
-      }
+      let y = (1 - r / R) * 10;                                          // dome rising out of the sea
+      if (r < R) y += (fbm(x * 0.022, z * 0.022) - 0.45) * 17 * (1 - r / R * 0.55); // rolling hills + valleys
+      for (const hl of hills) { const d = Math.hypot(x - hl.x, z - hl.z); if (d < hl.r) y += hl.h * Math.pow(Math.cos(d / hl.r * Math.PI / 2), 2); }
+      if (r > R - 12 && r < R + 4) y *= 0.42;                            // flatten the beach near the waterline
+      for (const L of lakes) { const d = Math.hypot(x - L.x, z - L.z); if (d < L.r) y -= L.depth * (0.5 + 0.5 * Math.cos((d / L.r) * Math.PI)); }
       return y;
     };
     this.terrainHeight = h;
 
     const geo = new THREE.PlaneGeometry(size, size, segs, segs); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, colors = [];
-    const grass = new THREE.Color(0x5aa83c), grassHi = new THREE.Color(0x82c25a), sand = new THREE.Color(0xddcb8c), rock = new THREE.Color(0x8c8578);
+    const sand = new THREE.Color(0xe6d6a4), gDark = new THREE.Color(0x4f9a34), gLight = new THREE.Color(0x8ccb5e),
+      gDry = new THREE.Color(0xa8b257), dirt = new THREE.Color(0x7c5a36), rock = new THREE.Color(0x847d70);
     const c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
-      if (y < 0.8) c.copy(sand); else if (y > 12) c.copy(rock); else c.copy(grass).lerp(grassHi, Math.min(1, y / 9));
+      const slope = Math.hypot(h(x + 2, z) - h(x - 2, z), h(x, z + 2) - h(x, z - 2)) / 4; // local steepness
+      if (y < 1.0) c.copy(sand);
+      else if (slope > 0.8 && y > 2) c.copy(rock);                       // steep cliff faces
+      else if (y > 13) c.copy(gDry).lerp(rock, Math.min(1, (y - 13) / 7)); // dry rocky high ground (snow stays on the mountains)
+      else {
+        const g1 = fbm(x * 0.06, z * 0.06);
+        c.copy(gDark).lerp(gLight, g1);
+        const dn = fbm(x * 0.035 + 50, z * 0.035 + 50);
+        if (dn > 0.62) c.lerp(dirt, Math.min(0.7, (dn - 0.62) / 0.3));   // dirt / worn patches
+        else if (g1 < 0.24) c.lerp(gDry, 0.45);                          // dry-grass patches
+      }
       colors.push(c.r, c.g, c.b);
     }
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
@@ -543,11 +573,23 @@ export class LevelBuilder {
       noOutline(new THREE.MeshStandardMaterial({ color: 0x2c74b8, roughness: 0.12, metalness: 0.45, transparent: true, opacity: 0.9 })));
     water.rotation.x = -Math.PI / 2; water.position.y = 0; this.scene.add(water); this._sea = water;
 
-    for (let i = 0; i < 16; i++) { // distant mountain ring
-      const a = i / 16 * Math.PI * 2 + 0.2, rr = size * 0.6 + Math.random() * 60;
-      const hgt = 34 + Math.random() * 46;
-      const m = new THREE.Mesh(new THREE.ConeGeometry(22 + Math.random() * 18, hgt, 6), mat(0x6f7d8e, { roughness: 1, flat: true }));
-      m.position.set(Math.cos(a) * rr, hgt / 2 - 5, Math.sin(a) * rr); this.scene.add(m);
+    // a varied mountain range: craggy jittered peaks, snow caps, near + far/hazy depth layers
+    const mkMountain = (mx, mz, hgt, rad, segn, snowCap, col) => {
+      const g = new THREE.Group();
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(rad, hgt, segn), mat(col, { roughness: 1, flat: true }));
+      const p = cone.geometry.attributes.position;
+      for (let k = 0; k < p.count; k++) { if (p.getY(k) < hgt * 0.42) { p.setX(k, p.getX(k) * (0.8 + Math.random() * 0.55)); p.setZ(k, p.getZ(k) * (0.8 + Math.random() * 0.55)); } }
+      cone.geometry.computeVertexNormals(); g.add(cone);
+      if (snowCap) { const cap = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.46, hgt * 0.34, segn), mat(0xeef3f6, { roughness: 0.9, flat: true })); cap.position.y = hgt * 0.33; g.add(cap); }
+      g.position.set(mx, hgt / 2 - 5, mz); this.scene.add(g);
+    };
+    for (let i = 0; i < 18; i++) { // near ring — varied rocky peaks
+      const a = i / 18 * Math.PI * 2 + Math.random() * 0.3, rr = size * 0.56 + Math.random() * 70, hgt = 30 + Math.random() * 46;
+      mkMountain(Math.cos(a) * rr, Math.sin(a) * rr, hgt, 18 + Math.random() * 16, 5 + Math.floor(Math.random() * 3), hgt > 52, 0x6d7669);
+    }
+    for (let i = 0; i < 11; i++) { // far ring — big hazy snow peaks for depth
+      const a = i / 11 * Math.PI * 2 + 0.4, rr = size * 0.98 + Math.random() * 240, hgt = 78 + Math.random() * 90;
+      mkMountain(Math.cos(a) * rr, Math.sin(a) * rr, hgt, 42 + Math.random() * 44, 6, true, 0x9aa6b4);
     }
     for (const L of lakes) { // wadeable shallow-lake surfaces (sit just below the original ground)
       const wy = h(L.x, L.z) + L.depth - 0.28;

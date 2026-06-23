@@ -32,12 +32,12 @@ export const arcfall = {
     b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
     b.giftCrate(-50, 70, "arc");     // ARC LANCE out by the lake
 
-    // hostiles — all terrain-following: raptors + spiders charge, a T-Rex roams, a giant mech guards a far arc
-    const raptors = [[18, -26], [-24, -18], [40, 48], [-40, 58], [78, -46], [12, 70], [-70, 40], [64, 8]];
+    // hostiles — kept clear of the ~55m drop zone, spread around the island so you pick your fights
+    const raptors = [[62, -34], [-72, 22], [42, 84], [-54, -74], [98, 44]];   // 5 raptors, well spread
     for (const [x, z] of raptors) b.enemy({ kind: "monster", x, z });
-    const spiders = [[-30, 40], [60, -20], [-90, -20], [30, -55], [-50, -10], [100, -30]];
+    const spiders = [[-92, -32], [82, -72], [-32, 98], [112, -12]];           // 4 spiders elsewhere
     for (const [x, z] of spiders) b.enemy({ kind: "spider", x, z });
-    b.enemy({ kind: "trex", x: -112, z: 64 });   // T-Rex mini-boss roaming the far side
-    b.enemy({ kind: "robot", x: 118, z: 48 });    // giant mech guarding a far arc
+    b.enemy({ kind: "trex", x: -122, z: 70 });   // T-Rex mini-boss roaming the far side
+    b.enemy({ kind: "robot", x: 126, z: 56 });   // giant mech guarding a far arc
   },
 };

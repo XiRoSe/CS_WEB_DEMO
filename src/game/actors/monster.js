@@ -20,7 +20,9 @@ export class Monster {
     const inst = CREATURES[this.kind].make();
     if (inst) {
       this.model = inst.model;
-      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+      const tint = new THREE.Color().setHSL(0.07 + Math.random() * 0.16, 0.45, 0.42 + Math.random() * 0.16); // earthy per-instance variation
+      const mix = 0.22 + Math.random() * 0.28;
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; o.material = o.material.clone(); o.material.color.lerp(tint, mix); } });
       this.group.add(this.model);
       this.mixer = new THREE.AnimationMixer(this.model);
       this._actions = {}; for (const c of inst.animations) this._actions[c.name] = this.mixer.clipAction(c);
