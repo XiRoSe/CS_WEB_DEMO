@@ -39,6 +39,15 @@ export class Audio {
       laser: "/audio/laser.ogg",
       sword: "/audio/sword.ogg",
       shotgun: "/audio/shotgun.ogg",
+      plasma: "/audio/plasma.ogg",
+      zap: "/audio/zap.ogg",
+      thunder: "/audio/thunder.ogg",
+      creature: "/audio/creature.ogg",
+      hurt: "/audio/hurt.ogg",
+      whoosh: "/audio/whoosh.ogg",
+      pickup: "/audio/pickup.ogg",
+      splash: "/audio/splash.ogg",
+      car_engine: "/audio/car_engine.ogg",
     };
     for (const [name, url] of Object.entries(clips)) {
       try {
@@ -119,6 +128,7 @@ export class Audio {
     if (killed) { this._tone(220, 0.12, "square", 0.2, 90); }
   }
   hurt() {
+    if (this.playBuf("hurt", 0.6, 0.9 + Math.random() * 0.15)) return;
     this._noiseBurst(0.18, 500, 0.7, 0.4);
     this._tone(80, 0.18, "sawtooth", 0.3, 40);
   }
@@ -137,24 +147,27 @@ export class Audio {
     this._noiseBurst(0.08, 1800, 1, 0.2);
   }
   // --- ARCFALL: synth sci-fi + creature + pickup sounds ---
-  plasma() { this._tone(560, 0.2, "sawtooth", 0.3, 150); this._noiseBurst(0.12, 1400, 1, 0.12, "bandpass"); }
-  zap() { this._noiseBurst(0.18, 3200, 0.6, 0.22, "bandpass"); this._tone(1000, 0.12, "square", 0.16, 2000); }
+  plasma() { if (this.playBuf("plasma", 0.5, 0.9 + Math.random() * 0.12)) return; this._tone(560, 0.2, "sawtooth", 0.3, 150); this._noiseBurst(0.12, 1400, 1, 0.12, "bandpass"); }
+  zap() { if (this.playBuf("zap", 0.4)) return; this._noiseBurst(0.18, 3200, 0.6, 0.22, "bandpass"); this._tone(1000, 0.12, "square", 0.16, 2000); }
   laser() { if (this.playBuf("laser", 0.5, 1.4 + Math.random() * 0.15)) return; this._tone(880, 0.09, "square", 0.16, 300); this._noiseBurst(0.05, 2200, 1, 0.05); }
   swordSwing() { if (this.playBuf("sword", 0.6, 0.95 + Math.random() * 0.1)) return; this._noiseBurst(0.2, 760, 0.6, 0.18, "bandpass"); }
-  thunder() { this._noiseBurst(0.9, 220, 0.5, 0.45); this._tone(52, 0.8, "sawtooth", 0.32, 26); } // storm rumble
-  splash() { this._noiseBurst(0.32, 1300, 0.7, 0.32); } // water entry
+  thunder() { if (this.playBuf("thunder", 0.7, 0.7 + Math.random() * 0.2)) return; this._noiseBurst(0.9, 220, 0.5, 0.45); this._tone(52, 0.8, "sawtooth", 0.32, 26); } // storm rumble
+  splash() { if (this.playBuf("splash", 0.5, 0.9 + Math.random() * 0.2)) return; this._noiseBurst(0.32, 1300, 0.7, 0.32); } // water entry
   shotgun() { if (this.playBuf("shotgun", 0.6, 0.9 + Math.random() * 0.1)) return; this._noiseBurst(0.3, 500, 0.6, 0.5); this._tone(80, 0.2, "sawtooth", 0.3, 40); }
-  swimStroke() { this._noiseBurst(0.22, 680, 0.6, 0.14, "bandpass"); } // swim swish
-  dropWhoosh() { this._noiseBurst(7.0, 440, 0.4, 0.34); this._tone(190, 7.0, "sawtooth", 0.13, 64); } // descent rush + rocket rumble
-  creature() { this._tone(120, 0.34, "sawtooth", 0.3, 64); this._noiseBurst(0.18, 360, 0.8, 0.14); } // growl/bite
-  arcGet() { // ascending recovered-arc chime
-    this._tone(660, 0.12, "sine", 0.32);
-    setTimeout(() => this._tone(990, 0.16, "sine", 0.32), 90);
-    setTimeout(() => this._tone(1320, 0.26, "sine", 0.3), 185);
-  }
-  // looping vehicle engine — pitch rises with speed
+  swimStroke() { if (this.playBuf("splash", 0.28, 1.5 + Math.random() * 0.2)) return; this._noiseBurst(0.22, 680, 0.6, 0.14, "bandpass"); } // swim swish
+  dropWhoosh() { if (this.playBuf("whoosh", 0.55, 0.8)) return; this._noiseBurst(7.0, 440, 0.4, 0.34); this._tone(190, 7.0, "sawtooth", 0.13, 64); } // descent rush
+  creature() { if (this.playBuf("creature", 0.55, 0.7 + Math.random() * 0.25)) return; this._tone(120, 0.34, "sawtooth", 0.3, 64); this._noiseBurst(0.18, 360, 0.8, 0.14); } // growl/bite
+  arcGet() { if (this.playBuf("pickup", 0.6)) return; this._tone(660, 0.12, "sine", 0.32); setTimeout(() => this._tone(990, 0.16, "sine", 0.32), 90); setTimeout(() => this._tone(1320, 0.26, "sine", 0.3), 185); }
+  // looping vehicle engine — real engine loop (pitch rises with speed); synth fallback
   startEngine() {
     if (!this.ctx || this._eng) return;
+    if (this.buffers.car_engine) {
+      const s = this.ctx.createBufferSource(); s.buffer = this.buffers.car_engine; s.loop = true;
+      const g = this.ctx.createGain(); g.gain.value = 0; s.connect(g); g.connect(this.master); s.start();
+      g.gain.linearRampToValueAtTime(0.45, this.ctx.currentTime + 0.3);
+      this._eng = { src: s, g, real: true };
+      return;
+    }
     const o = this.ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = 52;
     const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 430;
     const g = this.ctx.createGain(); g.gain.value = 0;
@@ -162,8 +175,16 @@ export class Audio {
     g.gain.linearRampToValueAtTime(0.13, this.ctx.currentTime + 0.3);
     this._eng = { o, g };
   }
-  setEngine(speed) { if (this._eng) this._eng.o.frequency.value = 48 + Math.abs(speed) * 4.5; }
-  stopEngine() { if (!this._eng) return; const e = this._eng; this._eng = null; e.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12); setTimeout(() => { try { e.o.stop(); } catch { /* already stopped */ } }, 350); }
+  setEngine(speed) {
+    if (!this._eng) return;
+    if (this._eng.real) this._eng.src.playbackRate.value = 0.62 + Math.min(1.4, Math.abs(speed) * 0.045);
+    else this._eng.o.frequency.value = 48 + Math.abs(speed) * 4.5;
+  }
+  stopEngine() {
+    if (!this._eng) return; const e = this._eng; this._eng = null;
+    e.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
+    setTimeout(() => { try { (e.src || e.o).stop(); } catch { /* already stopped */ } }, 350);
+  }
   startRotor() {
     this._rotorWanted = true;
     if (!this.ctx || this._rotorSrc || this._rotor) return; // already running (or no ctx yet)
