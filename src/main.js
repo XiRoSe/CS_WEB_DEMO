@@ -649,9 +649,9 @@ class Game {
           // hide the box + glow, but leave the (now-dark) light in the scene: toggling a light's
           // visibility changes the scene light count and recompiles every shader (a multi-second freeze).
           p.taken = true; p.box.visible = false; p.glow.visible = false; p.light.intensity = 0;
-          this.weapon.reserve += p.rounds;
+          this.weapon.addAmmo(1); // resupply ALL weapons
           this.audio.playBuf?.("clipin", 0.6);
-          this.hud.notify(`+${p.rounds} ROUNDS · MAGAZINE`);
+          this.hud.notify("✦ AMMO RESUPPLY — ALL WEAPONS");
         }
       }
     }
@@ -669,7 +669,7 @@ class Game {
           else if (gf.kind === "plasma" || gf.kind === "laser" || gf.kind === "shotgun") {
             this.weapon.give(gf.kind); this.hud.setWeaponName(this._weaponName(gf.kind));
             this.hud.notify(`✦ ${this._weaponName(gf.kind)} ACQUIRED — Q to cycle`);
-          } else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
+          } else { this.weapon.addAmmo(1.5); this.hud.notify("✦ AMMO CACHE — ALL WEAPONS REPLENISHED"); }
         }
       }
     }

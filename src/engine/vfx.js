@@ -37,6 +37,9 @@ export class VFX {
     // thin additive tracers
     const tg = new THREE.CylinderGeometry(0.01, 0.01, 1, 4); tg.translate(0, 0.5, 0);
     this.tracers = this._pool(20, tg, () => noOutline(new THREE.MeshBasicMaterial({ color: 0xfff0bf, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+    // red enemy laser beams (thin glowing cylinders)
+    const eg = new THREE.CylinderGeometry(0.13, 0.13, 1, 6); eg.translate(0, 0.5, 0);
+    this.enemyBeams = this._pool(12, eg, () => noOutline(new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     // expanding shockwave rings (billboarded)
     const ring = new THREE.RingGeometry(0.55, 0.72, 28);
     this.rings = this._pool(4, ring, () => noOutline(new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })));
@@ -88,14 +91,16 @@ export class VFX {
     this._beam.scale.set(1, len, 1);
     this._beam.visible = true; this._beam.material.opacity = 0.9; this._beamCore.material.opacity = 1;
     this._beamLife = 0.85;
-    this._flash(a, 3.8, 0xffd24a); // muzzle bloom at the chest
+    this._flash(a, 5.5, 0xffd24a); this._flash(a, 3.0, 0xffffff); // big muzzle bloom at the chest
   }
 
-  // glowing colored enemy laser BOLT (red Iron Legion / green Hollow Watch): a string of colored glow
-  // sprites along the beam (no yellow tracer) so the bolt itself reads red/green
-  enemyLaser(a, b, color = 0xff3a2a) {
-    const p = this._mid || (this._mid = a.clone()), n = 8;
-    for (let i = 0; i <= n; i++) { p.lerpVectors(a, b, i / n); this._flash(p, i === n ? 0.7 : 0.34, color); }
+  // a glowing red enemy laser BEAM (a real thin cylinder that briefly lingers) + impact glow
+  enemyLaser(a, b, color = 0xff2a1a) {
+    this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;
+    const t = this._next(this.enemyBeams);
+    t.mesh.position.copy(a); t.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); t.mesh.scale.set(1, len, 1);
+    t.mesh.material.color.setHex(color); t.mesh.visible = true; t.mesh.material.opacity = 0.95; t.life = t.max = 0.13;
+    this._flash(b, 0.7, color); this._flash(a, 0.5, color); // impact + muzzle glow
   }
 
   _flash(point, size, color) {
@@ -237,6 +242,7 @@ export class VFX {
     const camQ = this._cam && this._cam.quaternion;
     if (this._beam && this._beam.visible) { this._beamLife -= dt; const f = Math.max(0, this._beamLife / 0.85); this._beam.material.opacity = 0.9 * f; this._beamCore.material.opacity = f; if (this._beamLife <= 0) this._beam.visible = false; }
     for (const t of this.tracers) if (t.life > 0) { t.life -= dt; t.mesh.material.opacity = Math.max(0, t.life / t.max); if (t.life <= 0) t.mesh.visible = false; }
+    for (const t of this.enemyBeams) if (t.life > 0) { t.life -= dt; t.mesh.material.opacity = Math.max(0, 0.95 * t.life / t.max); if (t.life <= 0) t.mesh.visible = false; }
     for (const e of this.embers) if (e.life > 0) {
       e.life -= dt; e.vel.y -= 14 * dt;
       e.mesh.position.addScaledVector(e.vel, dt);

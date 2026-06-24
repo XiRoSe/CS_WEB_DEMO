@@ -225,6 +225,15 @@ export class Weapon {
       if (m) this.extraGun.add(m);
     }
   }
+  // top up EVERY weapon's ammo (ammo pickups collected around the island)
+  addAmmo(mult = 1) {
+    this.reserve += Math.round(90 * mult);
+    this.laserAmmo += Math.round(80 * mult);
+    this.shotgunAmmo += Math.round(10 * mult);
+    this.plasmaAmmo += Math.round(8 * mult);
+    this.rockets = Math.min(8, this.rockets + Math.round(2 * mult));
+    for (const k in this.guns) this.gunAmmo[k] += Math.round(this.guns[k].ammo * 0.35 * mult);
+  }
   canFireGun(t) { const g = this.guns[this.mode]; return !!g && this.gunAmmo[this.mode] > 0 && (t - this._gunLast[this.mode]) >= g.rate; }
   fireGun(t) { const g = this.guns[this.mode]; this._gunLast[this.mode] = t; this.gunAmmo[this.mode]--; this.kick = g.kick; this.kickRot = g.kick * 1.2; this.audio && this.audio[g.sound] && this.audio[g.sound](); }
 

@@ -23,8 +23,7 @@ export class Robot {
     this.fly = cfg.fly;
     this.dead = false; this.counted = false; this.removable = false;
     this.aggro = false; this.aggroRange = spawn.aggro || cfg.range + 24; // idle until the player approaches
-    // glowing laser colour by tribe: Hollow Watch (sentry/drone) = green, Iron Legion (mech/heavy) = red
-    this._laserColor = (this.kind === "sentry" || this.kind === "drone") ? 0x46ff5a : 0xff3a2a;
+    this._laserColor = 0xff2a1a; // all robots fire red laser beams
     this.yaw = 0; this._fireCd = 1.5 + Math.random(); this._deathT = 0; this._needBoom = false; this._cur = null; this._curAction = null; this._fallV = 0;
     this._muzzle = new THREE.Vector3(); this._tmp = new THREE.Vector3();
 
@@ -54,7 +53,7 @@ export class Robot {
     const chest = this._tmp.set(this.pos.x, this.group.position.y + this._chestY, this.pos.z);
     if (this._charging) {
       this._charge += dt;
-      ctx.vfx && ctx.vfx._flash && ctx.vfx._flash(chest, 0.6 + this._charge * 2.2, 0xff7a2a); // growing charge orb
+      if (ctx.vfx && ctx.vfx._flash) { const sz = 1.6 + this._charge * 5.5; ctx.vfx._flash(chest, sz, 0xff5a1a); ctx.vfx._flash(chest, sz * 0.55, 0xffe0a0); } // big growing charge orb (bright core)
       if (this._charge >= 1.3) {
         this._charging = false; this._bossCd = 5 + Math.random() * 2.5;
         // aim at the GROUND beneath the player so the beam is a visible downward diagonal ray (not head-on)
@@ -64,7 +63,7 @@ export class Robot {
         ctx.vfx && ctx.vfx.bossBeam && ctx.vfx.bossBeam(from, beamEnd);
         for (let i = 1; i <= 6; i++) ctx.vfx && ctx.vfx.explosion && ctx.vfx.explosion(from.clone().lerp(to, i / 6), 1.6 + i * 0.25); // bigger booms toward the impact
         ctx.vfx && ctx.vfx._shockwave && ctx.vfx._shockwave(to);
-        ctx.audio && ctx.audio.explosion && ctx.audio.explosion(); ctx.audio && ctx.audio.plasma && ctx.audio.plasma();
+        ctx.audio && ctx.audio.laser && ctx.audio.laser(0.72); ctx.audio && ctx.audio.explosion && ctx.audio.explosion(); // giant's laser (full) + boom
         ctx.onBossBeam && ctx.onBossBeam();
         ctx.onPlayerHit && ctx.onPlayerHit(34 + Math.floor(Math.random() * 22));
       }
@@ -122,7 +121,7 @@ export class Robot {
       this._gunTip.getWorldPosition(this._muzzle);
       ctx.vfx?.muzzle?.(this._muzzle);
       (ctx.vfx?.enemyLaser ? ctx.vfx.enemyLaser(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z), this._laserColor) : ctx.vfx?.tracer?.(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z)));
-      ctx.audio?.heliShot?.();
+      ctx.audio?.laser?.(0.5); // small robots: laser beam at ~70% of the giant's volume
       if (Math.random() < 0.5) ctx.onPlayerHit?.(this.cfg.dmg[0] + Math.floor(Math.random() * (this.cfg.dmg[1] - this.cfg.dmg[0])));
     }
   }

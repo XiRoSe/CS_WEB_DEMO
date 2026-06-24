@@ -67,6 +67,8 @@ export const arcfall = {
     // gift crates (loot: ammo / health / grenades + two sci-fi weapons to find)
     b.giftCrate(8, -22, "ammo"); b.giftCrate(-22, 27, "health"); b.giftCrate(48, 42, "grenade");
     b.giftCrate(-62, -16, "ammo"); b.giftCrate(96, 12, "health"); b.giftCrate(-100, -26, "grenade");
+    // ammo caches spread across every region — collect them to resupply ALL weapons
+    for (const [x, z] of [[-84, 58], [108, 50], [86, -64], [-96, -46], [20, 98], [56, 8], [-40, -64]]) b.giftCrate(x, z, "ammo");
     b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
     b.giftCrate(-50, 70, "laser");   // LASER RIFLE out by the lake
     b.giftCrate(64, 30, "shotgun");  // PULSE SHOTGUN

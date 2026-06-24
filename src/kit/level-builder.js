@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "../engine/primitives.js";
 import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
+import { makeFpWeapon } from "./content/fpweapons.js";
 import { makeTree, makeRock } from "./content/nature.js";
 import { Car } from "./car.js";
 
@@ -454,14 +455,36 @@ export class LevelBuilder {
   giftCrate(x, z, kind = "ammo") {
     const C = { ammo: 0xffce73, grenade: 0xd0552e, health: 0x4fd06a, plasma: 0x4fb4ff, laser: 0xff5a3c, shotgun: 0xff8a3a }[kind] || 0xffce73;
     const g = new THREE.Group(); g.position.set(x, this._groundY(x, z), z);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat(C, { roughness: 0.5 })); box.position.y = 0.4; box.castShadow = true;
-    const rib = mat(0xfff4e0, { roughness: 0.5 });
-    const rx = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.16), rib); rx.position.y = 0.4;
-    const rz = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.86, 0.86), rib); rz.position.y = 0.4;
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); halo.scale.setScalar(2.2); halo.position.y = 0.5;
-    g.add(box, rx, rz, halo);
+    // a low dark plinth + glow halo, with a distinct floating ICON per pickup kind
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.22, 10), mat(0x2c2f36, { roughness: 0.7 })); base.position.y = 0.11; base.castShadow = true;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); halo.scale.setScalar(2.2); halo.position.y = 0.6;
+    const icon = this._pickupIcon(kind, C); icon.position.y = 0.75;
+    g.add(base, halo, icon);
     this.scene.add(g);
-    this.gifts.push({ x, z, r: 1.8, group: g, box, halo, kind, taken: false });
+    this.gifts.push({ x, z, r: 1.8, group: g, box: icon, halo, kind, taken: false });
+  }
+
+  // a relevant low-poly icon for each pickup kind (ammo box, med kit, grenades, or the real weapon model)
+  _pickupIcon(kind, C) {
+    const grp = new THREE.Group();
+    if (kind === "plasma" || kind === "laser" || kind === "shotgun") {
+      const m = makeFpWeapon(kind); if (m) { m.scale.multiplyScalar(1.15); m.rotation.set(0, 0, Math.PI * 0.12); grp.add(m); return grp; }
+    }
+    if (kind === "health") {
+      grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.42, 0.42), mat(0xf2f2f2, { roughness: 0.5 })));
+      const red = mat(0xe23b3b, { roughness: 0.5 });
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.3, 0.03), red); v.position.z = 0.22; grp.add(v);
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.13, 0.03), red); h.position.z = 0.22; grp.add(h);
+    } else if (kind === "grenade") {
+      const gm = mat(0x3c4a2e, { roughness: 0.6 }), cap = mat(0x9a9a9a, { metalness: 0.6, roughness: 0.4 });
+      for (let i = 0; i < 3; i++) { const o = (i - 1) * 0.24, yy = i === 1 ? 0.1 : 0; const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), gm); b.position.set(o, yy, 0); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 6), cap); c.position.set(o, yy + 0.2, 0); grp.add(b, c); }
+    } else { // ammo: an olive ammo box + brass rounds on top
+      grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.4, 0.46), mat(0x55621f, { roughness: 0.6 })));
+      const brass = mat(0xd9a441, { metalness: 0.7, roughness: 0.3 });
+      for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 8), brass); r.rotation.z = Math.PI / 2; r.position.set(-0.12 + i * 0.12, 0.26, 0); grp.add(r); }
+    }
+    grp.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return grp;
   }
 
   // a low-poly GLB tree (Quaternius birch/palm); the trunk blocks movement, seated on the terrain
@@ -762,7 +785,7 @@ export class LevelBuilder {
     }
     for (const gf of this.gifts) {
       if (gf.taken) continue;
-      gf.box.rotation.y = t * 0.8; gf.halo.material.opacity = 0.5 + Math.sin(t * 3) * 0.2;
+      gf.box.rotation.y = t * 0.8; gf.box.position.y = 0.78 + Math.sin(t * 2) * 0.07; gf.halo.material.opacity = 0.5 + Math.sin(t * 3) * 0.2;
     }
     if (this._bombLed) this._bombLed.visible = Math.sin(t * 6) > -0.3; // blinking charge indicator
     if (this.pickups) for (const p of this.pickups) {
