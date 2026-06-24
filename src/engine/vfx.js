@@ -79,10 +79,10 @@ export class VFX {
   bossBeam(a, b) {
     if (!this._beam) {
       const g = new THREE.CylinderGeometry(1.1, 1.1, 1, 14); g.translate(0, 0.5, 0);
-      this._beam = new THREE.Mesh(g, noOutline(new THREE.MeshBasicMaterial({ color: 0xff4a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      this._beam = new THREE.Mesh(g, noOutline(new THREE.MeshBasicMaterial({ color: 0xff1810, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
       this._beam.frustumCulled = false; this.scene.add(this._beam);
       const gc = new THREE.CylinderGeometry(0.42, 0.42, 1, 10); gc.translate(0, 0.5, 0);
-      this._beamCore = new THREE.Mesh(gc, noOutline(new THREE.MeshBasicMaterial({ color: 0xffe6c0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      this._beamCore = new THREE.Mesh(gc, noOutline(new THREE.MeshBasicMaterial({ color: 0xff6a4a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
       this._beamCore.frustumCulled = false; this._beam.add(this._beamCore);
     }
     this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;

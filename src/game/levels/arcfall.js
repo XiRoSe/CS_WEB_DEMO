@@ -71,6 +71,5 @@ export const arcfall = {
     for (const [x, z] of [[-84, 58], [108, 50], [86, -64], [-96, -46], [20, 98], [56, 8], [-40, -64]]) b.giftCrate(x, z, "ammo");
     b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
     b.giftCrate(-50, 70, "laser");   // LASER RIFLE out by the lake
-    b.giftCrate(64, 30, "shotgun");  // PULSE SHOTGUN
   },
 };

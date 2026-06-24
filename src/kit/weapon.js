@@ -66,7 +66,7 @@ export class Weapon {
     this.extraGun.position.set(0.32, -0.34, -0.4); this.extraGun.rotation.set(0, Math.PI, 0);
     camera.add(this.extraGun); this._gunModels = {};
     // master weapon list (every hero owns all; signature equipped on deploy)
-    this.allWeapons = ["rifle", "smg", "minigun", "burst", "railgun", "shotgun", "flak", "laser", "plasma", "launcher", "sword"];
+    this.allWeapons = ["rifle", "smg", "minigun", "burst", "railgun", "flak", "laser", "plasma", "launcher", "sword"]; // pulse shotgun removed
     this.sword = new THREE.Group(); this.sword.visible = false;
     this.sword.position.set(0.3, -0.34, -0.5); this.sword.rotation.set(0, Math.PI, 0);
     camera.add(this.sword);
