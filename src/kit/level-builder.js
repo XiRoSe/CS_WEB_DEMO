@@ -673,6 +673,7 @@ export class LevelBuilder {
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
     const land = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
     land.material.vertexColors = true; land.receiveShadow = true; this.scene.add(land);
+    this.solidMeshes.push(land); // bullets hit the ground/hills/mountains (no shooting through terrain)
 
     // sea — clear, smooth-shaded water with gentle rolling swell + sky-env reflection (cheap, no reflector).
     const waterGeo = new THREE.PlaneGeometry(sea, sea, 80, 80); waterGeo.rotateX(-Math.PI / 2);
@@ -791,6 +792,11 @@ export class LevelBuilder {
   // 2D segment-vs-AABB occlusion test for enemy line-of-sight (minTop>0 => only tall blockers)
   segmentBlocked(ax, az, bx, bz, minTop = 0) {
     const dx = bx - ax, dz = bz - az;
+    // terrain occlusion: a hill/mountain rising above the sight line blocks it
+    if (this.terrainHeight) {
+      const sy = this.terrainHeight(ax, az) + 1.6, ey = this.terrainHeight(bx, bz) + 1.6;
+      for (let k = 1; k < 7; k++) { const u = k / 7, ly = sy + (ey - sy) * u; if (this.terrainHeight(ax + dx * u, az + dz * u) > ly + 0.8) return true; }
+    }
     for (const c of this.colliders) {
       if (c.top < minTop) continue;
       if (ax >= c.minX && ax <= c.maxX && az >= c.minZ && az <= c.maxZ) continue;

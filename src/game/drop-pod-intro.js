@@ -39,7 +39,7 @@ export class DropPodIntro {
 
   update(dt) {
     if (this.phase === "crawl") {
-      if (!this._calledCrawl) { this._calledCrawl = true; this.onCrawl && this.onCrawl(); this.audio && this.audio.dropWhoosh && this.audio.dropWhoosh(); }
+      if (!this._calledCrawl) { this._calledCrawl = true; this.onCrawl && this.onCrawl(); } // (no descent engine SFX — leaving room for a story narrator)
       this.t += dt;
       const k = Math.min(this.t / this.crawlDur, 1);
       this.pos.y = this.startY + (this.hoverY - this.startY) * k; // slow drift down

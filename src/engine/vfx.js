@@ -72,11 +72,23 @@ export class VFX {
     t.life = t.max = 0.03;
   }
 
-  // THE GUARDIAN's giant chest beam: a thick bright string of big glow sprites
+  // THE GUARDIAN's giant chest beam: a real persistent glowing RAY (thick red cylinder + bright core) that lingers
   bossBeam(a, b) {
-    const p = this._mid2 || (this._mid2 = a.clone()), n = 18;
-    for (let i = 0; i <= n; i++) { p.lerpVectors(a, b, i / n); this._flash(p, 1.6, 0xff4a1a); }
-    this._flash(a, 3.2, 0xffd24a); // muzzle bloom at the chest
+    if (!this._beam) {
+      const g = new THREE.CylinderGeometry(0.7, 0.7, 1, 12); g.translate(0, 0.5, 0);
+      this._beam = new THREE.Mesh(g, noOutline(new THREE.MeshBasicMaterial({ color: 0xff4a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      this._beam.frustumCulled = false; this.scene.add(this._beam);
+      const gc = new THREE.CylinderGeometry(0.26, 0.26, 1, 8); gc.translate(0, 0.5, 0);
+      this._beamCore = new THREE.Mesh(gc, noOutline(new THREE.MeshBasicMaterial({ color: 0xffe6c0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+      this._beamCore.frustumCulled = false; this._beam.add(this._beamCore);
+    }
+    this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;
+    this._beam.position.copy(a);
+    this._beam.quaternion.setFromUnitVectors(this._up, this._dir.normalize());
+    this._beam.scale.set(1, len, 1);
+    this._beam.visible = true; this._beam.material.opacity = 0.85; this._beamCore.material.opacity = 1;
+    this._beamLife = 0.55;
+    this._flash(a, 3.4, 0xffd24a); // muzzle bloom at the chest
   }
 
   // glowing colored enemy laser BOLT (red Iron Legion / green Hollow Watch): a string of colored glow
@@ -223,6 +235,7 @@ export class VFX {
 
   update(dt) {
     const camQ = this._cam && this._cam.quaternion;
+    if (this._beam && this._beam.visible) { this._beamLife -= dt; const f = Math.max(0, this._beamLife / 0.55); this._beam.material.opacity = 0.85 * f; this._beamCore.material.opacity = f; if (this._beamLife <= 0) this._beam.visible = false; }
     for (const t of this.tracers) if (t.life > 0) { t.life -= dt; t.mesh.material.opacity = Math.max(0, t.life / t.max); if (t.life <= 0) t.mesh.visible = false; }
     for (const e of this.embers) if (e.life > 0) {
       e.life -= dt; e.vel.y -= 14 * dt;

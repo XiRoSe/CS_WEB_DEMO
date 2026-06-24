@@ -17,6 +17,8 @@ export class Voice {
     return a;
   }
   _play(name, cooldown = 0) {
+    return; // CS-style voice callouts disabled (a story narrator will replace them)
+    // eslint-disable-next-line no-unreachable
     const a = this.clips[name];
     if (!a) return;
     const now = performance.now() / 1000;

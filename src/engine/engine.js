@@ -109,9 +109,9 @@ export class Engine {
     const g = x.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#3a1c66"); g.addColorStop(0.42, "#5f2f86"); g.addColorStop(0.78, "#a8568f"); g.addColorStop(1, "#d39a86"); // purple anomaly storm sky (deep violet up top, not black)
     x.fillStyle = g; x.fillRect(0, 0, W, H);
-    // scattered stars high in the sky (no moon) — brighter toward the top
+    // scattered stars (no moon) — kept clear of the canvas TOP so they don't pinch at the zenith pole
     for (let i = 0; i < 220; i++) {
-      const sx = Math.random() * W, sy = Math.random() * H * 0.42, r = Math.random() * 1.6 + 0.4;
+      const sx = Math.random() * W, sy = H * 0.14 + Math.random() * H * 0.32, r = Math.random() * 1.6 + 0.4;
       x.globalAlpha = 0.35 + Math.random() * 0.6; x.fillStyle = "#fdfbff";
       x.beginPath(); x.arc(sx, sy, r, 0, 7); x.fill();
     }
@@ -125,7 +125,7 @@ export class Engine {
       }
     };
     for (let i = 0; i < 8; i++) {
-      const cx = Math.random() * W, cy = 70 + Math.random() * H * 0.3, s = 0.8 + Math.random() * 0.9, n = 5 + Math.floor(Math.random() * 4), base = cy + 26 * s;
+      const cx = Math.random() * W, cy = H * 0.18 + Math.random() * H * 0.22, s = 0.8 + Math.random() * 0.9, n = 5 + Math.floor(Math.random() * 4), base = cy + 26 * s;
       for (let j = 0; j < n; j++) { // shaded grey underbellies first
         const px = cx + (j - n / 2) * 52 * s, r = (40 + Math.random() * 34) * s;
         puff(px, base, r, "200,210,222", 0.5);

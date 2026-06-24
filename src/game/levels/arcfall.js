@@ -54,8 +54,8 @@ export const arcfall = {
       specs.forEach((s, i) => {
         const ang = (ax * 0.7 + az * 1.3) + (i / specs.length) * Math.PI * 2, rr = 12 + (i % 3) * 5; // 12-22m out
         let gx = ax + Math.cos(ang) * rr, gz = az + Math.sin(ang) * rr;
-        const dS = Math.hypot(gx, gz); // keep the central landing zone clear so the player can adjust safely
-        if (dS < 40) { const m = 40 / (dS || 1); gx *= m; gz *= m; }
+        const dS = Math.hypot(gx, gz); // keep a wide clear landing bubble so nothing engages at spawn
+        if (dS < 58) { const m = 58 / (dS || 1); gx *= m; gz *= m; }
         b.enemy({ ...s, x: gx, z: gz });
       });
     }

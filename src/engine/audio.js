@@ -220,6 +220,46 @@ export class Audio {
     if (this._rotorSrc) { try { this._rotorSrc.stop(); } catch (e) { /* already stopped */ } this._rotorSrc.disconnect(); this._rotorSrc = null; }
     this._stopSynthRotor();
   }
+  // ── chill lo-fi R&B groove for the hero-select screen (warm Rhodes chords + bassline + soft beat) ──
+  startLobbyMusic() {
+    if (!this.ctx || this._lobbyMusic) return;
+    const ctx = this.ctx, bus = ctx.createGain(); bus.gain.value = 0; bus.connect(this.master);
+    bus.gain.linearRampToValueAtTime(0.34, ctx.currentTime + 1.4); // fade in
+    const f = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+    // a smooth ii–V–I–vi style progression: Fmaj7, Em7, Dm7, G7
+    const chords = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [55, 59, 62, 65]].map((c) => c.map(f));
+    const bass = [29, 28, 26, 31].map(f); // F1, E1, D1, G1 (laid-back roots)
+    const bpm = 72, beat = 60 / bpm, bar = beat * 4;
+    const m = { bus, stopped: false, interval: null }; this._lobbyMusic = m;
+    const pad = (fr, t, dur, vol) => { // soft electric-piano-ish voice
+      const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = fr;
+      const o2 = ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = fr * 2.001;
+      const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1500;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(bus); o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    };
+    const bassV = (fr, t, dur, vol) => { const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = fr; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + 0.05); };
+    const kick = (t) => { const o = ctx.createOscillator(); o.type = "sine"; o.frequency.setValueAtTime(125, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12); const g = ctx.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g); g.connect(bus); o.start(t); o.stop(t + 0.22); };
+    const noise = (t, dur, freq, q, vol, type) => { const s = ctx.createBufferSource(); s.buffer = this._noise; const bp = ctx.createBiquadFilter(); bp.type = type; bp.frequency.value = freq; bp.Q.value = q; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(bp); bp.connect(g); g.connect(bus); s.start(t); s.stop(t + dur + 0.02); };
+    let i = 0;
+    const playBar = () => {
+      if (m.stopped) return;
+      const t = ctx.currentTime + 0.06, c = chords[i % 4], b = bass[i % 4];
+      for (const fr of c) pad(fr, t + 0.02, bar * 0.95, 0.085);              // held chord
+      bassV(b, t, beat * 1.4, 0.2); bassV(b, t + beat * 2.5, beat * 1.2, 0.16); // syncopated bass
+      kick(t); kick(t + beat * 2 + beat * 0.5);                              // laid-back kick
+      noise(t + beat, 0.18, 1400, 1, 0.18, "bandpass"); noise(t + beat * 3, 0.18, 1400, 1, 0.18, "bandpass"); // snaps on 2 & 4
+      for (let h = 0; h < 8; h++) noise(t + h * beat * 0.5, 0.04, 8000, 0.7, h % 2 ? 0.05 : 0.09, "highpass"); // hats
+      i++;
+    };
+    playBar(); m.interval = setInterval(playBar, bar * 1000);
+  }
+  stopLobbyMusic() {
+    const m = this._lobbyMusic; if (!m) return; this._lobbyMusic = null; m.stopped = true;
+    if (m.interval) clearInterval(m.interval);
+    try { m.bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4); } catch { /* ctx gone */ }
+    setTimeout(() => { try { m.bus.disconnect(); } catch { /* already gone */ } }, 1400);
+  }
   win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this._tone(f, 0.18, "square", 0.22), i * 130)); }
   lose() { [330, 262, 196, 131].forEach((f, i) => setTimeout(() => this._tone(f, 0.25, "sawtooth", 0.22), i * 160)); }
 }

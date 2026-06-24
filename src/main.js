@@ -150,7 +150,8 @@ class Game {
   // screen 1: pick a hero (hero framed close); screen 2: deploy (camera pulls back)
   _showHeroSelect() {
     this._lobbyFrame("select");
-    this.hud.showHeroSelect(() => this._showDeploy(), { heroes: HERO_LIST, selected: this.hero, onHero: (id) => this._setLobbyHero(id) });
+    this.audio.resume?.(); this.audio.startLobbyMusic?.(); // chill R&B groove on the character-select screen
+    this.hud.showHeroSelect(() => this._showDeploy(), { heroes: HERO_LIST, selected: this.hero, onHero: (id) => { this.audio.resume?.(); this.audio.startLobbyMusic?.(); this._setLobbyHero(id); } });
   }
   _showDeploy() {
     this._lobbyFrame("deploy");
@@ -193,6 +194,7 @@ class Game {
   // Mobile (a finger tapped Deploy -> touch active) starts directly; desktop uses pointer lock.
   _deploy() {
     this.audio.resume();
+    this.audio.stopLobbyMusic?.(); // fade out the select-screen groove
     if (this.touch.enabled) this._beginIntro();
     else this.controller.lock(); // onLock -> _beginIntro
   }
@@ -202,6 +204,7 @@ class Game {
     if (this.state === "intro" || this._introDone) return;
     if (!this.cfg.intro.enabled) { this._introDone = true; this._startPlay(); return; }
     this.state = "intro";
+    this.audio.stopLobbyMusic?.();
     this._disposeLobby();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(false);
@@ -709,7 +712,8 @@ class Game {
     else if (wm === "laser") this.hud.setAmmo(this.weapon.laserAmmo, "∞", false);
     else if (wm === "shotgun") this.hud.setAmmo(this.weapon.shotgunAmmo, "∞", false);
     else if (this.weapon.guns[wm]) this.hud.setAmmo(this.weapon.gunAmmo[wm], "∞", false);
-    else if (wm === "plasma" || wm === "sword") this.hud.setAmmo("∞", "∞", false);
+    else if (wm === "plasma") this.hud.setAmmo(this.weapon.plasmaAmmo, "∞", false);
+    else if (wm === "sword") this.hud.setAmmo("∞", "∞", false);
     else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
 

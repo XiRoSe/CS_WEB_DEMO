@@ -38,7 +38,7 @@ export class Weapon {
 
     // weapons cycled with Q — sword (melee) always owned; plasma/laser unlocked via island pickups
     this.owned = ["rifle", "sword", "launcher"]; // mode order for cycling
-    this.plasmaRate = 0.5; this._lastPlasma = -10;
+    this.plasmaRate = 0.5; this._lastPlasma = -10; this.plasmaAmmo = 24;
     this.laserRate = 0.11; this._lastLaser = -10; this.laserAmmo = 200; // rapid laser rifle
     this.shotgunRate = 0.8; this._lastShotgun = -10; this.shotgunAmmo = 24; // spread shotgun
     this.swordRate = 0.5; this._lastSword = -10;
@@ -191,7 +191,7 @@ export class Weapon {
     swap(this.energy, "plasma", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
     swap(this.laserGun, "laser", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
     swap(this.shotgunGun, "shotgun", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
-    swap(this.sword, "sword", [-0.7, 0, 0], [0, 0.12, -0.18]); // blade angled up-forward out of the grip
+    swap(this.sword, "sword", [-0.7 + Math.PI, 0, 0], [0, 0.12, -0.18]); // flipped: blade leads up-forward, grip toward camera
     for (const key of ["smg", "minigun", "railgun"]) { // generic-gun viewmodels (swapped into one slot)
       const m = makeFpWeapon(key); if (m) { m.rotation.set(0, -Math.PI / 2, 0); m.position.set(0, 0, 0.1); this._gunModels[key] = m; }
     }
@@ -245,8 +245,8 @@ export class Weapon {
     return !this.reloading && this.ammo > 0 && (t - this._lastShot) >= this.fireRate;
   }
 
-  canFirePlasma(t) { return this.mode === "plasma" && (t - this._lastPlasma) >= this.plasmaRate; }
-  firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.plasma?.(); }
+  canFirePlasma(t) { return this.mode === "plasma" && this.plasmaAmmo > 0 && (t - this._lastPlasma) >= this.plasmaRate; }
+  firePlasma(t) { this._lastPlasma = t; this.plasmaAmmo--; this.kick = 0.13; this.kickRot = 0.17; this.audio?.plasma?.(); }
   canFireLaser(t) { return this.mode === "laser" && this.laserAmmo > 0 && (t - this._lastLaser) >= this.laserRate; }
   fireLaser(t) { this._lastLaser = t; this.laserAmmo--; this.kick = 0.04; this.kickRot = 0.05; this.audio?.laser?.(); }
   canFireShotgun(t) { return this.mode === "shotgun" && this.shotgunAmmo > 0 && (t - this._lastShotgun) >= this.shotgunRate; }

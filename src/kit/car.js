@@ -10,6 +10,7 @@ export class Car {
     this.pos = new THREE.Vector3(x, 0, z);
     this.yaw = Math.random() * Math.PI * 2; this.speed = 0;
     this.r = 3.2;                 // enter/interact radius
+    this.rideH = 0.75;            // lift so the wheels sit ON the ground (model origin is centred)
     this.maxSpeed = 40; this.maxRev = 11;   // fast sports car
     this._tmp = new THREE.Vector3(); this._look = new THREE.Vector3();
     this.scene.add(this.group);
@@ -19,13 +20,19 @@ export class Car {
   _groundY(x, z) { return this.level.terrainHeight ? this.level.terrainHeight(x, z) : 0; }
 
   seat() {
-    const gy = this._groundY(this.pos.x, this.pos.z);
-    this.group.position.set(this.pos.x, gy, this.pos.z);
-    // bank the body to the terrain slope so it hugs hills
-    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
-    const ahead = this._groundY(this.pos.x + fx * 2, this.pos.z + fz * 2);
-    const pitch = Math.atan2(ahead - gy, 2);
-    this.group.rotation.set(-pitch, this.yaw, 0);
+    const sea = this.level.seaLevel;
+    let gy = this._groundY(this.pos.x, this.pos.z);
+    if (sea !== undefined && gy < sea - 0.4) gy = sea - 0.5; // float low on the water instead of sinking to the seabed
+    this.group.position.set(this.pos.x, gy + this.rideH, this.pos.z);
+    // tilt the body to the terrain: pitch (front/back) + roll (side/side) so it banks on hills/mountains
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+    const ahead = this._groundY(this.pos.x + fx * 2.4, this.pos.z + fz * 2.4), behind = this._groundY(this.pos.x - fx * 2.4, this.pos.z - fz * 2.4);
+    const right = this._groundY(this.pos.x + rx * 1.8, this.pos.z + rz * 1.8), left = this._groundY(this.pos.x - rx * 1.8, this.pos.z - rz * 1.8);
+    const pitch = Math.atan2(ahead - behind, 4.8), roll = Math.atan2(right - left, 3.6);
+    // ease toward the target tilt for smooth, quality movement
+    this._pitch = (this._pitch || 0) + (pitch - (this._pitch || 0)) * 0.25;
+    this._roll = (this._roll || 0) + (roll - (this._roll || 0)) * 0.25;
+    this.group.rotation.set(-this._pitch, this.yaw, this._roll);
   }
 
   update(dt, input) {
@@ -35,7 +42,12 @@ export class Car {
     if (fwd) this.speed += 28 * dt;
     else if (back) this.speed -= (this.speed > 0.6 ? 52 : 20) * dt;   // firm brake when rolling forward, else reverse
     else this.speed -= this.speed * Math.min(1, 1.3 * dt);            // coast drag
-    this.speed = Math.max(-this.maxRev, Math.min(this.maxSpeed, this.speed));
+    // crawl in water — cars bog down in the sea instead of racing across it
+    const sea = this.level.seaLevel;
+    const inWater = sea !== undefined && this._groundY(this.pos.x, this.pos.z) < sea - 0.4;
+    const maxS = inWater ? 4 : this.maxSpeed;
+    if (inWater && this.speed > maxS) this.speed += (maxS - this.speed) * Math.min(1, 3 * dt); // drag down to a crawl
+    this.speed = Math.max(inWater ? -3 : -this.maxRev, Math.min(maxS, this.speed));
     if (!fwd && !back && Math.abs(this.speed) < 0.2) this.speed = 0;
     // steering scales with speed (and naturally reverses when backing up)
     const grip = Math.max(-1, Math.min(1, this.speed / 10));
