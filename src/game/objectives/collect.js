@@ -38,7 +38,7 @@ export class CollectObjective {
       this._region = q;
       const names = { NW: "NORTH RUINS · SAURIAN BROOD", NE: "EAST HIGHLANDS · IRON LEGION", SE: "SOUTH FLATS · HOLLOW WATCH", SW: "PALACE APPROACH · VAULT GARRISON" };
       const left = g.level.arcs.filter((a) => !a.taken && (a.x < 0 ? (a.z >= 0 ? "NW" : "SW") : (a.z >= 0 ? "NE" : "SE")) === q).length;
-      g.hud.notify(`◆ ${names[q]} — ${left} ARC${left === 1 ? "" : "S"} HERE`);
+      g.hud.showBanner(names[q], `${left} ARC${left === 1 ? "" : "S"} HERE`);
     }
     for (const a of g.level.arcs) {
       if (a.taken) continue;

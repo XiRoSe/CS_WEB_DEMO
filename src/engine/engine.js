@@ -107,13 +107,22 @@ export class Engine {
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const x = c.getContext("2d");
     const g = x.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#241046"); g.addColorStop(0.45, "#5a2a7e"); g.addColorStop(0.78, "#a8568f"); g.addColorStop(1, "#d39a86"); // purple anomaly storm sky
+    g.addColorStop(0, "#3a1c66"); g.addColorStop(0.42, "#5f2f86"); g.addColorStop(0.78, "#a8568f"); g.addColorStop(1, "#d39a86"); // purple anomaly storm sky (deep violet up top, not black)
     x.fillStyle = g; x.fillRect(0, 0, W, H);
+    // scattered stars high in the sky (no moon) — brighter toward the top
+    for (let i = 0; i < 220; i++) {
+      const sx = Math.random() * W, sy = Math.random() * H * 0.42, r = Math.random() * 1.6 + 0.4;
+      x.globalAlpha = 0.35 + Math.random() * 0.6; x.fillStyle = "#fdfbff";
+      x.beginPath(); x.arc(sx, sy, r, 0, 7); x.fill();
+    }
+    x.globalAlpha = 1;
     // painterly cumulus clouds: each is a cluster of soft white puffs sitting on a flat shaded base
     const puff = (px, py, r, col, alpha) => {
-      const cg = x.createRadialGradient(px, py - r * 0.2, r * 0.1, px, py, r);
-      cg.addColorStop(0, `rgba(${col},${alpha})`); cg.addColorStop(0.7, `rgba(${col},${alpha * 0.5})`); cg.addColorStop(1, `rgba(${col},0)`);
-      x.fillStyle = cg; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+      for (const ox of [0, -W, W]) { // draw wrapped copies so clouds are seamless across the equirect seam (no diagonal cut)
+        const cg = x.createRadialGradient(px + ox, py - r * 0.2, r * 0.1, px + ox, py, r);
+        cg.addColorStop(0, `rgba(${col},${alpha})`); cg.addColorStop(0.7, `rgba(${col},${alpha * 0.5})`); cg.addColorStop(1, `rgba(${col},0)`);
+        x.fillStyle = cg; x.beginPath(); x.arc(px + ox, py, r, 0, 7); x.fill();
+      }
     };
     for (let i = 0; i < 8; i++) {
       const cx = Math.random() * W, cy = 70 + Math.random() * H * 0.3, s = 0.8 + Math.random() * 0.9, n = 5 + Math.floor(Math.random() * 4), base = cy + 26 * s;

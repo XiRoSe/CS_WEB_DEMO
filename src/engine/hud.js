@@ -243,6 +243,19 @@ export class HUD {
     this._crawl = wrap;
   }
   hideCrawl() { if (this._crawl) { this._crawl.remove(); this._crawl = null; } }
+  // clean centered XIII-style banner (map-section entry etc.): bold text on a gold rule, sweeps in + fades
+  showBanner(title, sub = "", dur = 2600) {
+    this.hideBanner();
+    const el = document.createElement("div");
+    el.id = "xbanner";
+    el.style.cssText = "position:fixed;top:22%;left:0;right:0;z-index:55;text-align:center;pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;";
+    el.innerHTML = `<div style="font-weight:800;letter-spacing:0.2em;font-size:2.5vw;color:#ffd23a;text-shadow:0 2px 16px rgba(0,0,0,0.8);">${title}</div>`
+      + (sub ? `<div style="margin-top:0.45em;font-weight:700;letter-spacing:0.16em;font-size:1.3vw;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.8);">${sub}</div>` : "");
+    document.body.appendChild(el); this._banner = el;
+    el.animate([{ opacity: 0, transform: "translateY(-14px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 380, easing: "ease-out", fill: "forwards" });
+    this._bannerT = setTimeout(() => { if (this._banner === el) el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 520, fill: "forwards" }).finished.then(() => el.remove()).catch(() => {}); }, dur);
+  }
+  hideBanner() { if (this._banner) { this._banner.remove(); this._banner = null; } if (this._bannerT) clearTimeout(this._bannerT); }
   // generic top-left counter (e.g. "Hostiles" remaining, or "Eliminated" kill count)
   setCounter(label, value) { this.root.querySelector("#hostiles .lbl").textContent = label; this.hostiles.textContent = value; }
   setObjective(html) { const o = this.root.querySelector("#objective .obj"); if (o) o.innerHTML = html; }

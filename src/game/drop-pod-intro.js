@@ -5,7 +5,7 @@ import { makeHero } from "./actors/operator.js";
 // scrolls into the sky, then the pod ACCELERATES and plummets, slamming down in a big BLAST + shockwave —
 // the operator emerges and it cuts to first-person. Interface: { start(), update(dt), done, dispose() }.
 export class DropPodIntro {
-  constructor(scene, camera, spawn, groundY = 0, tint = null, vfx = null, audio = null, onImpact = null, onCrawl = null, onCrawlEnd = null) {
+  constructor(scene, camera, spawn, groundY = 0, heroId = null, vfx = null, audio = null, onImpact = null, onCrawl = null, onCrawlEnd = null) {
     this.scene = scene; this.camera = camera; this.vfx = vfx; this.audio = audio;
     this.onImpact = onImpact; this.onCrawl = onCrawl; this.onCrawlEnd = onCrawlEnd;
     this.spawn = new THREE.Vector3(spawn.x, groundY, spawn.z);
@@ -30,7 +30,7 @@ export class DropPodIntro {
     this.pod.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.group.add(this.pod);
 
-    const h = makeHero(tint);
+    const h = makeHero(heroId);
     if (h) { this.hero = h.model; this.hero.visible = false; this.group.add(this.hero); }
     this._look = new THREE.Vector3(); this._tmp = new THREE.Vector3();
   }

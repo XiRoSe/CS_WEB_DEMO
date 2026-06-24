@@ -20,7 +20,7 @@ import { ParachuteIntro } from "./game/parachute-intro.js";
 import { DropPodIntro } from "./game/drop-pod-intro.js";
 import { preloadEnemies } from "./game/actors/enemy.js";
 import { preloadOperator, makeHero } from "./game/actors/operator.js";
-import { preloadCreatures, HERO_LIST, HERO_TINT, HERO_LOADOUT } from "./game/actors/creature-assets.js";
+import { preloadCreatures, HERO_LIST, HERO_LOADOUT } from "./game/actors/creature-assets.js";
 import { preloadNature } from "./kit/content/nature.js";
 import { preloadVehicles } from "./kit/content/vehicles.js";
 import { preloadPickups } from "./kit/content/pickups.js";
@@ -118,7 +118,7 @@ class Game {
     this.levelDef.build(this.level);
     const sp = this.level.playerSpawn;
     this.hero = "assault";
-    this._heroLobby = HERO_TINT[this.hero] != null && this.cfg.intro && (this.cfg.intro.style === "parachute" || this.cfg.intro.style === "droppod");
+    this._heroLobby = HERO_LOADOUT[this.hero] != null && this.cfg.intro && (this.cfg.intro.style === "parachute" || this.cfg.intro.style === "droppod");
     if (this._heroLobby) this._setupLobby(); // hero-select lobby on the start screen
     else this.camera.position.set(sp.x, this.controller.eye, sp.z);
     // A persistent gunship searchlight, added to the scene ONCE (intensity 0 when idle). The heli
@@ -179,7 +179,7 @@ class Game {
     this.hero = id;
     if (!this._lobby) return;
     if (this._lobbyHero) { this._lobby.remove(this._lobbyHero); this._lobbyHero = null; this._lobbyMixer = null; }
-    const inst = makeHero(HERO_TINT[id]); if (!inst) return;
+    const inst = makeHero(id); if (!inst) return;
     inst.model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this._lobby.add(inst.model); this._lobbyHero = inst.model;
     const anims = inst.animations || [];
@@ -210,7 +210,7 @@ class Game {
     const sp = this.level.playerSpawn;
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     this.intro = style === "droppod"
-      ? new DropPodIntro(this.scene, this.camera, sp, groundY, HERO_TINT[this.hero], this.vfx, this.audio,
+      ? new DropPodIntro(this.scene, this.camera, sp, groundY, this.hero, this.vfx, this.audio,
         () => { this.hud._shake = Math.max(this.hud._shake || 0, 28); }, // big blast shake on impact
         () => { this.voice.deploy(); this.hud.showCrawl("ARCFALL", [ // radio call + Star-Wars story crawl during the fall
           "An unexpected <b>anomaly</b> has shattered <b>TIME</b> itself.",
@@ -355,20 +355,39 @@ class Game {
   }
 
   // Laser Rifle: rapid hitscan beam — instant hit on the targeted enemy + a bright laser bolt.
+  // shared hitscan: ray from the camera along `dir`, blocked by world geometry (solidMeshes), against
+  // fresh enemy hitbox matrices. Returns { point, enemy, dist } or { point } (a wall) or null (miss).
+  _rayShot(dir, far = 220, pierce = false) {
+    this._ray = this._ray || new THREE.Raycaster(); this._ray.far = far;
+    this._ray.set(this.camera.position, dir);
+    const targets = this._rayTargets || (this._rayTargets = []); targets.length = 0;
+    for (const m of this.level.solidMeshes) targets.push(m);          // walls/structures block the shot
+    for (const e of this.combat.enemies) if (!e.dead) { e.hitbox.updateWorldMatrix(true, false); targets.push(e.hitbox); }
+    const hits = this._ray.intersectObjects(targets, true);
+    if (!hits.length) return null;
+    const out = [];
+    for (const h of hits) {
+      let o = h.object; while (o && !(o.userData && o.userData.enemy)) o = o.parent;
+      if (o && o.userData.enemy) out.push({ point: h.point, enemy: o.userData.enemy, dist: h.distance });
+      else { if (!out.length) return { point: h.point, dist: h.distance }; break; } // a wall: stop here
+      if (!pierce) break;
+    }
+    return pierce ? { list: out, point: out.length ? out[out.length - 1].point : null } : out[0];
+  }
+
+  // damage falloff: full up close, tapering to ~40% at long range
+  _falloff(dmg, dist) { return dmg * Math.max(0.4, 1 - Math.max(0, dist - 28) / 150); }
+
   _fireLaser(t) {
     this.weapon.fireLaser(t);
     this.hud.bloom();
     const b = this.cfg.balance.laser;
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
-    this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 200;
-    this._aimRay.set(this.camera.position, dir);
     const start = this.camera.position.clone().addScaledVector(dir, 1.0);
-    const live = this.combat.enemies.filter((e) => !e.dead);
-    const hits = this._aimRay.intersectObjects(live.map((e) => e.hitbox), true);
-    let target = null, end = start.clone().addScaledVector(dir, 200);
-    if (hits.length) { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; target = o && o.userData && o.userData.enemy; }
+    const r = this._rayShot(dir, 220);
+    const end = r ? r.point.clone() : start.clone().addScaledVector(dir, 220);
     this.vfx.laserBeam(start, end);
-    if (target) { target.takeDamage(b.damage); this.vfx.energyBoom ? this.vfx.hitPuff(end) : null; }
+    if (r && r.enemy) { r.enemy.takeDamage(this._falloff(b.damage, r.dist)); this.vfx.hitPuff(end); }
     this._fovKick = Math.min(this._fovKick + 0.5, 3);
   }
 
@@ -379,16 +398,17 @@ class Game {
     const fwd = new THREE.Vector3(); this.camera.getWorldDirection(fwd);
     this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 140;
     const start = this.camera.position.clone().addScaledVector(fwd, 1.0);
-    const boxes = this.combat.enemies.filter((e) => !e.dead).map((e) => e.hitbox), dir = new THREE.Vector3();
+    const dir = new THREE.Vector3();
     for (let p = 0; p < g.pellets; p++) {
       dir.copy(fwd);
       if (g.spread) dir.add(new THREE.Vector3((Math.random() - 0.5) * g.spread, (Math.random() - 0.5) * g.spread, (Math.random() - 0.5) * g.spread)).normalize();
-      this._aimRay.set(this.camera.position, dir);
-      const hits = this._aimRay.intersectObjects(boxes, true);
       let end = start.clone().addScaledVector(dir, 140);
-      if (hits.length) {
-        if (g.pierce) { for (const h of hits) { let o = h.object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(g.dmg); this.vfx.hitPuff(h.point); } } end = hits[hits.length - 1].point.clone(); }
-        else { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(g.dmg); this.vfx.hitPuff(end); } }
+      if (g.pierce) {
+        const r = this._rayShot(dir, 200, true);
+        if (r && r.list) { for (const hit of r.list) { hit.enemy.takeDamage(this._falloff(g.dmg, hit.dist)); this.vfx.hitPuff(hit.point); } if (r.point) end = r.point.clone(); }
+      } else {
+        const r = this._rayShot(dir, 200);
+        if (r) { end = r.point.clone(); if (r.enemy) { r.enemy.takeDamage(this._falloff(g.dmg, r.dist)); this.vfx.hitPuff(end); } }
       }
       if (p === 0 || g.pellets <= 3) this.vfx.tracer(start, end);
     }
@@ -401,16 +421,13 @@ class Game {
     this.hud.bloom();
     const b = this.cfg.balance.shotgun;
     const fwd = new THREE.Vector3(); this.camera.getWorldDirection(fwd);
-    this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 60;
     const start = this.camera.position.clone().addScaledVector(fwd, 1.0);
-    const live = this.combat.enemies.filter((e) => !e.dead), boxes = live.map((e) => e.hitbox);
     const dir = new THREE.Vector3();
     for (let p = 0; p < b.pellets; p++) {
       dir.copy(fwd).add(new THREE.Vector3((Math.random() - 0.5) * b.spread, (Math.random() - 0.5) * b.spread, (Math.random() - 0.5) * b.spread)).normalize();
-      this._aimRay.set(this.camera.position, dir);
-      const hits = this._aimRay.intersectObjects(boxes, true);
-      let end = start.clone().addScaledVector(dir, 60);
-      if (hits.length) { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(b.damage); this.vfx.hitPuff(end); } }
+      const r = this._rayShot(dir, 80);
+      const end = r ? r.point.clone() : start.clone().addScaledVector(dir, 80);
+      if (r && r.enemy) { r.enemy.takeDamage(this._falloff(b.damage, r.dist)); this.vfx.hitPuff(end); }
       if (p % 2 === 0) this.vfx.tracer(start, end);
     }
     this._fovKick = Math.min(this._fovKick + 2.2, 6);

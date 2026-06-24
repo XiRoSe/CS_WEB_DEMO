@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { noOutline } from "../engine/primitives.js";
 import { makeHero } from "./actors/operator.js";
-import { HERO_TINT } from "./actors/creature-assets.js";
 
 // Third-person parachute insertion: a behind-the-back camera follows a strong warrior descending under
 // a canopy, all the way down until he lands on the ground, the canopy collapsing — then it cuts to
@@ -17,7 +16,7 @@ export class ParachuteIntro {
 
     // the operator avatar hanging from the harness
     this.rig = new THREE.Group(); this.group.add(this.rig);
-    const inst = makeHero(HERO_TINT[heroId]);
+    const inst = makeHero(heroId);
     if (inst) { this.op = inst.model; this.rig.add(this.op); this.rig.rotation.x = 0.14; }
 
     // colorful canopy + risers down to the harness

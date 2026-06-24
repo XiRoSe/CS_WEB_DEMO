@@ -9,7 +9,7 @@ export const arcfall = {
     objective: { type: "collect", count: 12 },
     helicopter: { spawnDelay: 99999 }, // no gunship boss on the island (for now)
     player: { grenades: 4 },
-    messages: { deployHint: "PARACHUTE DROP — click to skip" },
+    messages: { deployHint: "DROP POD INBOUND — click to skip" },
   },
 
   build(b) {
@@ -43,12 +43,16 @@ export const arcfall = {
       const specs = TRIBES[quad(ax, az)];
       specs.forEach((s, i) => {
         const ang = (ax * 0.7 + az * 1.3) + (i / specs.length) * Math.PI * 2, rr = 12 + (i % 3) * 5; // 12-22m out
-        b.enemy({ ...s, x: ax + Math.cos(ang) * rr, z: az + Math.sin(ang) * rr });
+        let gx = ax + Math.cos(ang) * rr, gz = az + Math.sin(ang) * rr;
+        const dS = Math.hypot(gx, gz); // keep the central landing zone clear so the player can adjust safely
+        if (dS < 40) { const m = 40 / (dS || 1); gx *= m; gz *= m; }
+        b.enemy({ ...s, x: gx, z: gz });
       });
     }
     b.enemy({ kind: "trex", x: -58, z: 30 });   // the Saurian Brood's apex predator, prowling the NW arcs
-    // THE GUARDIAN — a colossal boss mech guarding the palace / Vault core (the finale)
-    b.enemy({ kind: "robot", x: 40, z: -48, hp: 1600, scale: 2.0, boss: true });
+    // THE GUARDIAN — a colossal boss mech standing in the OPEN before the palace stairs (clear of the
+    // structure), guarding the approach + the nearby SE arc (the finale)
+    b.enemy({ kind: "robot", x: 44, z: -24, hp: 1600, scale: 2.0, boss: true });
 
     // gift crates (loot: ammo / health / grenades + two sci-fi weapons to find)
     b.giftCrate(8, -22, "ammo"); b.giftCrate(-22, 27, "health"); b.giftCrate(48, 42, "grenade");

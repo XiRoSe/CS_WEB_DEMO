@@ -71,7 +71,8 @@ export class Combat {
       }
       this.vfx.tracer(muzzle, h.point);
       if (enemy && !enemy.dead) {
-        enemy.takeDamage(this.weapon.damage);
+        const fall = Math.max(0.4, 1 - Math.max(0, h.distance - 28) / 150); // less hit power at range
+        enemy.takeDamage(this.weapon.damage * fall);
         this.vfx.hitPuff(h.point);
         this.hooks.onHitmarker?.(enemy.dead);
       } else if (heli && !heli.dead) {
