@@ -57,9 +57,9 @@ export class Monster {
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
     if (this.dead) { this.group.position.y = groundY; if ((this._deathT -= dt) <= 0) this.removable = true; return; }
     const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
-    if (!this.aggro) { // wait until the player comes near, then lock on
+    if (!this.aggro) { // roam until the player comes near, then lock on
       if (d <= this.aggroRange) this.aggro = true;
-      else { this._play("idle"); this.group.position.set(this.pos.x, groundY, this.pos.z); return; }
+      else { this._wander(dt); return; }
     }
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
     if (d > this.reach) { // charge
@@ -73,6 +73,25 @@ export class Monster {
       if ((this._atkCd -= dt) <= 0) { this._atkCd = 1.0; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 5)); ctx.audio?.creature?.(); }
     }
     this.group.position.set(this.pos.x, groundY, this.pos.z);
+  }
+
+  // idle roaming: drift slowly toward random nearby points (trex roams slower than raptors via this.speed)
+  _wander(dt) {
+    if (!this._home) this._home = this.pos.clone();
+    if (!this._roam || (this._roamCd -= dt) <= 0 || Math.hypot(this._roam.x - this.pos.x, this._roam.z - this.pos.z) < 2) {
+      const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 20;
+      this._roam = { x: this._home.x + Math.cos(a) * r, z: this._home.z + Math.sin(a) * r };
+      this._roamCd = 3 + Math.random() * 4;
+    }
+    const wx = this._roam.x - this.pos.x, wz = this._roam.z - this.pos.z, wd = Math.hypot(wx, wz) || 1;
+    const step = this.speed * 0.4 * dt;
+    const nx = this.pos.x + (wx / wd) * step, nz = this.pos.z + (wz / wd) * step;
+    if (!this._blocked(nx, this.pos.z)) this.pos.x = nx;
+    if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
+    this.yaw = Math.atan2(wx, wz); this.group.rotation.y = this.yaw;
+    const gy = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
+    this.group.position.set(this.pos.x, gy, this.pos.z);
+    this._play("walk");
   }
 
   _blocked(x, z) {

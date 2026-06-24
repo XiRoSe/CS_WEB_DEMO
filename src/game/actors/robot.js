@@ -51,6 +51,25 @@ export class Robot {
     if (sc !== 1) { this.model && this.model.scale.multiplyScalar(sc); this.hitbox.scale.setScalar(sc); this.hitbox.position.y = cfg.hbH / 2 * sc; this.cfg = { ...cfg, boom: cfg.boom * sc }; }
   }
 
+  // idle roaming: drift slowly toward random nearby points around home (speed scales with size via cfg.speed)
+  _wander(dt) {
+    if (!this._home) this._home = this.pos.clone();
+    if (!this._roam || (this._roamCd -= dt) <= 0 || Math.hypot(this._roam.x - this.pos.x, this._roam.z - this.pos.z) < 2) {
+      const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 20;
+      this._roam = { x: this._home.x + Math.cos(a) * r, z: this._home.z + Math.sin(a) * r };
+      this._roamCd = 3 + Math.random() * 4;
+    }
+    const wx = this._roam.x - this.pos.x, wz = this._roam.z - this.pos.z, wd = Math.hypot(wx, wz) || 1;
+    const step = this.speed * 0.45 * dt;
+    const nx = this.pos.x + (wx / wd) * step, nz = this.pos.z + (wz / wd) * step;
+    if (!this._blocked(nx, this.pos.z)) this.pos.x = nx;
+    if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
+    this.yaw = Math.atan2(wx, wz); this.group.rotation.y = this.yaw;
+    const gy = this.level.terrainHeight ? this.level.terrainHeight(this.pos.x, this.pos.z) : 0;
+    this.group.position.set(this.pos.x, gy + (this.fly || 0), this.pos.z);
+    this._play(this.fly || this.speed > 3 ? "run" : "walk");
+  }
+
   // THE GUARDIAN's signature: charge a glowing orb at the chest, then unleash a giant laser beam + booms
   _bossBeam(dt, playerPos, ctx) {
     const chest = this._tmp.set(this.pos.x, this.group.position.y + this._chestY, this.pos.z);
@@ -103,9 +122,9 @@ export class Robot {
     }
     const flyY = groundY + this.fly;
     const dx = playerPos.x - this.pos.x, dz = playerPos.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
-    if (!this.aggro) { // hold position until the player approaches
+    if (!this.aggro) { // roam the island until the player approaches
       if (d <= this.aggroRange) this.aggro = true;
-      else { this._play("idle"); this.group.position.set(this.pos.x, flyY, this.pos.z); return; }
+      else { this._wander(dt); return; }
     }
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
     if (d > this.cfg.range) { // close in

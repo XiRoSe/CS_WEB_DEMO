@@ -21,6 +21,7 @@ export class Enemy {
     this.scene = scene;
     this.level = level;
     this.baseY = spawn.y || 0; // raised for watchtower posts
+    this._raised = (spawn.y || 0) > 0; // a deliberate tower post (stays stationary up high)
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.patrol = spawn.patrol || [{ x: spawn.x, z: spawn.z }];
     this.wp = 0;
@@ -231,8 +232,8 @@ export class Enemy {
   }
 
   update(dt, playerPos, ctx) {
-    // terrain-follow on sculpted levels (island): keep the soldier seated on the relief under it
-    if (this.level.terrainHeight && !this.blasted) this.baseY = this.level.terrainHeight(this.pos.x, this.pos.z);
+    // terrain-follow on sculpted levels (island): keep the soldier seated on the relief under it (not tower posts)
+    if (this.level.terrainHeight && !this.blasted && !this._raised) this.baseY = this.level.terrainHeight(this.pos.x, this.pos.z);
     if (this.dead) {
       this.deathT += dt;
       if (this.blasted) {
@@ -307,7 +308,7 @@ export class Enemy {
     if (fireNow) { this.model.updateWorldMatrix(true, true); this._fire(playerPos, ctx); }
 
     // watchtower guard: never moves — just tracks the player and fires from the post
-    if (this.baseY > 0) {
+    if (this._raised) { // deliberate watchtower post — hold position up high
       this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
       this._play("Idle");
       this.group.position.set(this.pos.x, this.baseY, this.pos.z);
@@ -341,10 +342,17 @@ export class Enemy {
       this._play(movingNow ? (this.actions.Run ? "Run" : "Walk") : "Idle");
     } else {
       this.cover = null; this.peeking = false;
-      const t = this.patrol[this.wp];
-      if (this._moveToward(t.x, t.z, dt)) this.wp = (this.wp + 1) % this.patrol.length;
-      this.yaw = Math.atan2(t.x - this.pos.x, t.z - this.pos.z);
-      this._play("Walk");
+      // roam around home until the player is spotted
+      if (!this._home) this._home = { x: this.pos.x, z: this.pos.z };
+      this._roamCd = (this._roamCd || 0) - dt;
+      if (!this._roam || this._roamCd <= 0 || Math.hypot(this._roam.x - this.pos.x, this._roam.z - this.pos.z) < 2) {
+        const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 20;
+        this._roam = { x: this._home.x + Math.cos(a) * r, z: this._home.z + Math.sin(a) * r };
+        this._roamCd = 3 + Math.random() * 4;
+      }
+      movingNow = !this._moveToward(this._roam.x, this._roam.z, dt, this.speed * 0.6);
+      this.yaw = Math.atan2(this._roam.x - this.pos.x, this._roam.z - this.pos.z);
+      this._play(movingNow ? (this.actions.Walk ? "Walk" : "Run") : "Idle");
     }
 
     // explosion knockback while still alive — shoved away from the blast, sliding to a stop

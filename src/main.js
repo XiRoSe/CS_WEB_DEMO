@@ -503,6 +503,16 @@ class Game {
         const dx = this.heli.pos.x - p.pos.x, dy = (this.heli.pos.y || 0) - p.pos.y, dz = this.heli.pos.z - p.pos.z;
         if (dx * dx + dy * dy + dz * dz < 36) { p.done = true; p._heliHit = this.heli; } // ~6m
       }
+      // ...and on contact with any enemy (rockets/plasma sailed straight through them before)
+      if (p.detonateOnHit && !p.done) {
+        for (const e of this.combat.enemies) {
+          if (e.dead) continue;
+          const ex = e.pos.x - p.pos.x, ez = e.pos.z - p.pos.z, hr = e.boss ? 6 : e.kind === "robot" ? 4.5 : 2.6;
+          if (ex * ex + ez * ez > hr * hr) continue;
+          const hTop = (e.group.position.y || 0) + (e.boss ? 14 : e.kind === "robot" ? 12 : 4);
+          if (p.pos.y <= hTop + 1 && p.pos.y >= (e.group.position.y || 0) - 1) { p.done = true; break; } // within the enemy's body
+        }
+      }
       if (p.done) {
         const c = p.pos.clone();
         if (p.energy) this.vfx.energyBoom(c, p.scale || 1); else this.vfx.explosion(c, p.scale || 0.6);
