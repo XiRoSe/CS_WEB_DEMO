@@ -32,7 +32,19 @@ export class LevelBuilder {
   // ---- level-definition helpers ----
   spawnAt(x, z) { this.playerSpawn.set(x, 0, z); return this; }
   setBounds(b) { this.bounds = b; return this; }
-  enemy(spec) { this.enemySpawns.push(spec); return this; }
+  enemy(spec) {
+    // keep spawns OUT of structures: if (x,z) sits inside a collider, shove it to the nearest edge + margin
+    let x = spec.x, z = spec.z;
+    for (const c of this.colliders) {
+      if (x > c.minX - 1 && x < c.maxX + 1 && z > c.minZ - 1 && z < c.maxZ + 1) {
+        const dl = x - (c.minX - 1.5), dr = (c.maxX + 1.5) - x, db = z - (c.minZ - 1.5), dt = (c.maxZ + 1.5) - z;
+        const m = Math.min(dl, dr, db, dt);
+        if (m === dl) x = c.minX - 1.5; else if (m === dr) x = c.maxX + 1.5; else if (m === db) z = c.minZ - 1.5; else z = c.maxZ + 1.5;
+      }
+    }
+    spec.x = x; spec.z = z;
+    this.enemySpawns.push(spec); return this;
+  }
 
   collide(x, z, w, d, top = 3.4) {
     // `top` = height you can stand on (low props are mountable, tall walls aren't)

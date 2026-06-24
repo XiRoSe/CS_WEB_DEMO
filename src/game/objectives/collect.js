@@ -32,6 +32,14 @@ export class CollectObjective {
 
   update(dt, t, presses) {
     const g = this.game, pp = g.driving ? g.driving.pos : g.camera.position; // works on foot or while driving
+    // region-entry callout: name the tribe's territory + how many Arcs remain there
+    const q = pp.x < 0 ? (pp.z >= 0 ? "NW" : "SW") : (pp.z >= 0 ? "NE" : "SE");
+    if (q !== this._region) {
+      this._region = q;
+      const names = { NW: "NORTH RUINS · SAURIAN BROOD", NE: "EAST HIGHLANDS · IRON LEGION", SE: "SOUTH FLATS · HOLLOW WATCH", SW: "PALACE APPROACH · VAULT GARRISON" };
+      const left = g.level.arcs.filter((a) => !a.taken && (a.x < 0 ? (a.z >= 0 ? "NW" : "SW") : (a.z >= 0 ? "NE" : "SE")) === q).length;
+      g.hud.notify(`◆ ${names[q]} — ${left} ARC${left === 1 ? "" : "S"} HERE`);
+    }
     for (const a of g.level.arcs) {
       if (a.taken) continue;
       const dx = pp.x - a.x, dz = pp.z - a.z;
