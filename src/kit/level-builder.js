@@ -503,8 +503,10 @@ export class LevelBuilder {
     const g = makeTree(kind); if (!g) return;
     const gy = this._groundY(x, z);
     g.position.set(x, gy, z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
-    const leaf = new THREE.Color(0xf4d62a); // bright yellow foliage (anomaly look)
-    g.traverse((o) => { // recolor greenish foliage → bright yellow, leave the trunk
+    // autumn palette — mostly yellow, with orange + red trees mixed in for a more interesting island
+    const r = Math.random();
+    const leaf = new THREE.Color(r < 0.55 ? 0xf4d62a : r < 0.82 ? 0xe8801c : 0xd6321f); // yellow / orange / red
+    g.traverse((o) => { // recolor greenish foliage → the chosen leaf color, leave the trunk
       if (!o.isMesh || !o.material || !o.material.color) return;
       const cc = o.material.color;
       if (cc.g > cc.r * 0.85 && cc.g > cc.b * 1.1) { o.material = o.material.clone(); o.material.color.copy(leaf); }
@@ -764,11 +766,12 @@ export class LevelBuilder {
     this.solidMeshes.push(land); // bullets hit the ground/hills/mountains (no shooting through terrain)
 
     // sea — clear, smooth-shaded water with gentle rolling swell + sky-env reflection (cheap, no reflector).
-    const waterGeo = new THREE.PlaneGeometry(sea, sea, 80, 80); waterGeo.rotateX(-Math.PI / 2);
+    const waterGeo = new THREE.PlaneGeometry(sea, sea, 120, 120); waterGeo.rotateX(-Math.PI / 2);
     const wpos = waterGeo.attributes.position, wcol = [], wc = new THREE.Color();
     const shallow = new THREE.Color(0x6fe0e8), midSea = new THREE.Color(0x2ba6cc), deep = new THREE.Color(0x10618f);
     for (let i = 0; i < wpos.count; i++) {
-      const r = Math.hypot(wpos.getX(i), wpos.getZ(i)), tt = Math.min(1, Math.max(0, (r - R) / (R * 1.6)));
+      // spread the shallow→deep gradient over a LARGE distance so it stays smooth across the wide sea (no hard ring/seam when viewed from high up)
+      const r = Math.hypot(wpos.getX(i), wpos.getZ(i)), tt = Math.min(1, Math.max(0, (r - R) / 1600));
       wc.copy(tt < 0.5 ? shallow.clone().lerp(midSea, tt * 2) : midSea.clone().lerp(deep, (tt - 0.5) * 2));
       wcol.push(wc.r, wc.g, wc.b);
     }
