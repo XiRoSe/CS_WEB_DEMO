@@ -5,6 +5,10 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const DEFS = {
   laser: { url: "/models/weapons/laser.glb", len: 0.62 },
   plasma: { url: "/models/weapons/plasma.glb", len: 0.58 },
+  shotgun: { url: "/models/weapons/shotgun.glb", len: 0.66 },
+  smg: { url: "/models/weapons/smg.glb", len: 0.6 },
+  minigun: { url: "/models/weapons/minigun.glb", len: 0.7 },
+  railgun: { url: "/models/weapons/railgun.glb", len: 0.72 },
   sword: { url: "/models/weapons/sword.glb", len: 0.7 },
 };
 const cache = {};

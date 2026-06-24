@@ -167,7 +167,7 @@ class Game {
     this._lobbyCtr = new THREE.Vector3(sp.x, (this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0) + 420, sp.z);
     this._lobby = new THREE.Group(); this._lobby.position.copy(this._lobbyCtr); this.scene.add(this._lobby);
     // hide all FP weapon viewmodels while in the lobby (re-shown on deploy)
-    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.sword.visible = false;
+    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.shotgunGun.visible = false; this.weapon.extraGun.visible = false; this.weapon.sword.visible = false;
     // a circular metal podium with a glowing rim under the hero
     const podium = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.4, 32), new THREE.MeshStandardMaterial({ color: 0x23272e, metalness: 0.8, roughness: 0.4 }));
     podium.position.y = -0.2; this._lobby.add(podium);
@@ -204,7 +204,7 @@ class Game {
     this._disposeLobby();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(false);
-    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.sword.visible = false;
+    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.shotgunGun.visible = false; this.weapon.extraGun.visible = false; this.weapon.sword.visible = false;
     const style = this.cfg.intro.style;
     if (style !== "parachute" && style !== "droppod") this.audio.startRotor();
     const sp = this.level.playerSpawn;
@@ -240,11 +240,11 @@ class Game {
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
-    // equip the chosen hero's DISTINCT loadout (each hero carries a different weapon pair, cycled with Q)
+    // every hero carries ALL weapons (cycle with Q), but STARTS equipped with their own signature weapon
     if (this.hero && HERO_LOADOUT[this.hero] && !this._loadoutGiven) {
       this._loadoutGiven = true;
-      this.weapon.owned = HERO_LOADOUT[this.hero].slice();
-      this.weapon.mode = this.weapon.owned[0];
+      this.weapon.owned = this.weapon.allWeapons.slice();
+      this.weapon.mode = HERO_LOADOUT[this.hero][0];
       this.weapon._showViewmodel();
       this.hud.setWeaponName(this._weaponName(this.weapon.mode));
     }
@@ -328,7 +328,7 @@ class Game {
   }
 
   _weaponName(mode) {
-    return { rifle: "MK-4 CARBINE", sword: "ARC BLADE", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", laser: "LASER RIFLE" }[mode] || "MK-4 CARBINE";
+    return { rifle: "MK-4 CARBINE", smg: "SMG", minigun: "MINIGUN", burst: "BURST RIFLE", railgun: "RAILGUN", sword: "ARC BLADE", shotgun: "PULSE SHOTGUN", flak: "FLAK CANNON", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", laser: "LASER RIFLE" }[mode] || "MK-4 CARBINE";
   }
 
   // Plasma Cannon: a glowing energy bolt that detonates in a big blue blast.
@@ -364,6 +364,50 @@ class Game {
     this._fovKick = Math.min(this._fovKick + 0.5, 3);
   }
 
+  // Generic hitscan gun (SMG / Minigun / Burst / Railgun / Flak) — params from weapon.guns[mode].
+  _fireGun(mode, t) {
+    this.weapon.fireGun(t); this.hud.bloom();
+    const g = this.weapon.guns[mode];
+    const fwd = new THREE.Vector3(); this.camera.getWorldDirection(fwd);
+    this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 140;
+    const start = this.camera.position.clone().addScaledVector(fwd, 1.0);
+    const boxes = this.combat.enemies.filter((e) => !e.dead).map((e) => e.hitbox), dir = new THREE.Vector3();
+    for (let p = 0; p < g.pellets; p++) {
+      dir.copy(fwd);
+      if (g.spread) dir.add(new THREE.Vector3((Math.random() - 0.5) * g.spread, (Math.random() - 0.5) * g.spread, (Math.random() - 0.5) * g.spread)).normalize();
+      this._aimRay.set(this.camera.position, dir);
+      const hits = this._aimRay.intersectObjects(boxes, true);
+      let end = start.clone().addScaledVector(dir, 140);
+      if (hits.length) {
+        if (g.pierce) { for (const h of hits) { let o = h.object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(g.dmg); this.vfx.hitPuff(h.point); } } end = hits[hits.length - 1].point.clone(); }
+        else { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(g.dmg); this.vfx.hitPuff(end); } }
+      }
+      if (p === 0 || g.pellets <= 3) this.vfx.tracer(start, end);
+    }
+    this._fovKick = Math.min(this._fovKick + g.kick * 8, 6);
+  }
+
+  // Shotgun: a cone of hitscan pellets — devastating up close, with a wide spread + heavy kick.
+  _fireShotgun(t) {
+    this.weapon.fireShotgun(t);
+    this.hud.bloom();
+    const b = this.cfg.balance.shotgun;
+    const fwd = new THREE.Vector3(); this.camera.getWorldDirection(fwd);
+    this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 60;
+    const start = this.camera.position.clone().addScaledVector(fwd, 1.0);
+    const live = this.combat.enemies.filter((e) => !e.dead), boxes = live.map((e) => e.hitbox);
+    const dir = new THREE.Vector3();
+    for (let p = 0; p < b.pellets; p++) {
+      dir.copy(fwd).add(new THREE.Vector3((Math.random() - 0.5) * b.spread, (Math.random() - 0.5) * b.spread, (Math.random() - 0.5) * b.spread)).normalize();
+      this._aimRay.set(this.camera.position, dir);
+      const hits = this._aimRay.intersectObjects(boxes, true);
+      let end = start.clone().addScaledVector(dir, 60);
+      if (hits.length) { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; if (o && o.userData.enemy) { o.userData.enemy.takeDamage(b.damage); this.vfx.hitPuff(end); } }
+      if (p % 2 === 0) this.vfx.tracer(start, end);
+    }
+    this._fovKick = Math.min(this._fovKick + 2.2, 6);
+  }
+
   // Arc Blade: a heavy melee swing — hits every enemy in a wide frontal arc, knocks them back, swoosh streak.
   _swingSword(t) {
     this.weapon.fireSword(t);
@@ -389,7 +433,7 @@ class Game {
   _enterCar(car) {
     this.driving = car; car._cam = null; // snap the chase cam fresh on entry
     this.weapon.group.visible = false; this.weapon.launcher.visible = false;
-    this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.sword.visible = false;
+    this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.shotgunGun.visible = false; this.weapon.extraGun.visible = false; this.weapon.sword.visible = false;
     this.laser?.hide?.();
     this._carPrompt = false;
     this.audio.startEngine?.();
@@ -546,6 +590,8 @@ class Game {
       if (mode === "launcher") { if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t); }
       else if (mode === "plasma") { if (firing && this.weapon.canFirePlasma(t)) this._firePlasma(t); }
       else if (mode === "laser") { if (firing && this.weapon.canFireLaser(t)) this._fireLaser(t); }
+      else if (this.weapon.guns[mode]) { if (firing && this.weapon.canFireGun(t)) this._fireGun(mode, t); }
+      else if (mode === "shotgun") { if (firing && this.weapon.canFireShotgun(t)) this._fireShotgun(t); }
       else if (mode === "sword") { if (firing && this.weapon.canFireSword(t)) this._swingSword(t); }
       else if (firing && this.weapon.canFire(t)) { this.shotsFired++; this.combat.tryShoot(t); this.hud.bloom(); this._fovKick = Math.min(this._fovKick + 0.8, 3.5); }
       // recoil FOV punch recovery
@@ -593,7 +639,7 @@ class Game {
           this.audio.playBuf?.("clipin", 0.6);
           if (gf.kind === "grenade") { this.grenades += 2; this.hud.setGrenades(this.grenades); this.hud.notify("+2 GRENADES · GIFT"); }
           else if (gf.kind === "health") { this.health = Math.min(this.cfg.player.maxHealth, this.health + 40); this.hud.notify("+40 HEALTH · GIFT"); }
-          else if (gf.kind === "plasma" || gf.kind === "laser") {
+          else if (gf.kind === "plasma" || gf.kind === "laser" || gf.kind === "shotgun") {
             this.weapon.give(gf.kind); this.hud.setWeaponName(this._weaponName(gf.kind));
             this.hud.notify(`✦ ${this._weaponName(gf.kind)} ACQUIRED — Q to cycle`);
           } else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
@@ -635,6 +681,8 @@ class Game {
     const wm = this.weapon.mode;
     if (wm === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
     else if (wm === "laser") this.hud.setAmmo(this.weapon.laserAmmo, "∞", false);
+    else if (wm === "shotgun") this.hud.setAmmo(this.weapon.shotgunAmmo, "∞", false);
+    else if (this.weapon.guns[wm]) this.hud.setAmmo(this.weapon.gunAmmo[wm], "∞", false);
     else if (wm === "plasma" || wm === "sword") this.hud.setAmmo("∞", "∞", false);
     else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);

@@ -40,6 +40,7 @@ export class Weapon {
     this.owned = ["rifle", "sword", "launcher"]; // mode order for cycling
     this.plasmaRate = 0.5; this._lastPlasma = -10;
     this.laserRate = 0.11; this._lastLaser = -10; this.laserAmmo = 200; // rapid laser rifle
+    this.shotgunRate = 0.8; this._lastShotgun = -10; this.shotgunAmmo = 24; // spread shotgun
     this.swordRate = 0.5; this._lastSword = -10;
     this.energy = new THREE.Group(); this.energy.visible = false;
     this.energy.position.set(0.26, -0.2, -0.5); this.energy.rotation.set(0, Math.PI, 0);
@@ -49,6 +50,23 @@ export class Weapon {
     this.laserGun.position.set(0.26, -0.2, -0.5); this.laserGun.rotation.set(0, Math.PI, 0);
     camera.add(this.laserGun);
     this._buildLaserGun();
+    this.shotgunGun = new THREE.Group(); this.shotgunGun.visible = false;
+    this.shotgunGun.position.set(0.26, -0.2, -0.5); this.shotgunGun.rotation.set(0, Math.PI, 0);
+    camera.add(this.shotgunGun);
+    // generic hitscan guns (one shared viewmodel slot; model swapped per mode)
+    this.guns = {
+      smg:     { model: "smg",     rate: 0.075, ammo: 240, dmg: 16,  pellets: 1, spread: 0.03, sound: "shoot",   beam: 0xfff0bf, kick: 0.05 },
+      minigun: { model: "minigun", rate: 0.05,  ammo: 400, dmg: 12,  pellets: 1, spread: 0.06, sound: "shoot",   beam: 0xfff0bf, kick: 0.04 },
+      burst:   { model: "smg",     rate: 0.32,  ammo: 150, dmg: 22,  pellets: 3, spread: 0.02, sound: "shoot",   beam: 0xfff0bf, kick: 0.1 },
+      railgun: { model: "railgun", rate: 1.1,   ammo: 24,  dmg: 240, pellets: 1, spread: 0,    sound: "laser",   beam: 0x9fe8ff, kick: 0.16, pierce: true },
+      flak:    { model: "minigun", rate: 0.45,  ammo: 70,  dmg: 18,  pellets: 6, spread: 0.16, sound: "shotgun", beam: 0xffcaa0, kick: 0.16 },
+    };
+    this.gunAmmo = {}; this._gunLast = {}; for (const k in this.guns) { this.gunAmmo[k] = this.guns[k].ammo; this._gunLast[k] = -10; }
+    this.extraGun = new THREE.Group(); this.extraGun.visible = false;
+    this.extraGun.position.set(0.26, -0.2, -0.5); this.extraGun.rotation.set(0, Math.PI, 0);
+    camera.add(this.extraGun); this._gunModels = {};
+    // master weapon list (every hero owns all; signature equipped on deploy)
+    this.allWeapons = ["rifle", "smg", "minigun", "burst", "railgun", "shotgun", "flak", "laser", "plasma", "launcher", "sword"];
     this.sword = new THREE.Group(); this.sword.visible = false;
     this.sword.position.set(0.3, -0.34, -0.5); this.sword.rotation.set(0, Math.PI, 0);
     camera.add(this.sword);
@@ -172,7 +190,11 @@ export class Weapon {
     };
     swap(this.energy, "plasma", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
     swap(this.laserGun, "laser", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
+    swap(this.shotgunGun, "shotgun", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
     swap(this.sword, "sword", [-0.7, 0, 0], [0, 0.12, -0.18]); // blade angled up-forward out of the grip
+    for (const key of ["smg", "minigun", "railgun"]) { // generic-gun viewmodels (swapped into one slot)
+      const m = makeFpWeapon(key); if (m) { m.rotation.set(0, -Math.PI / 2, 0); m.position.set(0, 0, 0.1); this._gunModels[key] = m; }
+    }
   }
 
   // a long sleek laser rifle (red emitter coils + scope) — distinct from the plasma orb-blaster
@@ -189,12 +211,22 @@ export class Weapon {
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), em); tip.position.set(0, 0.03, -0.88); g.add(tip);
   }
   _showViewmodel() {
+    const g = this.guns[this.mode];
     this.group.visible = this.mode === "rifle";
     this.launcher.visible = this.mode === "launcher";
     this.energy.visible = this.mode === "plasma";
     this.laserGun.visible = this.mode === "laser";
+    this.shotgunGun.visible = this.mode === "shotgun";
     this.sword.visible = this.mode === "sword";
+    this.extraGun.visible = !!g;
+    if (g) { // swap the right model into the shared generic-gun slot
+      const m = this._gunModels[g.model];
+      while (this.extraGun.children.length) this.extraGun.remove(this.extraGun.children[0]);
+      if (m) this.extraGun.add(m);
+    }
   }
+  canFireGun(t) { const g = this.guns[this.mode]; return !!g && this.gunAmmo[this.mode] > 0 && (t - this._gunLast[this.mode]) >= g.rate; }
+  fireGun(t) { const g = this.guns[this.mode]; this._gunLast[this.mode] = t; this.gunAmmo[this.mode]--; this.kick = g.kick; this.kickRot = g.kick * 1.2; this.audio && this.audio[g.sound] && this.audio[g.sound](); }
 
   // cycle through owned weapons (Q)
   toggle() {
@@ -217,6 +249,8 @@ export class Weapon {
   firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.plasma?.(); }
   canFireLaser(t) { return this.mode === "laser" && this.laserAmmo > 0 && (t - this._lastLaser) >= this.laserRate; }
   fireLaser(t) { this._lastLaser = t; this.laserAmmo--; this.kick = 0.04; this.kickRot = 0.05; this.audio?.laser?.(); }
+  canFireShotgun(t) { return this.mode === "shotgun" && this.shotgunAmmo > 0 && (t - this._lastShotgun) >= this.shotgunRate; }
+  fireShotgun(t) { this._lastShotgun = t; this.shotgunAmmo--; this.kick = 0.18; this.kickRot = 0.24; this.audio?.shotgun?.(); }
   canFireSword(t) { return this.mode === "sword" && (t - this._lastSword) >= this.swordRate; }
   fireSword(t) { this._lastSword = t; this._swingT = 0.32; this.audio?.swordSwing?.(); }
 

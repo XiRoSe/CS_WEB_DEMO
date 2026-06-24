@@ -440,7 +440,7 @@ export class LevelBuilder {
 
   // a loot gift crate (kind = "ammo" | "grenade" | "health"); collected on proximity by the runner.
   giftCrate(x, z, kind = "ammo") {
-    const C = { ammo: 0xffce73, grenade: 0xd0552e, health: 0x4fd06a, plasma: 0x4fb4ff, laser: 0xff5a3c }[kind] || 0xffce73;
+    const C = { ammo: 0xffce73, grenade: 0xd0552e, health: 0x4fd06a, plasma: 0x4fb4ff, laser: 0xff5a3c, shotgun: 0xff8a3a }[kind] || 0xffce73;
     const g = new THREE.Group(); g.position.set(x, this._groundY(x, z), z);
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat(C, { roughness: 0.5 })); box.position.y = 0.4; box.castShadow = true;
     const rib = mat(0xfff4e0, { roughness: 0.5 });

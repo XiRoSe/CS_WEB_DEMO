@@ -38,6 +38,7 @@ export class Audio {
       heli_fire: "/audio/heli_fire.wav",
       laser: "/audio/laser.ogg",
       sword: "/audio/sword.ogg",
+      shotgun: "/audio/shotgun.ogg",
     };
     for (const [name, url] of Object.entries(clips)) {
       try {
@@ -142,6 +143,7 @@ export class Audio {
   swordSwing() { if (this.playBuf("sword", 0.6, 0.95 + Math.random() * 0.1)) return; this._noiseBurst(0.2, 760, 0.6, 0.18, "bandpass"); }
   thunder() { this._noiseBurst(0.9, 220, 0.5, 0.45); this._tone(52, 0.8, "sawtooth", 0.32, 26); } // storm rumble
   splash() { this._noiseBurst(0.32, 1300, 0.7, 0.32); } // water entry
+  shotgun() { if (this.playBuf("shotgun", 0.6, 0.9 + Math.random() * 0.1)) return; this._noiseBurst(0.3, 500, 0.6, 0.5); this._tone(80, 0.2, "sawtooth", 0.3, 40); }
   swimStroke() { this._noiseBurst(0.22, 680, 0.6, 0.14, "bandpass"); } // swim swish
   creature() { this._tone(120, 0.34, "sawtooth", 0.3, 64); this._noiseBurst(0.18, 360, 0.8, 0.14); } // growl/bite
   arcGet() { // ascending recovered-arc chime

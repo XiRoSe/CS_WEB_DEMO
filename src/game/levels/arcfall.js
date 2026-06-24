@@ -36,6 +36,7 @@ export const arcfall = {
     b.giftCrate(-62, -16, "ammo"); b.giftCrate(96, 12, "health"); b.giftCrate(-100, -26, "grenade");
     b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
     b.giftCrate(-50, 70, "laser");   // LASER RIFLE out by the lake
+    b.giftCrate(64, 30, "shotgun");  // PULSE SHOTGUN
 
     // hostiles — kept clear of the ~55m drop zone, spread around the island
     const raptors = [[62, -34], [-72, 22], [42, 84], [-54, -74], [98, 44]];   // raptors
