@@ -17,8 +17,8 @@ export const arcfall = {
     b.setBounds({ minX: -205, maxX: 205, minZ: -205, maxZ: 205 });
     b.lake(-46, 20, 18, 1.5); b.lake(70, -64, 22, 1.6); b.lake(30, 90, 16, 1.4); // shallow wadeable lakes (carved first)
     b.islandTerrain({ size: 460 });   // hills → beach → sea → distant mountains
-    b.scatterTrees(150, 20, 198);     // GLB forest (birch + palms), seated on the terrain (perf-tuned)
-    b.scatterRocks(32, 26, 198);      // GLB rocks (cover + dressing)
+    b.scatterTrees(120, 20, 198);     // GLB forest (birch + palms), seated on the terrain (perf-tuned)
+    b.scatterRocks(28, 26, 198);      // GLB rocks (cover + dressing)
     b.palace(40, -64);          // grand temple you can climb the stairs into (glowing relic inside)
     // structures from across the ages, scattered for landmarks + cover
     b.ruin(-44, 82); b.ruin(76, 44);

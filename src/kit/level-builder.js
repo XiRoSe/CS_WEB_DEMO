@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { Water } from "three/addons/objects/Water.js";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "../engine/primitives.js";
 import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
@@ -604,7 +603,7 @@ export class LevelBuilder {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
 
-  islandTerrain({ size = 460, segs = 170, sea = 5000 } = {}) {
+  islandTerrain({ size = 460, segs = 190, sea = 5000 } = {}) {
     const R = size * 0.46; // shore radius
     const lakes = this._lakes || [];
     // smooth value-noise → fbm, for organic relief + ground variety
@@ -622,7 +621,7 @@ export class LevelBuilder {
       let y = (1 - r / R) * 10;                                          // dome rising out of the sea
       if (r < R) y += (fbm(x * 0.022, z * 0.022) - 0.45) * 17 * (1 - r / R * 0.55); // rolling hills + valleys
       for (const hl of hills) { const d = Math.hypot(x - hl.x, z - hl.z); if (d < hl.r) y += hl.h * Math.pow(Math.cos(d / hl.r * Math.PI / 2), 2); }
-      for (const m of mtns) { const d = Math.hypot(x - m.x, z - m.z); if (d < m.r) y += m.h * Math.pow(Math.cos(d / m.r * Math.PI / 2), 3); } // sharper peaks
+      for (const m of mtns) { const d = Math.hypot(x - m.x, z - m.z); if (d < m.r) y += m.h * Math.pow(Math.cos(d / m.r * Math.PI / 2), 2); } // gentler peaks (climbable, fewer facet gaps)
       if (r > R - 12 && r < R + 4) y *= 0.42;                            // flatten the beach near the waterline
       for (const L of lakes) { const d = Math.hypot(x - L.x, z - L.z); if (d < L.r) y -= L.depth * (0.5 + 0.5 * Math.cos((d / L.r) * Math.PI)); }
       return y;
@@ -655,15 +654,21 @@ export class LevelBuilder {
     const land = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
     land.material.vertexColors = true; land.receiveShadow = true; this.scene.add(land);
 
-    // sea — realistic animated reflective water (three/addons Water) with a procedural ripple normal map
-    const water = new Water(new THREE.PlaneGeometry(sea, sea), {
-      textureWidth: 256, textureHeight: 256, // modest reflection res for perf
-      waterNormals: this._waterNormals(),
-      sunDirection: new THREE.Vector3(0.5, 0.82, 0.32).normalize(),
-      sunColor: 0xccd6dc, waterColor: 0x0a4866, distortionScale: 3.4, fog: !!this.scene.fog,
-    });
-    water.rotation.x = -Math.PI / 2; water.position.y = 0; water.userData.outlineParameters = { visible: false };
-    this.scene.add(water); this._sea = water;
+    // sea — lively animated water that reflects the SKY ENVIRONMENT (cheap: no reflection render pass).
+    // Big faceted Gerstner waves + a turquoise→deep gradient; flatShading makes the moving facets glint.
+    const waterGeo = new THREE.PlaneGeometry(sea, sea, 64, 64); waterGeo.rotateX(-Math.PI / 2);
+    const wpos = waterGeo.attributes.position, wcol = [], wc = new THREE.Color();
+    const shallow = new THREE.Color(0x4fcfe0), midSea = new THREE.Color(0x1f8fc4), deep = new THREE.Color(0x0c4f86);
+    for (let i = 0; i < wpos.count; i++) {
+      const r = Math.hypot(wpos.getX(i), wpos.getZ(i)), tt = Math.min(1, Math.max(0, (r - R) / (R * 1.6)));
+      wc.copy(tt < 0.5 ? shallow.clone().lerp(midSea, tt * 2) : midSea.clone().lerp(deep, (tt - 0.5) * 2));
+      wcol.push(wc.r, wc.g, wc.b);
+    }
+    waterGeo.setAttribute("color", new THREE.Float32BufferAttribute(wcol, 3));
+    const water = new THREE.Mesh(waterGeo, noOutline(new THREE.MeshStandardMaterial({
+      vertexColors: true, flatShading: true, metalness: 0.55, roughness: 0.12, envMapIntensity: 1.3, transparent: true, opacity: 0.92,
+    })));
+    water.position.y = 0; this.scene.add(water); this._sea = water; this._seaPos = wpos;
     const foam = new THREE.Mesh(new THREE.RingGeometry(R - 4, R + 6, 110),
       noOutline(new THREE.MeshBasicMaterial({ color: 0xf2fbff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })));
     foam.rotation.x = -Math.PI / 2; foam.position.y = 0.3; this.scene.add(foam);
@@ -711,8 +716,13 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
-    if (this._sea && this._sea.material && this._sea.material.uniforms && this._sea.material.uniforms.time) {
-      this._sea.material.uniforms.time.value = t * 0.6; // animate the Water ripples
+    if (this._seaPos) { // big rolling Gerstner waves; flatShading + env map make the moving facets glint
+      const p = this._seaPos;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i);
+        p.setY(i, Math.sin(x * 0.03 + t * 1.4) * 1.0 + Math.cos(z * 0.026 + t * 1.05) * 1.0 + Math.sin((x + z) * 0.06 + t * 2.0) * 0.5);
+      }
+      p.needsUpdate = true;
     }
     for (const a of this.arcs) {
       if (a.taken) continue;

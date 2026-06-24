@@ -54,7 +54,7 @@ export class Car {
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), gy = this.group.position.y;
     const tx = this.pos.x - fx * 9, ty = gy + 4.5, tz = this.pos.z - fz * 9;
     if (!this._cam) this._cam = new THREE.Vector3(tx, ty, tz);
-    const k = 1 - Math.pow(0.0008, dt); // exponential smoothing toward the target
+    const k = Math.min(1, dt * 14); // framerate-aware smoothing — snappy even at lower FPS
     this._cam.x += (tx - this._cam.x) * k; this._cam.y += (ty - this._cam.y) * k; this._cam.z += (tz - this._cam.z) * k;
     camera.position.copy(this._cam);
     this._look.set(this.pos.x + fx * 6, gy + 1.6, this.pos.z + fz * 6);

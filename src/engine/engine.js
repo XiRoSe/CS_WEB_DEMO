@@ -7,7 +7,7 @@ export class Engine {
   constructor(container) {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // cap at 1 — big FPS win on hi-dpi (smooth driving)
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -140,6 +140,21 @@ export class Engine {
     const st = new THREE.CanvasTexture(mc); st.colorSpace = THREE.SRGBColorSpace;
     const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: st, transparent: true, depthWrite: false, fog: false }));
     sun.position.copy(this.sunDir).multiplyScalar(500); sun.scale.setScalar(170); scene.add(sun);
+
+    // drifting 3D cloud billboards (a soft cloud sprite, scattered in a high ring; rotated slowly each frame)
+    const cc = document.createElement("canvas"); cc.width = cc.height = 256; const cx2 = cc.getContext("2d");
+    for (let i = 0; i < 16; i++) { const px = 60 + Math.random() * 136, py = 90 + Math.random() * 80, r = 30 + Math.random() * 50;
+      const cg = cx2.createRadialGradient(px, py - r * 0.2, 2, px, py, r);
+      cg.addColorStop(0, "rgba(255,255,255,0.9)"); cg.addColorStop(0.7, "rgba(245,248,252,0.35)"); cg.addColorStop(1, "rgba(245,248,252,0)");
+      cx2.fillStyle = cg; cx2.beginPath(); cx2.arc(px, py, r, 0, 7); cx2.fill(); }
+    const cloudTex = new THREE.CanvasTexture(cc); cloudTex.colorSpace = THREE.SRGBColorSpace;
+    this.cloudGroup = new THREE.Group(); scene.add(this.cloudGroup);
+    for (let i = 0; i < 18; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.55 + Math.random() * 0.3, depthWrite: false, fog: false }));
+      const a = Math.random() * Math.PI * 2, rad = 260 + Math.random() * 360, h = 150 + Math.random() * 170;
+      sp.position.set(Math.cos(a) * rad, h, Math.sin(a) * rad); sp.scale.set(120 + Math.random() * 160, 60 + Math.random() * 80, 1);
+      this.cloudGroup.add(sp);
+    }
   }
 
   // bright sun-lit lighting for the daytime island

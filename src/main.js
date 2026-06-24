@@ -447,6 +447,7 @@ class Game {
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
+    if (this.engine.cloudGroup) this.engine.cloudGroup.rotation.y += dt * 0.006; // clouds drift across the sky
     this.level.update(t); // wave the objective flag
     this.laser.hide(); // re-shown each frame during play
     if (this.state === "intro") {
