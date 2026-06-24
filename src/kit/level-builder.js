@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Water } from "three/addons/objects/Water.js";
 import { COLORS, mat, box, cyl, texMat, groundTexture, makeCrate, makeBarrel, makeSandbags, makeBollard, makeExfilPad, makeFlag, noOutline } from "../engine/primitives.js";
 import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
@@ -590,6 +591,19 @@ export class LevelBuilder {
   // Call BEFORE islandTerrain() so the heightfield mesh reflects the carve.
   lake(x, z, r = 14, depth = 1.4) { (this._lakes ||= []).push({ x, z, r, depth }); }
 
+  // a tiling ripple normal map for the Water shader (soft random slopes around the neutral 128,128,255)
+  _waterNormals() {
+    const s = 256, c = document.createElement("canvas"); c.width = c.height = s; const x = c.getContext("2d");
+    x.fillStyle = "rgb(128,128,255)"; x.fillRect(0, 0, s, s);
+    for (let i = 0; i < 240; i++) {
+      const px = Math.random() * s, py = Math.random() * s, r = 8 + Math.random() * 26, dx = Math.random() * 56 - 28, dy = Math.random() * 56 - 28;
+      const g = x.createRadialGradient(px, py, 0, px, py, r);
+      g.addColorStop(0, `rgb(${128 + dx | 0},${128 + dy | 0},255)`); g.addColorStop(1, "rgba(128,128,255,0)");
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+    }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  }
+
   islandTerrain({ size = 460, segs = 170, sea = 5000 } = {}) {
     const R = size * 0.46; // shore radius
     const lakes = this._lakes || [];
@@ -641,19 +655,15 @@ export class LevelBuilder {
     const land = new THREE.Mesh(geo, mat(0xffffff, { roughness: 1, flat: true }));
     land.material.vertexColors = true; land.receiveShadow = true; this.scene.add(land);
 
-    // sea — stylized low-poly water: flat-shaded facets, a shallow-turquoise → deep-blue gradient, animated
-    // wave swell (in update), and a foam ring at the shoreline.
-    const waterGeo = new THREE.PlaneGeometry(sea, sea, 72, 72); waterGeo.rotateX(-Math.PI / 2);
-    const wpos = waterGeo.attributes.position, wcol = [], wc = new THREE.Color();
-    const shallow = new THREE.Color(0x7ad9cf), midSea = new THREE.Color(0x2aa3cc), deep = new THREE.Color(0x12598f);
-    for (let i = 0; i < wpos.count; i++) {
-      const r = Math.hypot(wpos.getX(i), wpos.getZ(i)), t = Math.min(1, Math.max(0, (r - R) / (R * 1.7)));
-      wc.copy(t < 0.5 ? shallow.clone().lerp(midSea, t * 2) : midSea.clone().lerp(deep, (t - 0.5) * 2));
-      wcol.push(wc.r, wc.g, wc.b);
-    }
-    waterGeo.setAttribute("color", new THREE.Float32BufferAttribute(wcol, 3));
-    const water = new THREE.Mesh(waterGeo, noOutline(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.32, transparent: true, opacity: 0.95, flatShading: true })));
-    water.position.y = 0; this.scene.add(water); this._sea = water; this._seaPos = wpos;
+    // sea — realistic animated reflective water (three/addons Water) with a procedural ripple normal map
+    const water = new Water(new THREE.PlaneGeometry(sea, sea), {
+      textureWidth: 256, textureHeight: 256, // modest reflection res for perf
+      waterNormals: this._waterNormals(),
+      sunDirection: new THREE.Vector3(0.5, 0.82, 0.32).normalize(),
+      sunColor: 0xccd6dc, waterColor: 0x0a4866, distortionScale: 3.4, fog: !!this.scene.fog,
+    });
+    water.rotation.x = -Math.PI / 2; water.position.y = 0; water.userData.outlineParameters = { visible: false };
+    this.scene.add(water); this._sea = water;
     const foam = new THREE.Mesh(new THREE.RingGeometry(R - 4, R + 6, 110),
       noOutline(new THREE.MeshBasicMaterial({ color: 0xf2fbff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })));
     foam.rotation.x = -Math.PI / 2; foam.position.y = 0.3; this.scene.add(foam);
@@ -701,13 +711,8 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
-    if (this._seaPos) { // rolling, faceted wave swell (flatShading derives normals in-shader — no recompute)
-      const p = this._seaPos;
-      for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i), z = p.getZ(i);
-        p.setY(i, Math.sin(x * 0.045 + t * 1.3) * 0.7 + Math.cos(z * 0.04 + t * 1.0) * 0.7 + Math.sin((x + z) * 0.09 + t * 2.0) * 0.4);
-      }
-      p.needsUpdate = true;
+    if (this._sea && this._sea.material && this._sea.material.uniforms && this._sea.material.uniforms.time) {
+      this._sea.material.uniforms.time.value = t * 0.6; // animate the Water ripples
     }
     for (const a of this.arcs) {
       if (a.taken) continue;
