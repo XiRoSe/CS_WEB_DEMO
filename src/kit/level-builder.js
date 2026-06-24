@@ -644,7 +644,8 @@ export class LevelBuilder {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
       const slope = Math.hypot(h(x + 2, z) - h(x - 2, z), h(x, z + 2) - h(x, z - 2)) / 4; // local steepness
       const highLine = 15 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 8;
-      if (y < 1.0) c.copy(sand);
+      if (y < -0.6) { c.copy(gDark).lerp(gLight, fbm(x * 0.06, z * 0.06)); } // ocean floor = orange ground (seen through the clear water)
+      else if (y < 1.2) c.copy(sand);                                    // sandy beach at the waterline
       else if (slope > 0.95 && y > 2) c.copy(rock);                       // steep cliff faces
       else if (y > highLine) c.copy(gDry).lerp(gHigh, Math.min(1, (y - highLine) / 8)); // dark-yellow grass on the heights
       else if (y > 14) c.copy(gDry).lerp(gHigh, Math.min(1, (y - 14) / 10));

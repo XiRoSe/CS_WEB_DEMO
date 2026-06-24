@@ -141,19 +141,35 @@ export class Engine {
     const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: st, transparent: true, depthWrite: false, fog: false }));
     sun.position.copy(this.sunDir).multiplyScalar(500); sun.scale.setScalar(170); scene.add(sun);
 
-    // drifting 3D cloud billboards (a soft cloud sprite, scattered in a high ring; rotated slowly each frame)
-    const cc = document.createElement("canvas"); cc.width = cc.height = 256; const cx2 = cc.getContext("2d");
-    for (let i = 0; i < 16; i++) { const px = 60 + Math.random() * 136, py = 90 + Math.random() * 80, r = 30 + Math.random() * 50;
-      const cg = cx2.createRadialGradient(px, py - r * 0.2, 2, px, py, r);
-      cg.addColorStop(0, "rgba(255,255,255,0.9)"); cg.addColorStop(0.7, "rgba(245,248,252,0.35)"); cg.addColorStop(1, "rgba(245,248,252,0)");
-      cx2.fillStyle = cg; cx2.beginPath(); cx2.arc(px, py, r, 0, 7); cx2.fill(); }
-    const cloudTex = new THREE.CanvasTexture(cc); cloudTex.colorSpace = THREE.SRGBColorSpace;
-    this.cloudGroup = new THREE.Group(); scene.add(this.cloudGroup);
-    for (let i = 0; i < 18; i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.55 + Math.random() * 0.3, depthWrite: false, fog: false }));
-      const a = Math.random() * Math.PI * 2, rad = 260 + Math.random() * 360, h = 150 + Math.random() * 170;
-      sp.position.set(Math.cos(a) * rad, h, Math.sin(a) * rad); sp.scale.set(120 + Math.random() * 160, 60 + Math.random() * 80, 1);
-      this.cloudGroup.add(sp);
+    // XIII-style cloud billboards: bold flat cumulus (shaded grey underbelly + crisp white body), each
+    // drawn fully INSIDE its canvas (margin → no hard edges). Several distinct shapes so they never repeat.
+    const makeCloud = () => {
+      const cc = document.createElement("canvas"); cc.width = cc.height = 256; const x = cc.getContext("2d");
+      const n = 4 + Math.floor(Math.random() * 3), lobes = [];
+      for (let i = 0; i < n; i++) lobes.push({ x: 128 + (i - (n - 1) / 2) * 30 + (Math.random() - 0.5) * 14, y: 148 - Math.pow(Math.abs(i - (n - 1) / 2), 1.3) * 10 + (Math.random() - 0.5) * 12, r: 34 + Math.random() * 22 });
+      for (const L of lobes) { const g = x.createRadialGradient(L.x, L.y + L.r * 0.45, 2, L.x, L.y + L.r * 0.45, L.r * 1.05); g.addColorStop(0, "rgba(170,180,202,0.9)"); g.addColorStop(0.8, "rgba(170,180,202,0.45)"); g.addColorStop(1, "rgba(170,180,202,0)"); x.fillStyle = g; x.beginPath(); x.arc(L.x, L.y + L.r * 0.35, L.r, 0, 7); x.fill(); } // shaded underbelly
+      for (const L of lobes) { const g = x.createRadialGradient(L.x, L.y - L.r * 0.25, 2, L.x, L.y, L.r); g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.82, "rgba(255,255,255,0.97)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.beginPath(); x.arc(L.x, L.y, L.r, 0, 7); x.fill(); } // bold white body
+      const t = new THREE.CanvasTexture(cc); t.colorSpace = THREE.SRGBColorSpace; return t;
+    };
+    const cloudTexes = [makeCloud(), makeCloud(), makeCloud(), makeCloud(), makeCloud()];
+    this.cloudGroup = new THREE.Group(); scene.add(this.cloudGroup); this._clouds = [];
+    for (let i = 0; i < 26; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTexes[i % cloudTexes.length], transparent: true, opacity: 0.72 + Math.random() * 0.24, depthWrite: false, fog: false }));
+      const a = Math.random() * Math.PI * 2, rad = 240 + Math.random() * 420, h = 140 + Math.random() * 180;
+      sp.position.set(Math.cos(a) * rad, h, Math.sin(a) * rad);
+      const w = 150 + Math.random() * 180; sp.scale.set(w, w * 0.52, 1);
+      this.cloudGroup.add(sp); this._clouds.push({ sp, baseY: h, ph: Math.random() * 6.28, sc: w });
+    }
+  }
+
+  // drift the whole cloud field + a gentle per-cloud billow (bob + breathe) so the sky feels alive
+  driftClouds(dt, t) {
+    if (this.cloudGroup) this.cloudGroup.rotation.y += dt * 0.012;
+    if (!this._clouds) return;
+    for (const c of this._clouds) {
+      c.sp.position.y = c.baseY + Math.sin(t * 0.25 + c.ph) * 5;
+      const b = 1 + Math.sin(t * 0.4 + c.ph) * 0.04;
+      c.sp.scale.set(c.sc * b, c.sc * 0.52 * b, 1);
     }
   }
 

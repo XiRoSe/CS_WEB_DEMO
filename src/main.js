@@ -525,7 +525,7 @@ class Game {
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
-    if (this.engine.cloudGroup) this.engine.cloudGroup.rotation.y += dt * 0.016; // clouds drift across the sky
+    this.engine.driftClouds && this.engine.driftClouds(dt, t); // clouds drift + billow across the sky
     this.engine.skyStorm && this.engine.skyStorm(dt); // purple-storm lightning
     this.engine.shootingStars && this.engine.shootingStars(dt); // meteors streak the storm sky
     this.level.update(t); // wave the objective flag
