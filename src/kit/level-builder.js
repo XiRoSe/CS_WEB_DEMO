@@ -457,6 +457,12 @@ export class LevelBuilder {
     const g = makeTree(kind); if (!g) return;
     const gy = this._groundY(x, z);
     g.position.set(x, gy, z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
+    const leaf = new THREE.Color(0xf4d62a); // bright yellow foliage (anomaly look)
+    g.traverse((o) => { // recolor greenish foliage → bright yellow, leave the trunk
+      if (!o.isMesh || !o.material || !o.material.color) return;
+      const cc = o.material.color;
+      if (cc.g > cc.r * 0.85 && cc.g > cc.b * 1.1) { o.material = o.material.clone(); o.material.color.copy(leaf); }
+    });
     this.scene.add(g);
     const c = this.collide(x, z, 0.7 * s, 0.7 * s, 1.4); c.baseY = gy;
   }
@@ -637,7 +643,7 @@ export class LevelBuilder {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
       const slope = Math.hypot(h(x + 2, z) - h(x - 2, z), h(x, z + 2) - h(x, z - 2)) / 4; // local steepness
-      const snowLine = 25 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 9; // uneven, natural snow boundary
+      const snowLine = 15 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 8; // lower line → more snowy high ground
       if (y < 1.0) c.copy(sand);
       else if (y > snowLine) c.copy(rock).lerp(snow, Math.min(1, (y - snowLine) / 6)); // snowy peaks (irregular line)
       else if (slope > 0.9 && y > 2) c.copy(rock);                        // steep cliff faces

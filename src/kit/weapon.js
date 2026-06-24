@@ -43,15 +43,15 @@ export class Weapon {
     this.shotgunRate = 0.8; this._lastShotgun = -10; this.shotgunAmmo = 24; // spread shotgun
     this.swordRate = 0.5; this._lastSword = -10;
     this.energy = new THREE.Group(); this.energy.visible = false;
-    this.energy.position.set(0.26, -0.2, -0.5); this.energy.rotation.set(0, Math.PI, 0);
+    this.energy.position.set(0.32, -0.34, -0.4); this.energy.rotation.set(0, Math.PI, 0);
     camera.add(this.energy);
     this._buildEnergy();
     this.laserGun = new THREE.Group(); this.laserGun.visible = false;
-    this.laserGun.position.set(0.26, -0.2, -0.5); this.laserGun.rotation.set(0, Math.PI, 0);
+    this.laserGun.position.set(0.32, -0.34, -0.4); this.laserGun.rotation.set(0, Math.PI, 0);
     camera.add(this.laserGun);
     this._buildLaserGun();
     this.shotgunGun = new THREE.Group(); this.shotgunGun.visible = false;
-    this.shotgunGun.position.set(0.26, -0.2, -0.5); this.shotgunGun.rotation.set(0, Math.PI, 0);
+    this.shotgunGun.position.set(0.32, -0.34, -0.4); this.shotgunGun.rotation.set(0, Math.PI, 0);
     camera.add(this.shotgunGun);
     // generic hitscan guns (one shared viewmodel slot; model swapped per mode)
     this.guns = {
@@ -63,7 +63,7 @@ export class Weapon {
     };
     this.gunAmmo = {}; this._gunLast = {}; for (const k in this.guns) { this.gunAmmo[k] = this.guns[k].ammo; this._gunLast[k] = -10; }
     this.extraGun = new THREE.Group(); this.extraGun.visible = false;
-    this.extraGun.position.set(0.26, -0.2, -0.5); this.extraGun.rotation.set(0, Math.PI, 0);
+    this.extraGun.position.set(0.32, -0.34, -0.4); this.extraGun.rotation.set(0, Math.PI, 0);
     camera.add(this.extraGun); this._gunModels = {};
     // master weapon list (every hero owns all; signature equipped on deploy)
     this.allWeapons = ["rifle", "smg", "minigun", "burst", "railgun", "shotgun", "flak", "laser", "plasma", "launcher", "sword"];
