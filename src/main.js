@@ -22,6 +22,7 @@ import { preloadEnemies } from "./game/actors/enemy.js";
 import { preloadOperator, makeHero } from "./game/actors/operator.js";
 import { preloadCreatures, HERO_LIST, HERO_LOADOUT } from "./game/actors/creature-assets.js";
 import { preloadNature } from "./kit/content/nature.js";
+import { preloadBuildings } from "./kit/content/buildings.js";
 import { preloadVehicles } from "./kit/content/vehicles.js";
 import { preloadPickups } from "./kit/content/pickups.js";
 import { Projectile, applyBlast } from "./engine/projectiles.js";
@@ -113,7 +114,7 @@ class Game {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
     // load models progressively (async, off the main thread) with a progress readout
-    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadFpWeapons()];
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadFpWeapons(), preloadBuildings()];
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);

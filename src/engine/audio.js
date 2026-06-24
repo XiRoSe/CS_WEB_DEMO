@@ -159,16 +159,21 @@ export class Audio {
     this._tone(380, 0.22, "sine", 0.12, 150);
   }
   shotgun() { if (this.playBuf("shotgun", 0.6, 0.9 + Math.random() * 0.1)) return; this._noiseBurst(0.3, 500, 0.6, 0.5); this._tone(80, 0.2, "sawtooth", 0.3, 40); }
-  jetpack(on) { // looping thruster roar while the jetpack fires
+  jetpack(on) { // realistic rocket thruster: looping filtered noise hiss + a low rumble
     if (!this.ctx) return;
     if (on && !this._jet) {
-      const g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.master);
-      if (this.buffers.whoosh) { const s = this.ctx.createBufferSource(); s.buffer = this.buffers.whoosh; s.loop = true; s.playbackRate.value = 1.3; s.connect(g); s.start(); this._jet = { src: s, g }; }
-      else { const o = this.ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = 90; const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 700; o.connect(lp); lp.connect(g); o.start(); this._jet = { src: o, g }; }
-      g.gain.linearRampToValueAtTime(0.4, this.ctx.currentTime + 0.12);
+      const t = this.ctx.currentTime, g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.master);
+      if (!this._noiseBuf) { const n = this.ctx.sampleRate * 2, b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; this._noiseBuf = b; }
+      const src = this.ctx.createBufferSource(); src.buffer = this._noiseBuf; src.loop = true;       // continuous exhaust hiss
+      const bp = this.ctx.createBiquadFilter(); bp.type = "lowpass"; bp.frequency.value = 1500; bp.Q.value = 0.9;
+      src.connect(bp); bp.connect(g);
+      const o = this.ctx.createOscillator(); o.type = "sawtooth"; o.frequency.value = 62; const og = this.ctx.createGain(); og.gain.value = 0.32; o.connect(og); og.connect(g); // deep rumble
+      src.start(); o.start();
+      g.gain.linearRampToValueAtTime(0.5, t + 0.1);
+      this._jet = { src, o, g };
     } else if (!on && this._jet) {
-      const j = this._jet; this._jet = null; j.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-      setTimeout(() => { try { j.src.stop(); } catch { /* already stopped */ } }, 280);
+      const j = this._jet; this._jet = null; j.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
+      setTimeout(() => { try { j.src.stop(); } catch { /* stopped */ } try { j.o.stop(); } catch { /* stopped */ } }, 340);
     }
   }
   wade() { // a wet footstep: bright surface splash + a sloosh + a couple of droplet bloops

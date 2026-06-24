@@ -4,6 +4,7 @@ import { makeVehicle } from "./content/vehicles.js";
 import { makeAmmo } from "./content/pickups.js";
 import { makeFpWeapon } from "./content/fpweapons.js";
 import { makeTree, makeRock } from "./content/nature.js";
+import { makeBuilding } from "./content/buildings.js";
 import { Car } from "./car.js";
 
 // The level toolkit for THIS game (a night military-compound FPS). A level module calls these
@@ -574,6 +575,46 @@ export class LevelBuilder {
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 7, 4), mat(stone, { roughness: 0.9, flat: true })); shaft.position.set(x, gy + 4.1, z); shaft.rotation.y = Math.PI / 4; shaft.castShadow = true; this.scene.add(shaft);
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.46, 1, 4), mat(0xd9b24a, { roughness: 0.5, flat: true })); tip.position.set(x, gy + 8.1, z); tip.rotation.y = Math.PI / 4; this.scene.add(tip);
     (this.collide(x, z, 2.2, 2.2, 8)).baseY = gy;
+  }
+
+  // ── TIME-BROKEN LANDMARKS (the anomaly tore eras together) — real CC0 building GLBs ──
+  // a real skyscraper (Quaternius), optionally leaning to read as time-fractured. Bullets hit it, blocks
+  // movement, and the player can stand on its footprint top.
+  skyscraper(x, z, kind = "b1", tilt = 0) {
+    const g = makeBuilding(kind); if (!g || !g.children.length) return;
+    const gy = this._lowGround(x, z, 6);
+    g.position.set(x, gy, z); g.rotation.y = Math.random() * 6.28; g.rotation.z = tilt; g.rotation.x = tilt * 0.4;
+    this.scene.add(g);
+    const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.solidMeshes.push(g);                                          // bullets hit it
+    const half = Math.max(6, Math.min(sz.x, sz.z) * 0.42);
+    (this.collide(x, z, half * 2, half * 2, sz.y * (tilt ? 0.45 : 0.92))).baseY = gy; // stand on top + blocks (leaning ones standable lower)
+  }
+
+  // a weathered stone pyramid (ancient era) — climbable faces, bullets hit it
+  pyramid(x, z, size = 24) {
+    const gy = this._lowGround(x, z, size / 2);
+    const p = new THREE.Mesh(new THREE.ConeGeometry(size * 0.72, size * 0.82, 4), mat(0xcdb98a, { roughness: 0.96, flat: true }));
+    p.position.set(x, gy + size * 0.41 - 0.5, z); p.rotation.y = Math.PI / 4; p.castShadow = true; p.receiveShadow = true; this.scene.add(p);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(size * 0.12, size * 0.14, 4), mat(0xd9b24a, { roughness: 0.5, flat: true })); cap.position.set(x, gy + size * 0.82 - 0.5, z); cap.rotation.y = Math.PI / 4; this.scene.add(cap);
+    this.solidMeshes.push(p);
+    (this.collide(x, z, size * 0.9, size * 0.9, size * 0.6)).baseY = gy;
+  }
+
+  // a Big Ben-style clock tower (real bell-tower GLB) with four glowing frozen clock faces
+  clockTower(x, z) {
+    const g = makeBuilding("bell"); if (!g || !g.children.length) return;
+    const gy = this._lowGround(x, z, 4);
+    g.position.set(x, gy, z); g.rotation.y = Math.random() * 6.28; g.rotation.z = 0.04;
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    const faceMat = noOutline(new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe39a, emissiveIntensity: 1.3 }));
+    for (const [dx, dz, ry] of [[2.0, 0, Math.PI / 2], [-2.0, 0, Math.PI / 2], [0, 2.0, 0], [0, -2.0, 0]]) {
+      const face = new THREE.Mesh(new THREE.CircleGeometry(1.3, 20), faceMat); face.position.set(dx, 22, dz); face.rotation.y = ry; g.add(face);
+      const hand = box(0.14, 1.0, 0.06, 0x201810); hand.position.set(dx, 22, dz); hand.rotation.set(0, ry, 1.4); g.add(hand); // hands frozen — time broke
+    }
+    this.scene.add(g); this.solidMeshes.push(g);
+    (this.collide(x, z, 7, 7, 9)).baseY = gy;
   }
 
   // A grand open temple/palace the player can climb into: a stepped stone base reached by a front
