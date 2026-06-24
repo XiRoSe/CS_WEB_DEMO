@@ -478,10 +478,14 @@ export class LevelBuilder {
     } else if (kind === "grenade") {
       const gm = mat(0x3c4a2e, { roughness: 0.6 }), cap = mat(0x9a9a9a, { metalness: 0.6, roughness: 0.4 });
       for (let i = 0; i < 3; i++) { const o = (i - 1) * 0.24, yy = i === 1 ? 0.1 : 0; const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), gm); b.position.set(o, yy, 0); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 6), cap); c.position.set(o, yy + 0.2, 0); grp.add(b, c); }
-    } else { // ammo: an olive ammo box + brass rounds on top
-      grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.4, 0.46), mat(0x55621f, { roughness: 0.6 })));
-      const brass = mat(0xd9a441, { metalness: 0.7, roughness: 0.3 });
-      for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 8), brass); r.rotation.z = Math.PI / 2; r.position.set(-0.12 + i * 0.12, 0.26, 0); grp.add(r); }
+    } else { // ammo: a cluster of upright brass BULLETS (casing + pointed tip)
+      const brass = mat(0xe0b24a, { metalness: 0.8, roughness: 0.22 }), tip = mat(0xb07a2c, { metalness: 0.85, roughness: 0.3 });
+      for (let i = 0; i < 6; i++) {
+        const o = (i % 3 - 1) * 0.16, row = i < 3 ? -0.08 : 0.08, b = new THREE.Group();
+        const cse = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.34, 10), brass); cse.position.y = 0.17;
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 10), tip); nose.position.y = 0.41;
+        b.add(cse, nose); b.position.set(o, 0, row); b.rotation.set((Math.random() - 0.5) * 0.08, 0, (Math.random() - 0.5) * 0.08); grp.add(b);
+      }
     }
     grp.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     return grp;

@@ -262,5 +262,10 @@ export class Audio {
     setTimeout(() => { try { m.bus.disconnect(); } catch { /* already gone */ } }, 1400);
   }
   win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this._tone(f, 0.18, "square", 0.22), i * 130)); }
-  lose() { [330, 262, 196, 131].forEach((f, i) => setTimeout(() => this._tone(f, 0.25, "sawtooth", 0.22), i * 160)); }
+  lose() { // dramatic death sting: dull impact + a slow descending drone
+    this._noiseBurst(0.5, 320, 0.6, 0.42);
+    this._tone(200, 1.3, "sawtooth", 0.3, 46);
+    setTimeout(() => this._tone(130, 1.5, "sine", 0.26, 38), 220);
+    setTimeout(() => this._tone(85, 1.8, "sawtooth", 0.2, 26), 520);
+  }
 }

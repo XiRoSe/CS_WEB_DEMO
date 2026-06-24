@@ -91,7 +91,7 @@ export class VFX {
     this._beam.scale.set(1, len, 1);
     this._beam.visible = true; this._beam.material.opacity = 0.9; this._beamCore.material.opacity = 1;
     this._beamLife = 0.85;
-    this._flash(a, 5.5, 0xffd24a); this._flash(a, 3.0, 0xffffff); // big muzzle bloom at the chest
+    this._flash(a, 6.0, 0xff1808); this._flash(a, 3.2, 0xff7a50); // big RED muzzle bloom at the chest
   }
 
   // a glowing red enemy laser BEAM (a real thin cylinder that briefly lingers) + impact glow

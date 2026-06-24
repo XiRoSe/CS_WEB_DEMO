@@ -367,14 +367,22 @@ class Game {
     for (const e of this.combat.enemies) if (!e.dead) { e.hitbox.updateWorldMatrix(true, false); targets.push(e.hitbox); }
     const hits = this._ray.intersectObjects(targets, true);
     if (!hits.length) return null;
-    const out = [];
+    // GRACE: an enemy counts as hit if it's no more than this far behind the nearest wall/ground —
+    // so shots aimed at an enemy standing on the terrain register even though the ground is technically nearer.
+    const GRACE = 4.5;
+    let wallDist = Infinity; const out = [];
     for (const h of hits) {
       let o = h.object; while (o && !(o.userData && o.userData.enemy)) o = o.parent;
-      if (o && o.userData.enemy) out.push({ point: h.point, enemy: o.userData.enemy, dist: h.distance });
-      else { if (!out.length) return { point: h.point, dist: h.distance }; break; } // a wall: stop here
-      if (!pierce) break;
+      if (o && o.userData.enemy) {
+        if (h.distance > wallDist + GRACE) break; // genuinely behind solid cover
+        out.push({ point: h.point, enemy: o.userData.enemy, dist: h.distance });
+        if (!pierce) break;
+      } else if (wallDist === Infinity) {
+        wallDist = h.distance; // nearest solid surface (terrain/structure)
+      }
     }
-    return pierce ? { list: out, point: out.length ? out[out.length - 1].point : null } : out[0];
+    if (!out.length) return wallDist < Infinity ? { point: hits[0].point, dist: wallDist } : null;
+    return pierce ? { list: out, point: out[out.length - 1].point } : out[0];
   }
 
   // damage falloff: full up close, tapering to ~40% at long range

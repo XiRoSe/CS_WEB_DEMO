@@ -53,7 +53,7 @@ export class Robot {
     const chest = this._tmp.set(this.pos.x, this.group.position.y + this._chestY, this.pos.z);
     if (this._charging) {
       this._charge += dt;
-      if (ctx.vfx && ctx.vfx._flash) { const sz = 1.6 + this._charge * 5.5; ctx.vfx._flash(chest, sz, 0xff5a1a); ctx.vfx._flash(chest, sz * 0.55, 0xffe0a0); } // big growing charge orb (bright core)
+      if (ctx.vfx && ctx.vfx._flash) { const sz = 2.4 + this._charge * 8; ctx.vfx._flash(chest, sz, 0xff1408); ctx.vfx._flash(chest, sz * 0.5, 0xff6a40); } // big growing RED charge orb
       if (this._charge >= 1.3) {
         this._charging = false; this._bossCd = 5 + Math.random() * 2.5;
         // aim at the GROUND beneath the player so the beam is a visible downward diagonal ray (not head-on)

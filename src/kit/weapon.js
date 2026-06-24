@@ -319,11 +319,12 @@ export class Weapon {
     );
     this.group.rotation.set(this._baseRot.x - this.kickRot, this._baseRot.y, this._baseRot.z);
 
-    // sword: held CLOSE up-right; a diagonal overhead chop slashing down across to the lower-left
+    // sword: blade raised up-right at rest (windup) → diagonal CUT down-across to the lower-left.
+    // Grip stays CLOSE to the camera (fixed, lower-right) the whole time so no hands are needed.
     if (this.sword.visible) {
       const a = this._swingT > 0 ? Math.sin((1 - (this._swingT -= dt) / 0.32) * Math.PI) : 0;
-      this.sword.rotation.set(-0.25 - a * 0.7, Math.PI + a * 1.5, 0.75 - a * 2.5);
-      this.sword.position.set(0.3 - a * 0.52, -0.26 + a * 0.06, -0.4 - a * 0.06);
+      this.sword.rotation.set(-1.3 + a * 1.9, Math.PI, 1.0 - a * 2.1); // pitch up→down, roll sweeps across
+      this.sword.position.set(0.36, -0.34, -0.42);                     // grip held close, lower-right
       if (this._swingT < 0) this._swingT = 0;
     }
 
