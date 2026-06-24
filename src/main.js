@@ -217,7 +217,7 @@ class Game {
           "<b>THE VAULT</b> — a rogue intelligence — has shattered the world into <b>twelve Arcs</b> and scattered them across a dying island.",
           "Its tribes and war-machines guard the fragments.",
           "One operator falls from the storm. Recover the Arcs — <b>seal the breach.</b>",
-        ]); },
+        ], 14000); },
         () => this.hud.hideCrawl())
       : style === "parachute"
         ? new ParachuteIntro(this.scene, this.camera, sp, groundY, this.hero)

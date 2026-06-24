@@ -11,8 +11,8 @@ export class DropPodIntro {
     this.spawn = new THREE.Vector3(spawn.x, groundY, spawn.z);
     this.phase = "crawl"; this.t = 0; this.hold = 0; this.done = false; this.impacted = false;
     this._calledCrawl = false; this._endedCrawl = false;
-    this.crawlDur = 9.5;   // slow-mo crawl descent
-    this.fallDur = 1.7;    // hard plummet
+    this.crawlDur = 14.0;  // slow-mo crawl descent (reads comfortably)
+    this.fallDur = 1.9;    // hard plummet
     this.startY = 330; this.hoverY = 250;
     this.pos = new THREE.Vector3(spawn.x, this.startY, spawn.z);
     this.group = new THREE.Group(); this.scene.add(this.group);
@@ -50,7 +50,10 @@ export class DropPodIntro {
       this.camera.position.set(this.pos.x + Math.cos(a) * 9, this.pos.y - 3.5, this.pos.z + Math.sin(a) * 9 - 5);
       this._look.set(this.pos.x, this.pos.y + 1.6, this.pos.z);
       this.camera.lookAt(this._look);
-      if (this.vfx && Math.random() < 0.3) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.6, this.pos.y + 3, this.pos.z + (Math.random() - 0.5) * 1.6));
+      if (this.vfx) { // smouldering re-entry fire streaming off the pod
+        for (let i = 0; i < 3; i++) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 2.0, this.pos.y + 2.6 + Math.random() * 3, this.pos.z + (Math.random() - 0.5) * 2.0));
+        if (this.vfx._fireball && Math.random() < 0.6) this.vfx._fireball(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.6, this.pos.y + 3 + Math.random() * 2.5, this.pos.z + (Math.random() - 0.5) * 1.6), 0.55);
+      }
       if (k >= 1) { this.phase = "fall"; this.t = 0; this._endCrawl(); }
     } else if (this.phase === "fall") {
       if (!this._endedCrawl) this._endCrawl();
@@ -59,7 +62,10 @@ export class DropPodIntro {
       this.pos.y = this.hoverY + (this.spawn.y - this.hoverY) * ease;
       this.group.position.copy(this.pos);
       this.pod.rotation.y += dt * (3 + ease * 9);
-      if (this.vfx) for (let i = 0; i < 3; i++) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.4, this.pos.y + 2.4 + Math.random() * 3, this.pos.z + (Math.random() - 0.5) * 1.4));
+      if (this.vfx) { // blazing comet trail on the hard plummet
+        for (let i = 0; i < 9; i++) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.8, this.pos.y + 2.4 + Math.random() * 6, this.pos.z + (Math.random() - 0.5) * 1.8));
+        if (this.vfx._fireball) for (let i = 0; i < 3; i++) this.vfx._fireball(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.6, this.pos.y + 3 + Math.random() * 4, this.pos.z + (Math.random() - 0.5) * 1.6), 0.6 + Math.random() * 0.4);
+      }
       this.camera.position.set(this.pos.x - 3.5, this.pos.y + 4 + 6 * (1 - ease), this.pos.z - 12);
       this._look.set(this.pos.x, this.pos.y - 4 * ease, this.pos.z);
       this.camera.lookAt(this._look);
@@ -81,11 +87,13 @@ export class DropPodIntro {
   _blast() {
     this.impacted = true;
     if (this.vfx) {
-      for (let i = 0; i < 9; i++) this.vfx.explosion(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 7, this.spawn.y + 0.6 + Math.random() * 1.6, this.spawn.z + (Math.random() - 0.5) * 7), 2.3);
-      for (let i = 0; i < 12; i++) this.vfx.dustBurst(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 13, this.spawn.y + 0.4, this.spawn.z + (Math.random() - 0.5) * 13));
-      if (this.vfx._shockwave) this.vfx._shockwave(this._tmp.set(this.spawn.x, this.spawn.y + 0.3, this.spawn.z));
+      for (let i = 0; i < 18; i++) this.vfx.explosion(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 10, this.spawn.y + 0.5 + Math.random() * 2.4, this.spawn.z + (Math.random() - 0.5) * 10), 2.4 + Math.random() * 0.8);
+      for (let i = 0; i < 30; i++) this.vfx.dustBurst(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 22, this.spawn.y + 0.4, this.spawn.z + (Math.random() - 0.5) * 22));
+      if (this.vfx._fireball) for (let i = 0; i < 8; i++) this.vfx._fireball(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 8, this.spawn.y + 1 + Math.random() * 2, this.spawn.z + (Math.random() - 0.5) * 8), 1.0 + Math.random());
+      if (this.vfx._spawnDebris) this.vfx._spawnDebris(this._tmp.set(this.spawn.x, this.spawn.y + 0.4, this.spawn.z), 16);
+      if (this.vfx._shockwave) { this.vfx._shockwave(this._tmp.set(this.spawn.x, this.spawn.y + 0.3, this.spawn.z)); setTimeout(() => this.vfx._shockwave(this._tmp.set(this.spawn.x, this.spawn.y + 0.3, this.spawn.z)), 120); }
     }
-    if (this.audio && this.audio.explosion) { this.audio.explosion(); setTimeout(() => this.audio.explosion(), 90); }
+    if (this.audio && this.audio.explosion) { this.audio.explosion(); setTimeout(() => this.audio.explosion(), 90); setTimeout(() => this.audio.explosion(), 220); }
     this.onImpact && this.onImpact();
     this.pod.position.y = -0.7; // pod buries its nose
     if (this.hero) this.hero.visible = true; // operator emerges

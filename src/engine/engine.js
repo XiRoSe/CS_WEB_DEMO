@@ -177,7 +177,7 @@ export class Engine {
   addDayLights(scene) {
     this._hemi = new THREE.HemisphereLight(0xb98ce0, 0x3a2a52, 0.95); scene.add(this._hemi);
     scene.add(new THREE.AmbientLight(0x6a4a8a, 0.26));
-    const sun = new THREE.DirectionalLight(0xe6ccff, 2.1);
+    const sun = new THREE.DirectionalLight(0xe6ccff, 2.1); this._sun = sun;
     sun.position.copy(this.sunDir || new THREE.Vector3(0.5, 0.82, 0.32)).multiplyScalar(90);
     sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
     const s = sun.shadow.camera; s.near = 1; s.far = 220; s.left = -70; s.right = 70; s.top = 70; s.bottom = -70;
@@ -204,13 +204,13 @@ export class Engine {
   shootingStars(dt) {
     if (!this._meteors) return;
     if ((this._meteorIn -= dt) <= 0) {
-      this._meteorIn = 1.4 + Math.random() * 3;
+      this._meteorIn = 0.7 + Math.random() * 1.8; // far more frequent
       const m = this._meteors.find((x) => !x.line.visible);
       if (m) {
-        const sx = (Math.random() - 0.5) * 820, sz = (Math.random() - 0.5) * 820;
-        m.from.set(sx, 270 + Math.random() * 90, sz);
-        m.to.set(sx + (Math.random() - 0.5) * 340, 120 + Math.random() * 60, sz + (Math.random() - 0.5) * 340);
-        m.t = 0; m.dur = 0.7 + Math.random() * 0.5; m.line.visible = true;
+        const sx = (Math.random() - 0.5) * 900, sz = (Math.random() - 0.5) * 900, drop = 150 + Math.random() * 120;
+        m.from.set(sx, 300 + Math.random() * 90, sz);
+        m.to.set(sx + (Math.random() - 0.5) * 380, 300 + Math.random() * 90 - drop, sz + (Math.random() - 0.5) * 380); // longer, steeper streaks
+        m.t = 0; m.dur = 0.6 + Math.random() * 0.6; m.line.visible = true;
       }
     }
     const head = this._v0 || (this._v0 = new THREE.Vector3()), tail = this._v1 || (this._v1 = new THREE.Vector3());
@@ -230,15 +230,16 @@ export class Engine {
     if (!this._bolt) return;
     if (this._boltT > 0) {
       this._boltT -= dt;
-      const f = Math.max(0, this._boltT / 0.18);
-      this.renderer.toneMappingExposure = 1.1 + f * 1.7;
-      if (this._hemi) this._hemi.intensity = 0.95 + f * 2.6;
-      this._bolt.material.opacity = f;
-      if (this._boltT <= 0) { this._bolt.visible = false; this.renderer.toneMappingExposure = 1.1; if (this._hemi) this._hemi.intensity = 0.95; }
+      const f = Math.max(0, this._boltT / 0.26), flick = f * (0.7 + 0.3 * Math.sin(this._boltT * 90)); // flicker
+      this.renderer.toneMappingExposure = 1.1 + flick * 2.3;        // brighter flash
+      if (this._hemi) this._hemi.intensity = 0.95 + flick * 3.4;     // strong light pop
+      if (this._sun) this._sun.intensity = 2.1 + flick * 2.0;
+      this._bolt.material.opacity = Math.min(1, f * 1.6);
+      if (this._boltT <= 0) { this._bolt.visible = false; this.renderer.toneMappingExposure = 1.1; if (this._hemi) this._hemi.intensity = 0.95; if (this._sun) this._sun.intensity = 2.1; }
     } else if ((this._strikeIn -= dt) <= 0) {
-      this._strikeIn = 4 + Math.random() * 6; this._boltT = 0.18;
-      const bx = (Math.random() - 0.5) * 520, bz = (Math.random() - 0.5) * 520, pos = this._bolt.geometry.attributes.position;
-      for (let i = 0; i <= 10; i++) pos.setXYZ(i, bx + (Math.random() - 0.5) * 44, 400 - i * 36, bz + (Math.random() - 0.5) * 44);
+      this._strikeIn = 1.6 + Math.random() * 3.2; this._boltT = 0.26; // strike far more often
+      const bx = (Math.random() - 0.5) * 540, bz = (Math.random() - 0.5) * 540, pos = this._bolt.geometry.attributes.position;
+      let px = bx; for (let i = 0; i <= 10; i++) { px += (Math.random() - 0.5) * 30; pos.setXYZ(i, px, 410 - i * 38, bz + (Math.random() - 0.5) * 40); } // jagged forked bolt
       pos.needsUpdate = true; this._bolt.visible = true;
       this.onThunder && this.onThunder();
     }

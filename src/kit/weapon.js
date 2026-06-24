@@ -310,11 +310,11 @@ export class Weapon {
     );
     this.group.rotation.set(this._baseRot.x - this.kickRot, this._baseRot.y, this._baseRot.z);
 
-    // sword swing arc (rests held up-right, swings down-across)
+    // sword: held CLOSE up-right; a diagonal overhead chop slashing down across to the lower-left
     if (this.sword.visible) {
       const a = this._swingT > 0 ? Math.sin((1 - (this._swingT -= dt) / 0.32) * Math.PI) : 0;
-      this.sword.rotation.set(0.15 - a * 1.3, Math.PI, 0.55 - a * 2.0);
-      this.sword.position.set(0.34 - a * 0.16, -0.5 + a * 0.18, -0.85 - a * 0.12);
+      this.sword.rotation.set(-0.25 - a * 0.7, Math.PI + a * 1.5, 0.75 - a * 2.5);
+      this.sword.position.set(0.3 - a * 0.52, -0.26 + a * 0.06, -0.4 - a * 0.06);
       if (this._swingT < 0) this._swingT = 0;
     }
 
