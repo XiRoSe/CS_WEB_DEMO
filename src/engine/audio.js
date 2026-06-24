@@ -159,6 +159,10 @@ export class Audio {
     this._tone(380, 0.22, "sine", 0.12, 150);
   }
   shotgun() { if (this.playBuf("shotgun", 0.6, 0.9 + Math.random() * 0.1)) return; this._noiseBurst(0.3, 500, 0.6, 0.5); this._tone(80, 0.2, "sawtooth", 0.3, 40); }
+  wade() { // a wet footstep splash in shallow water
+    this._noiseBurst(0.2, 1500, 0.6, 0.2, "lowpass");
+    this._noiseBurst(0.13, 600, 0.7, 0.12, "lowpass");
+  }
   swimStroke() { // gentle water swish of a stroke
     this._noiseBurst(0.34, 1000, 0.6, 0.15, "lowpass");
     this._noiseBurst(0.2, 440, 0.7, 0.1, "lowpass");
