@@ -44,7 +44,29 @@ export class Robot {
     this.hitbox = new THREE.Mesh(new THREE.BoxGeometry(cfg.hbW, cfg.hbH, cfg.hbW), hbMat);
     this.hitbox.position.y = cfg.hbH / 2; this.hitbox.userData.enemy = this; this.group.add(this.hitbox);
     this.boss = !!spawn.boss;
+    this._bossCd = 4 + Math.random() * 2; this._charging = false; this._charge = 0; // chest-laser cycle
+    this._chestY = (cfg.hbH * 0.7) * (spawn.scale || 1);
     if (spawn.scale) { this.model && this.model.scale.multiplyScalar(spawn.scale); this.hitbox.scale.setScalar(spawn.scale); this.hitbox.position.y = cfg.hbH / 2 * spawn.scale; this.cfg = { ...cfg, boom: cfg.boom * spawn.scale }; }
+  }
+
+  // THE GUARDIAN's signature: charge a glowing orb at the chest, then unleash a giant laser beam + booms
+  _bossBeam(dt, playerPos, ctx) {
+    const chest = this._tmp.set(this.pos.x, this.group.position.y + this._chestY, this.pos.z);
+    if (this._charging) {
+      this._charge += dt;
+      ctx.vfx && ctx.vfx._flash && ctx.vfx._flash(chest, 0.6 + this._charge * 2.2, 0xff7a2a); // growing charge orb
+      if (this._charge >= 1.3) {
+        this._charging = false; this._bossCd = 5 + Math.random() * 2.5;
+        const from = chest.clone(), to = new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z);
+        ctx.vfx && ctx.vfx.bossBeam && ctx.vfx.bossBeam(from, to);
+        for (let i = 1; i <= 5; i++) ctx.vfx && ctx.vfx.explosion && ctx.vfx.explosion(from.clone().lerp(to, i / 5), 1.8); // booms along the beam
+        ctx.audio && ctx.audio.explosion && ctx.audio.explosion(); ctx.audio && ctx.audio.plasma && ctx.audio.plasma();
+        ctx.onBossBeam && ctx.onBossBeam();
+        ctx.onPlayerHit && ctx.onPlayerHit(34 + Math.floor(Math.random() * 22));
+      }
+    } else if ((this._bossCd -= dt) <= 0) {
+      this._charging = true; this._charge = 0; ctx.audio && ctx.audio.zap && ctx.audio.zap(); // charge whine
+    }
   }
 
   // crossfade to a clip; matches "Armature|Run" by suffix, else any clip containing the key
@@ -89,6 +111,7 @@ export class Robot {
     } else this._play("idle");
     const bob = this.fly ? Math.sin(performance.now() * 0.003 + this.pos.x) * 0.4 : 0;
     this.group.position.set(this.pos.x, flyY + bob, this.pos.z);
+    if (this.boss && d < 110) { this._bossBeam(dt, playerPos, ctx); } // giant chest laser
     if ((this._fireCd -= dt) <= 0 && d < this.cfg.range + 8 && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z, 1.8)) {
       this._fireCd = this.cfg.rate + Math.random() * 0.8;
       this._play("shoot", 0.08, true);

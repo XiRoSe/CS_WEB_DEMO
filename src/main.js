@@ -135,6 +135,7 @@ class Game {
     this.hud.setLoadingProgress(jobs.length + 1, jobs.length + 1);
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
+      onBossBeam: () => { this.hud._shake = Math.max(this.hud._shake || 0, 22); }, // GUARDIAN beam screen shake
       onKill: (count, left) => { this.hud.killFeed(this.cfg.messages.hostileDown); this.hud.setHostiles(left); this.voice.enemyDown(); },
       onHitmarker: (killed) => { this.shotsHit++; this.hud.hitmarker(killed); this.audio.hitmarker(killed); },
       onExplosive: (rec, units) => this.destructibles.damageExplosive(rec, units),

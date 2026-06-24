@@ -72,6 +72,13 @@ export class VFX {
     t.life = t.max = 0.03;
   }
 
+  // THE GUARDIAN's giant chest beam: a thick bright string of big glow sprites
+  bossBeam(a, b) {
+    const p = this._mid2 || (this._mid2 = a.clone()), n = 18;
+    for (let i = 0; i <= n; i++) { p.lerpVectors(a, b, i / n); this._flash(p, 1.6, 0xff4a1a); }
+    this._flash(a, 3.2, 0xffd24a); // muzzle bloom at the chest
+  }
+
   // glowing colored enemy laser BOLT (red Iron Legion / green Hollow Watch): a string of colored glow
   // sprites along the beam (no yellow tracer) so the bolt itself reads red/green
   enemyLaser(a, b, color = 0xff3a2a) {

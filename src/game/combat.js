@@ -100,6 +100,7 @@ export class Combat {
       vfx: this.vfx,
       audio: this.audio,
       onPlayerHit: (dmg) => this.hooks.onPlayerHit?.(dmg),
+      onBossBeam: () => this.hooks.onBossBeam?.(),
     };
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
