@@ -38,13 +38,12 @@ export const arcfall = {
     b.ruin(106, 48);
     // TIME-BROKEN LANDMARKS — eras collided: real skyscrapers (some leaning), pyramids + a frozen Big Ben, SCATTERED
     b.clockTower(120, 26);                                             // NE · Big Ben, hands frozen (time broke)
-    b.skyscraper(104, 96, "b1", 0.16);                                // NE · leaning skyscraper
     b.skyscraper(132, 70, "b6", 0);                                   // NE · upright tower
     b.skyscraper(-120, 80, "b2", 0.13);                               // NW · toppling tower
     b.skyscraper(-128, -58, "b4", -0.12);                             // SW · toppling tower
     b.skyscraper(66, -120, "b1", 0.1);                                // S  · toppling tower
     b.skyscraper(152, 24, "b3", 0);                                   // far E · upright tower
-    b.pyramid(-150, 14, 27); b.pyramid(40, -120, 23); b.pyramid(96, 124, 26); // pyramids spread W / S / far-NE
+    b.pyramid(-150, 14, 27); b.pyramid(40, -120, 23); b.pyramid(52, 122, 26); // pyramids spread W / S / N (the N one fills the open ground where the leaning tower stood)
     b.car(9, 13, "racefuture"); b.car(-12, 7, "sportscar"); b.car(2, -15, "race"); // fast sports cars in the clear drop zone (press R)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
