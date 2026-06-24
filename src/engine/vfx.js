@@ -72,6 +72,13 @@ export class VFX {
     t.life = t.max = 0.03;
   }
 
+  // glowing colored enemy laser bolt (red Iron Legion / green Hollow Watch): tracer + bold colored glow
+  enemyLaser(a, b, color = 0xff3a2a) {
+    this.tracer(a, b);
+    this._flash(a, 0.5, color); this._flash(b, 0.62, color);
+    (this._mid || (this._mid = a.clone())).lerpVectors(a, b, 0.5); this._flash(this._mid, 0.7, color);
+  }
+
   _flash(point, size, color) {
     const f = this._next(this.flashes);
     f.mesh.position.copy(point);

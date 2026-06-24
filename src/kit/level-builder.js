@@ -485,7 +485,7 @@ export class LevelBuilder {
     const gy = this._groundY(x, z);
     g.position.set(x, gy, z); g.scale.multiplyScalar(s); g.rotation.y = Math.random() * 6.28;
     this.scene.add(g);
-    const c = this.collide(x, z, 1.3 * s, 1.3 * s, 1.0); c.baseY = gy;
+    const c = this.collide(x, z, 1.3 * s, 1.3 * s, 2.8 * s); c.baseY = gy; // tall enough to block enemy line-of-sight (real cover)
   }
 
   // a climbable wooden lookout: a raised platform reached by a walkable staircase (terrain-seated).
@@ -621,8 +621,8 @@ export class LevelBuilder {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
 
-  islandTerrain({ size = 460, segs = 190, sea = 5000 } = {}) {
-    const R = size * 0.46; // shore radius
+  islandTerrain({ size = 460, segs = 190, sea = 8000 } = {}) {
+    const R = size * 0.46; this._seaR = R; // shore radius (wave taper reference)
     const lakes = this._lakes || [];
     // smooth value-noise → fbm, for organic relief + ground variety
     const hash = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -736,11 +736,12 @@ export class LevelBuilder {
   update(t) {
     this._updateSpots(t);
     if (this._seaPos) { // smooth rolling swell + analytic normals + bold white XIII foam crests
-      const p = this._seaPos, n = this._sea.geometry.attributes.normal, col = this._seaColAttr, base = this._seaBase;
+      const p = this._seaPos, n = this._sea.geometry.attributes.normal, col = this._seaColAttr, base = this._seaBase, R = this._seaR || 200;
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), z = p.getZ(i);
-        const wy = Math.sin(x * 0.02 + t * 1.0) * 0.8 + Math.cos(z * 0.017 + t * 0.8) * 0.8;
-        const ripple = Math.sin((x + z) * 0.09 + t * 2.2) * 0.18; // small chop riding the swell → sharper crests
+        const taper = Math.min(1, Math.max(0, (Math.hypot(x, z) - R) / 50)); // flat at the shoreline → swells out at sea
+        const wy = (Math.sin(x * 0.02 + t * 1.0) * 0.8 + Math.cos(z * 0.017 + t * 0.8) * 0.8) * taper;
+        const ripple = Math.sin((x + z) * 0.09 + t * 2.2) * 0.18 * taper; // small chop riding the swell → sharper crests
         p.setY(i, wy + ripple);
         const dydx = Math.cos(x * 0.02 + t * 1.0) * 0.02 * 0.8, dydz = -Math.sin(z * 0.017 + t * 0.8) * 0.017 * 0.8;
         const inv = 1 / Math.hypot(dydx, 1, dydz); n.setXYZ(i, -dydx * inv, inv, -dydz * inv);

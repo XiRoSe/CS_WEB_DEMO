@@ -8,26 +8,26 @@ export class CollectObjective {
     this.collected = 0;
     // story beats fired as Arcs are recovered — each names a tribe whose territory holds the next Arcs
     this.beats = {
-      1: "ARC ONLINE — THE VAULT HAS NOTICED YOU",
+      1: "ARC SECURED — THE TIMELINE FLICKERS",
       3: "NW · THE SAURIAN BROOD WAKES IN THE RUINS",
       5: "NE · THE IRON LEGION MOBILIZES",
       7: "SE · THE HOLLOW WATCH LOCKS ONTO YOU",
       9: "S · THE VAULT GARRISON RINGS THE PALACE",
-      11: "ONE ARC REMAINS — THE GUARDIAN STIRS",
+      11: "ONE ARC LEFT — TIME BEGINS TO MEND",
     };
   }
 
   brief() {
-    return `The rogue AI <b>THE VAULT</b> shattered reality into 12 Arcs and scattered them across this island — ` +
-      `held by four tribes: the <b>Saurian Brood</b> (NW), the <b>Iron Legion</b> (NE), the <b>Hollow Watch</b> (SE), ` +
-      `and the <b>Vault Garrison</b> guarding the palace. You're the last operator standing. ` +
-      `Recover all ${this.total} Arcs to seal the breach.`;
+    return `An unexpected <b>anomaly</b> has broken <b>time</b> itself. The 12 <b>Arcs</b> that anchor the timeline ` +
+      `are scattered across this fractured island — guarded by the beasts, machines and soldiers stranded here from every age: ` +
+      `the <b>Saurian Brood</b> (NW), the <b>Iron Legion</b> (NE), the <b>Hollow Watch</b> (SE) and the <b>Vault Garrison</b> at the palace. ` +
+      `Recover all ${this.total} Arcs to repair time and return to your own.`;
   }
 
   onPlayStart() {
     this.game.hud.setObjective('Recover the lost <span class="arrow">ARCS ✦</span>');
     this.game.hud.setCounter("Arcs", `${this.collected} / ${this.total}`);
-    this.game.hud.notify("SEAL THE BREACH — RECOVER THE 12 ARCS");
+    this.game.hud.notify("REPAIR TIME — RECOVER THE 12 ARCS");
   }
 
   update(dt, t, presses) {
@@ -51,7 +51,7 @@ export class CollectObjective {
         g.hud.setCounter("Arcs", `${this.collected} / ${this.total}`);
         if (this.beats[this.collected]) g.hud.notify(this.beats[this.collected]);
         if (this.collected >= this.total) {
-          g._win({ title: 'Reality <span class="hz">Saved</span>', sub: `The breach is sealed — all ${this.total} Arcs recovered` });
+          g._win({ title: 'Timeline <span class="hz">Restored</span>', sub: `All ${this.total} Arcs recovered — time mends and you return to your own` });
           return;
         }
       }

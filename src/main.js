@@ -213,10 +213,10 @@ class Game {
       ? new DropPodIntro(this.scene, this.camera, sp, groundY, HERO_TINT[this.hero], this.vfx, this.audio,
         () => { this.hud._shake = Math.max(this.hud._shake || 0, 28); }, // big blast shake on impact
         () => { this.voice.deploy(); this.hud.showCrawl("ARCFALL", [ // radio call + Star-Wars story crawl during the fall
-          "Reality is <b>fracturing</b>.",
-          "<b>THE VAULT</b> — a rogue intelligence — has shattered the world into <b>twelve Arcs</b> and scattered them across a dying island.",
-          "Its tribes and war-machines guard the fragments.",
-          "One operator falls from the storm. Recover the Arcs — <b>seal the breach.</b>",
+          "An unexpected <b>anomaly</b> has shattered <b>TIME</b> itself.",
+          "The twelve <b>ARCS</b> that anchor the timeline now lie scattered across a broken island — torn loose from their own eras.",
+          "Beasts, war-machines and lost soldiers from every age are stranded here, and they guard the fragments.",
+          "Recover all twelve Arcs to <b>repair time</b> — and return to your own.",
         ], 14000); },
         () => this.hud.hideCrawl())
       : style === "parachute"

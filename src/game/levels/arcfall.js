@@ -4,7 +4,7 @@ export const arcfall = {
   id: "arcfall",
   name: "ARCFALL",
   config: {
-    scene: { sky: "day", fog: { color: 0xbfe0f4, near: 160, far: 700 }, fov: 75 },
+    scene: { sky: "day", fog: { color: 0x9a7fb0, near: 240, far: 1300 }, fov: 75 }, // purple horizon haze; far enough to read the open ocean
     intro: { enabled: true, style: "droppod", spottedCalloutAt: 4.5 },
     objective: { type: "collect", count: 12 },
     helicopter: { spawnDelay: 99999 }, // no gunship boss on the island (for now)

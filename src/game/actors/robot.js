@@ -23,6 +23,8 @@ export class Robot {
     this.fly = cfg.fly;
     this.dead = false; this.counted = false; this.removable = false;
     this.aggro = false; this.aggroRange = spawn.aggro || cfg.range + 24; // idle until the player approaches
+    // glowing laser colour by tribe: Hollow Watch (sentry/drone) = green, Iron Legion (mech/heavy) = red
+    this._laserColor = (this.kind === "sentry" || this.kind === "drone") ? 0x46ff5a : 0xff3a2a;
     this.yaw = 0; this._fireCd = 1.5 + Math.random(); this._deathT = 0; this._needBoom = false; this._cur = null; this._curAction = null; this._fallV = 0;
     this._muzzle = new THREE.Vector3(); this._tmp = new THREE.Vector3();
 
@@ -87,12 +89,12 @@ export class Robot {
     } else this._play("idle");
     const bob = this.fly ? Math.sin(performance.now() * 0.003 + this.pos.x) * 0.4 : 0;
     this.group.position.set(this.pos.x, flyY + bob, this.pos.z);
-    if ((this._fireCd -= dt) <= 0 && d < this.cfg.range + 8 && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z, 2.6)) {
+    if ((this._fireCd -= dt) <= 0 && d < this.cfg.range + 8 && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z, 1.8)) {
       this._fireCd = this.cfg.rate + Math.random() * 0.8;
       this._play("shoot", 0.08, true);
       this._gunTip.getWorldPosition(this._muzzle);
       ctx.vfx?.muzzle?.(this._muzzle);
-      ctx.vfx?.tracer?.(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z));
+      (ctx.vfx?.enemyLaser ? ctx.vfx.enemyLaser(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z), this._laserColor) : ctx.vfx?.tracer?.(this._muzzle, this._tmp.set(playerPos.x, playerPos.y - 0.1, playerPos.z)));
       ctx.audio?.heliShot?.();
       if (Math.random() < 0.5) ctx.onPlayerHit?.(this.cfg.dmg[0] + Math.floor(Math.random() * (this.cfg.dmg[1] - this.cfg.dmg[0])));
     }
