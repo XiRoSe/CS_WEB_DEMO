@@ -636,18 +636,18 @@ export class LevelBuilder {
 
     const geo = new THREE.PlaneGeometry(size, size, segs, segs); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, colors = [];
-    // alien anomaly palette: orange/amber grass, sandy beaches, rock cliffs, snow peaks
+    // alien anomaly palette: orange/amber grass low, DARK-YELLOW grass on the heights (no snow), sand beaches
     const sand = new THREE.Color(0xe6d6a4), gDark = new THREE.Color(0xb05e22), gLight = new THREE.Color(0xe2933a),
-      gDry = new THREE.Color(0xc98a3a), dirt = new THREE.Color(0x7a4a26), rock = new THREE.Color(0x847d70), snow = new THREE.Color(0xeef3f6);
+      gDry = new THREE.Color(0xc98a3a), dirt = new THREE.Color(0x7a4a26), rock = new THREE.Color(0x847d70), gHigh = new THREE.Color(0x8f7016);
     const c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), y = h(x, z); pos.setY(i, y);
       const slope = Math.hypot(h(x + 2, z) - h(x - 2, z), h(x, z + 2) - h(x, z - 2)) / 4; // local steepness
-      const snowLine = 15 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 8; // lower line → more snowy high ground
+      const highLine = 15 + (fbm(x * 0.05 + 9, z * 0.05 + 4) - 0.5) * 8;
       if (y < 1.0) c.copy(sand);
-      else if (y > snowLine) c.copy(rock).lerp(snow, Math.min(1, (y - snowLine) / 6)); // snowy peaks (irregular line)
-      else if (slope > 0.9 && y > 2) c.copy(rock);                        // steep cliff faces
-      else if (y > 14) c.copy(gDry).lerp(rock, Math.min(1, (y - 14) / 12)); // rocky alpine high ground
+      else if (slope > 0.95 && y > 2) c.copy(rock);                       // steep cliff faces
+      else if (y > highLine) c.copy(gDry).lerp(gHigh, Math.min(1, (y - highLine) / 8)); // dark-yellow grass on the heights
+      else if (y > 14) c.copy(gDry).lerp(gHigh, Math.min(1, (y - 14) / 10));
       else {
         const g1 = fbm(x * 0.06, z * 0.06);
         c.copy(gDark).lerp(gLight, g1);
