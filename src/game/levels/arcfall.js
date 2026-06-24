@@ -17,10 +17,9 @@ export const arcfall = {
     b.setBounds({ minX: -205, maxX: 205, minZ: -205, maxZ: 205 });
     b.lake(-46, 20, 18, 1.5); b.lake(70, -64, 22, 1.6); b.lake(30, 90, 16, 1.4); // shallow wadeable lakes (carved first)
     b.islandTerrain({ size: 460 });   // hills → beach → sea → distant mountains
-    b.scatterTrees(260, 20, 198);     // thick GLB forest (birch + palms), seated on the terrain
-    b.scatterRocks(55, 26, 198);      // GLB rocks (cover + dressing)
+    b.scatterTrees(150, 20, 198);     // GLB forest (birch + palms), seated on the terrain (perf-tuned)
+    b.scatterRocks(32, 26, 198);      // GLB rocks (cover + dressing)
     b.palace(40, -64);          // grand temple you can climb the stairs into (glowing relic inside)
-    b.lookout(-58, 30);         // a climbable lookout for high ground / sniping
     // structures from across the ages, scattered for landmarks + cover
     b.ruin(-44, 82); b.ruin(76, 44);
     b.hut(-92, 8); b.hut(52, -92); b.hut(-18, -82);
@@ -36,20 +35,20 @@ export const arcfall = {
     b.giftCrate(8, -22, "ammo"); b.giftCrate(-22, 27, "health"); b.giftCrate(48, 42, "grenade");
     b.giftCrate(-62, -16, "ammo"); b.giftCrate(96, 12, "health"); b.giftCrate(-100, -26, "grenade");
     b.giftCrate(24, 14, "plasma");   // PLASMA CANNON near the drop
-    b.giftCrate(-50, 70, "arc");     // ARC LANCE out by the lake
+    b.giftCrate(-50, 70, "laser");   // LASER RIFLE out by the lake
 
-    // hostiles — kept clear of the ~55m drop zone, spread around the island so you pick your fights
-    const raptors = [[62, -34], [-72, 22], [42, 84], [-54, -74], [98, 44]];   // 5 raptors, well spread
+    // hostiles — kept clear of the ~55m drop zone, spread around the island
+    const raptors = [[62, -34], [-72, 22], [42, 84], [-54, -74], [98, 44]];   // raptors
     for (const [x, z] of raptors) b.enemy({ kind: "monster", x, z });
-    const spiders = [[-92, -32], [82, -72], [-32, 98], [112, -12]];           // 4 spiders elsewhere
-    for (const [x, z] of spiders) b.enemy({ kind: "spider", x, z });
     b.enemy({ kind: "trex", x: -122, z: 70 });   // T-Rex mini-boss roaming the far side
-    // robots — ranged, non-dino: walking gun-bots, hovering drones, a heavy, and the giant mech
+    // the robot legion — giant mechs + heavies + walking gun-bots + hovering drones (no spiders)
+    const heavies = [[-92, -32], [82, -72], [-32, 98]];
+    for (const [x, z] of heavies) b.enemy({ kind: "heavy", x, z });
     const sentries = [[70, 10], [-40, -60], [20, -90]];
     for (const [x, z] of sentries) b.enemy({ kind: "sentry", x, z });
     const drones = [[-20, 64], [86, -20]];
     for (const [x, z] of drones) b.enemy({ kind: "drone", x, z });
-    b.enemy({ kind: "heavy", x: -96, z: 30 });   // tanky gun-bot
     b.enemy({ kind: "robot", x: 126, z: 56 });   // giant mech guarding a far arc
+    b.enemy({ kind: "robot", x: 112, z: -12 });   // a second giant mech
   },
 };

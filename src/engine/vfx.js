@@ -182,6 +182,9 @@ export class VFX {
   // kicked-up dust (vehicle wheels / tracks)
   dust(point) { this._dustPuff(point, 0x9a8a62, 0.7); }
 
+  // a bright red laser bolt from a to b + flashes at both ends
+  laserBeam(a, b) { this.tracer(a, b); this._flash(a, 0.22, 0xff7a4c); this._flash(b, 0.5, 0xff4a30); }
+
   // sci-fi plasma detonation: a blue/cyan energy fireball + shockwave + sparks
   energyBoom(point, scale = 1) {
     for (let i = 0; i < 7; i++) {

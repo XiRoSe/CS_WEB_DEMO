@@ -14,7 +14,7 @@ export class Monster {
     this.melee = this.kind === "trex" ? 24 : this.kind === "spider" ? 9 : 11;
     this.reach = this.kind === "trex" ? 5.0 : 2.6;
     this.dead = false; this.counted = false; this.removable = false;
-    this.aggro = false; this.aggroRange = spawn.aggro || 12; // idle until the player gets close
+    this.aggro = false; this.aggroRange = spawn.aggro || 24; // idle until the player gets close
     this.yaw = 0; this._atkCd = 0; this._deathT = 0; this._cur = null; this._curAction = null;
 
     this.group = new THREE.Group(); this.group.position.copy(this.pos); this.scene.add(this.group);

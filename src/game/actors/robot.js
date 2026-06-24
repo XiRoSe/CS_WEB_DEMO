@@ -22,7 +22,7 @@ export class Robot {
     this.speed = spawn.speed || cfg.speed;
     this.fly = cfg.fly;
     this.dead = false; this.counted = false; this.removable = false;
-    this.aggro = false; this.aggroRange = spawn.aggro || cfg.range + 12; // idle until the player approaches
+    this.aggro = false; this.aggroRange = spawn.aggro || cfg.range + 24; // idle until the player approaches
     this.yaw = 0; this._fireCd = 1.5 + Math.random(); this._deathT = 0; this._needBoom = false; this._cur = null; this._curAction = null; this._fallV = 0;
     this._muzzle = new THREE.Vector3(); this._tmp = new THREE.Vector3();
 

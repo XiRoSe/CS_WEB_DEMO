@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { COLORS, box } from "../engine/primitives.js";
 import { makeLauncher } from "./content/weapons.js";
+import { makeFpWeapon } from "./content/fpweapons.js";
 
 // First-person rifle: viewmodel, ammo, recoil spring, muzzle flash.
 export class Weapon {
@@ -35,14 +36,23 @@ export class Weapon {
     this.launcher.scale.setScalar(0.98);
     camera.add(this.launcher);
 
-    // sci-fi energy weapons — unlocked via island pickups, cycled with Q
-    this.owned = ["rifle", "launcher"]; // mode order for cycling
+    // weapons cycled with Q — sword (melee) always owned; plasma/laser unlocked via island pickups
+    this.owned = ["rifle", "sword", "launcher"]; // mode order for cycling
     this.plasmaRate = 0.5; this._lastPlasma = -10;
-    this.arcRate = 0.7; this._lastArc = -10;
+    this.laserRate = 0.11; this._lastLaser = -10; this.laserAmmo = 200; // rapid laser rifle
+    this.swordRate = 0.5; this._lastSword = -10;
     this.energy = new THREE.Group(); this.energy.visible = false;
     this.energy.position.set(0.26, -0.2, -0.5); this.energy.rotation.set(0, Math.PI, 0);
     camera.add(this.energy);
     this._buildEnergy();
+    this.laserGun = new THREE.Group(); this.laserGun.visible = false;
+    this.laserGun.position.set(0.26, -0.2, -0.5); this.laserGun.rotation.set(0, Math.PI, 0);
+    camera.add(this.laserGun);
+    this._buildLaserGun();
+    this.sword = new THREE.Group(); this.sword.visible = false;
+    this.sword.position.set(0.3, -0.34, -0.5); this.sword.rotation.set(0, Math.PI, 0);
+    camera.add(this.sword);
+    this._buildSword();
 
     // recoil / sway state
     this.kick = 0;        // backward kick (springs to 0)
@@ -142,17 +152,48 @@ export class Weapon {
     const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), this._emitterMat); core.position.set(0, 0.02, -0.5); g.add(core);
     for (let i = 0; i < 3; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 16), this._emitterMat); ring.position.set(0, 0.02, -0.36 - i * 0.06); g.add(ring); }
   }
-  _setEnergyColor(mode) {
-    const arc = mode === "arc";
-    this._emitterMat.color.setHex(arc ? 0xb98bff : 0x6fd0ff);
-    this._emitterMat.emissive.setHex(arc ? 0x7a3aff : 0x4fb4ff);
+  // a stylized energy sword (glowing blade + crossguard) for the melee weapon
+  _buildSword() {
+    const g = this.sword, steel = { metalness: 0.85, roughness: 0.25 };
+    const grip = box(0.045, 0.18, 0.045, 0x2a2118, { roughness: 0.8 }); grip.position.set(0, -0.02, 0.18); g.add(grip);
+    const guard = box(0.22, 0.04, 0.06, 0x9a8a4a, steel); guard.position.set(0, 0.08, 0.18); g.add(guard);
+    this._bladeMat = new THREE.MeshStandardMaterial({ color: 0xdfe9f5, emissive: 0x4fc6ff, emissiveIntensity: 1.4, metalness: 0.6, roughness: 0.2 });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 0.02), this._bladeMat); blade.position.set(0, 0.6, 0.18); g.add(blade);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 4), this._bladeMat); tip.position.set(0, 1.1, 0.18); g.add(tip);
+    g.rotation.set(0.2, Math.PI, -0.3); // resting pose, blade up-right
+  }
+  // Replace the procedural placeholders with real CC0 GLB models once loaded (called post-preload).
+  buildFpWeapons() {
+    const swap = (group, key, rot, pos) => {
+      const m = makeFpWeapon(key); if (!m) return; // keep procedural fallback if the GLB failed to load
+      while (group.children.length) group.remove(group.children[0]);
+      m.rotation.set(rot[0], rot[1], rot[2]); m.position.set(pos[0], pos[1], pos[2]);
+      group.add(m);
+    };
+    swap(this.energy, "plasma", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
+    swap(this.laserGun, "laser", [0, -Math.PI / 2, 0], [0, 0, 0.1]);
+    swap(this.sword, "sword", [-0.7, 0, 0], [0, 0.12, -0.18]); // blade angled up-forward out of the grip
+  }
+
+  // a long sleek laser rifle (red emitter coils + scope) — distinct from the plasma orb-blaster
+  _buildLaserGun() {
+    const g = this.laserGun, body = { metalness: 0.6, roughness: 0.35 };
+    g.add(box(0.1, 0.1, 0.62, 0x23262c, body));
+    const grip = box(0.07, 0.15, 0.09, 0x17191e, body); grip.position.set(0, -0.12, 0.16); g.add(grip);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.72, 10), new THREE.MeshStandardMaterial({ color: 0x4a4f57, metalness: 0.75, roughness: 0.3 }));
+    barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.03, -0.52); g.add(barrel);
+    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.18, 8), new THREE.MeshStandardMaterial({ color: 0x111316, metalness: 0.5, roughness: 0.4 }));
+    scope.rotation.x = Math.PI / 2; scope.position.set(0, 0.12, -0.06); g.add(scope);
+    const em = new THREE.MeshStandardMaterial({ color: 0xff8a6a, emissive: 0xff2a1a, emissiveIntensity: 2.6 });
+    for (let i = 0; i < 3; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 8, 14), em); ring.position.set(0, 0.03, -0.56 - i * 0.06); g.add(ring); }
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), em); tip.position.set(0, 0.03, -0.88); g.add(tip);
   }
   _showViewmodel() {
-    const energy = this.mode === "plasma" || this.mode === "arc";
     this.group.visible = this.mode === "rifle";
     this.launcher.visible = this.mode === "launcher";
-    this.energy.visible = energy;
-    if (energy) this._setEnergyColor(this.mode);
+    this.energy.visible = this.mode === "plasma";
+    this.laserGun.visible = this.mode === "laser";
+    this.sword.visible = this.mode === "sword";
   }
 
   // cycle through owned weapons (Q)
@@ -174,8 +215,10 @@ export class Weapon {
 
   canFirePlasma(t) { return this.mode === "plasma" && (t - this._lastPlasma) >= this.plasmaRate; }
   firePlasma(t) { this._lastPlasma = t; this.kick = 0.13; this.kickRot = 0.17; this.audio?.plasma?.(); }
-  canFireArc(t) { return this.mode === "arc" && (t - this._lastArc) >= this.arcRate; }
-  fireArc(t) { this._lastArc = t; this.kick = 0.06; this.kickRot = 0.08; this.audio?.zap?.(); }
+  canFireLaser(t) { return this.mode === "laser" && this.laserAmmo > 0 && (t - this._lastLaser) >= this.laserRate; }
+  fireLaser(t) { this._lastLaser = t; this.laserAmmo--; this.kick = 0.04; this.kickRot = 0.05; this.audio?.laser?.(); }
+  canFireSword(t) { return this.mode === "sword" && (t - this._lastSword) >= this.swordRate; }
+  fireSword(t) { this._lastSword = t; this._swingT = 0.32; this.audio?.swordSwing?.(); }
 
   canFireRocket(t) { return this.rockets > 0 && this._rocketLoaded; }
   fireRocket(t) {
@@ -232,6 +275,14 @@ export class Weapon {
       this._basePos.z + this.kick
     );
     this.group.rotation.set(this._baseRot.x - this.kickRot, this._baseRot.y, this._baseRot.z);
+
+    // sword swing arc (rests held up-right, swings down-across)
+    if (this.sword.visible) {
+      const a = this._swingT > 0 ? Math.sin((1 - (this._swingT -= dt) / 0.32) * Math.PI) : 0;
+      this.sword.rotation.set(0.15 - a * 1.3, Math.PI, 0.55 - a * 2.0);
+      this.sword.position.set(0.34 - a * 0.16, -0.5 + a * 0.18, -0.85 - a * 0.12);
+      if (this._swingT < 0) this._swingT = 0;
+    }
 
     // multi-phase reload animation: dip + tilt, mag drops out, then slams back in
     if (this.reloading) {

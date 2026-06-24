@@ -25,6 +25,7 @@ import { preloadVehicles } from "./kit/content/vehicles.js";
 import { preloadPickups } from "./kit/content/pickups.js";
 import { Projectile, applyBlast } from "./engine/projectiles.js";
 import { preloadWeapons } from "./kit/content/weapons.js";
+import { preloadFpWeapons } from "./kit/content/fpweapons.js";
 import { config, mergeConfig } from "./game/config.js";
 import { levels, DEFAULT_LEVEL } from "./game/levels/index.js";
 import { makeObjective } from "./game/objectives/index.js";
@@ -105,11 +106,12 @@ class Game {
     this.hud.showLoading();
     this.audio.ensure(); // create the (suspended) audio context now so clips — incl. the heli rotor — preload before Deploy
     // load models progressively (async, off the main thread) with a progress readout
-    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadHeroes()];
+    const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadHeroes(), preloadFpWeapons()];
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);
     this.weapon.buildLauncher(); // launcher model is loaded now
+    this.weapon.buildFpWeapons(); // swap in the real GLB gun/sword viewmodels
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
     const sp = this.level.playerSpawn;
@@ -305,7 +307,7 @@ class Game {
   }
 
   _weaponName(mode) {
-    return { rifle: "MK-4 CARBINE", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", arc: "ARC LANCE" }[mode] || "MK-4 CARBINE";
+    return { rifle: "MK-4 CARBINE", sword: "ARC BLADE", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", laser: "LASER RIFLE" }[mode] || "MK-4 CARBINE";
   }
 
   // Plasma Cannon: a glowing energy bolt that detonates in a big blue blast.
@@ -323,34 +325,45 @@ class Game {
     this._fovKick = Math.min(this._fovKick + 1.6, 5);
   }
 
-  // Arc Lance: a chaining lightning beam — hits the targeted enemy, then leaps to nearby ones.
-  _fireArc(t) {
-    this.weapon.fireArc(t);
+  // Laser Rifle: rapid hitscan beam — instant hit on the targeted enemy + a bright laser bolt.
+  _fireLaser(t) {
+    this.weapon.fireLaser(t);
     this.hud.bloom();
-    const b = this.cfg.balance.arc;
+    const b = this.cfg.balance.laser;
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
-    this._arcRay = this._arcRay || new THREE.Raycaster(); this._arcRay.far = 110;
-    this._arcRay.set(this.camera.position, dir);
+    this._aimRay = this._aimRay || new THREE.Raycaster(); this._aimRay.far = 200;
+    this._aimRay.set(this.camera.position, dir);
     const start = this.camera.position.clone().addScaledVector(dir, 1.0);
     const live = this.combat.enemies.filter((e) => !e.dead);
-    const hits = this._arcRay.intersectObjects(live.map((e) => e.hitbox), true);
-    let target = null;
-    if (hits.length) { let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; target = o?.userData?.enemy; }
-    if (!target) { this.vfx.lightning(start, start.clone().addScaledVector(dir, 70)); return; } // missed — zap into the distance
-    const wp = (e) => e.hitbox.getWorldPosition(new THREE.Vector3());
-    this.vfx.lightning(start, wp(target)); target.takeDamage(b.damage); this.vfx.hitPuff(wp(target));
-    const chained = new Set([target]); let prev = target;
-    for (let n = 0; n < b.chains; n++) { // leap to the nearest un-zapped enemy
-      let best = null, bd = b.chainRange * b.chainRange;
-      for (const e of this.combat.enemies) { if (e.dead || chained.has(e)) continue; const d = e.pos.distanceToSquared(prev.pos); if (d < bd) { bd = d; best = e; } }
-      if (!best) break;
-      this.vfx.lightning(wp(prev), wp(best)); best.takeDamage(b.damage); this.vfx.hitPuff(wp(best)); chained.add(best); prev = best;
+    const hits = this._aimRay.intersectObjects(live.map((e) => e.hitbox), true);
+    let target = null, end = start.clone().addScaledVector(dir, 200);
+    if (hits.length) { end = hits[0].point.clone(); let o = hits[0].object; while (o && !(o.userData && o.userData.enemy)) o = o.parent; target = o && o.userData && o.userData.enemy; }
+    this.vfx.laserBeam(start, end);
+    if (target) { target.takeDamage(b.damage); this.vfx.energyBoom ? this.vfx.hitPuff(end) : null; }
+    this._fovKick = Math.min(this._fovKick + 0.5, 3);
+  }
+
+  // Arc Blade: a melee sword swing — hits every enemy in a short frontal arc.
+  _swingSword(t) {
+    this.weapon.fireSword(t);
+    const b = this.cfg.balance.sword;
+    const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+    const me = this.camera.position; let hit = false;
+    for (const e of this.combat.enemies) {
+      if (e.dead) continue;
+      const dx = e.pos.x - me.x, dz = e.pos.z - me.z, dist = Math.hypot(dx, dz);
+      if (dist > b.reach) continue;
+      const dot = (dx / dist) * dir.x + (dz / dist) * dir.z; // within the frontal arc?
+      if (dot < 0.4) continue;
+      e.takeDamage(b.damage); this.vfx.hitPuff(e.hitbox.getWorldPosition(new THREE.Vector3())); hit = true;
     }
+    if (hit) this.hud.bloom();
   }
 
   _enterCar(car) {
     this.driving = car; car._cam = null; // snap the chase cam fresh on entry
-    this.weapon.group.visible = false; this.weapon.launcher.visible = false; this.weapon.energy.visible = false;
+    this.weapon.group.visible = false; this.weapon.launcher.visible = false;
+    this.weapon.energy.visible = false; this.weapon.laserGun.visible = false; this.weapon.sword.visible = false;
     this.laser?.hide?.();
     this._carPrompt = false;
     this.audio.startEngine?.();
@@ -423,7 +436,7 @@ class Game {
 
   _updateLaser() {
     if (!this.combat) return;
-    if (this.weapon.mode === "launcher" || this.weapon.reloading) { this.laser.hide(); return; } // no laser on the launcher / mid-reload
+    if (this.weapon.mode !== "rifle" || this.weapon.reloading) { this.laser.hide(); return; } // laser sight only on the rifle
     const tg = this._laserTargets; tg.length = 0;
     for (const m of this.level.solidMeshes) tg.push(m);
     for (const e of this.combat.enemies) if (!e.dead) tg.push(e.hitbox);
@@ -500,7 +513,8 @@ class Game {
       const mode = this.weapon.mode;
       if (mode === "launcher") { if (firing && this.weapon.canFireRocket(t)) this._fireRocket(t); }
       else if (mode === "plasma") { if (firing && this.weapon.canFirePlasma(t)) this._firePlasma(t); }
-      else if (mode === "arc") { if (firing && this.weapon.canFireArc(t)) this._fireArc(t); }
+      else if (mode === "laser") { if (firing && this.weapon.canFireLaser(t)) this._fireLaser(t); }
+      else if (mode === "sword") { if (firing && this.weapon.canFireSword(t)) this._swingSword(t); }
       else if (firing && this.weapon.canFire(t)) { this.shotsFired++; this.combat.tryShoot(t); this.hud.bloom(); this._fovKick = Math.min(this._fovKick + 0.8, 3.5); }
       // recoil FOV punch recovery
       this._fovKick *= Math.pow(0.0009, dt);
@@ -547,7 +561,7 @@ class Game {
           this.audio.playBuf?.("clipin", 0.6);
           if (gf.kind === "grenade") { this.grenades += 2; this.hud.setGrenades(this.grenades); this.hud.notify("+2 GRENADES · GIFT"); }
           else if (gf.kind === "health") { this.health = Math.min(this.cfg.player.maxHealth, this.health + 40); this.hud.notify("+40 HEALTH · GIFT"); }
-          else if (gf.kind === "plasma" || gf.kind === "arc") {
+          else if (gf.kind === "plasma" || gf.kind === "laser") {
             this.weapon.give(gf.kind); this.hud.setWeaponName(this._weaponName(gf.kind));
             this.hud.notify(`✦ ${this._weaponName(gf.kind)} ACQUIRED — Q to cycle`);
           } else { this.weapon.reserve += 60; this.hud.notify("+60 ROUNDS · GIFT"); }
@@ -586,8 +600,10 @@ class Game {
     }
 
     // HUD sync (ammo readout swaps to rockets in launcher mode)
-    if (this.weapon.mode === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
-    else if (this.weapon.mode === "plasma" || this.weapon.mode === "arc") this.hud.setAmmo("∞", "∞", false);
+    const wm = this.weapon.mode;
+    if (wm === "launcher") this.hud.setAmmo(this.weapon.rockets, 0, false);
+    else if (wm === "laser") this.hud.setAmmo(this.weapon.laserAmmo, "∞", false);
+    else if (wm === "plasma" || wm === "sword") this.hud.setAmmo("∞", "∞", false);
     else this.hud.setAmmo(this.weapon.ammo, this.weapon.reserve, this.weapon.reloading);
     this.hud.setHealth(this.health, this.cfg.player.maxHealth);
 
