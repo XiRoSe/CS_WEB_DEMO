@@ -16,6 +16,7 @@ export const arcfall = {
     b.spawnAt(0, 0);
     b.setBounds({ minX: -320, maxX: 320, minZ: -320, maxZ: 320 }); // extends into the sea so you can swim around the island
     b.lake(-46, 20, 18, 1.5); b.lake(70, -64, 22, 1.6); b.lake(30, 90, 16, 1.4); // shallow wadeable lakes (carved first)
+    b.lake(-78, 50, 20, 1.7); // the Saurian Brood's forest pond (NW)
     b.islandTerrain({ size: 460 });   // hills → beach → sea → distant mountains
     b.scatterTrees(150, 20, 198);     // GLB forest (birch + palms), seated on the terrain (perf-tuned)
     b.scatterRocks(46, 24, 200);      // GLB rocks (cover + dressing)
@@ -24,6 +25,15 @@ export const arcfall = {
     b.ruin(-44, 82); b.ruin(76, 44); b.ruin(8, -110); b.ruin(-128, 30);
     b.hut(-92, 8); b.hut(52, -92); b.hut(-18, -82); b.hut(104, 8); b.hut(-70, -88);
     b.obelisk(112, -52); b.obelisk(-112, -12); b.obelisk(20, 110); b.obelisk(64, 96); b.obelisk(-96, 70);
+
+    // ── THEMED REGIONS — different look per tribe's territory ──
+    // NW · SAURIAN FOREST — a dense ring of trees around the forest pond
+    for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2 + i, r = 26 + (i % 4) * 12; b.tree(-78 + Math.cos(a) * r, 50 + Math.sin(a) * r, 0.9 + (i % 3) * 0.22); }
+    // NE · IRON LEGION TECH-CITY — clustered towers (obelisks) + ruined hulls (ruins)
+    for (const [x, z] of [[96, 40], [112, 58], [84, 66], [120, 32], [100, 76], [128, 50]]) b.obelisk(x, z);
+    b.ruin(106, 48); b.ruin(120, 66);
+    // SE · HOLLOW WATCH FLATS — sparse lookout posts (kept open) — extra rocks for cover
+    for (const [x, z] of [[80, -48], [56, -82], [100, -56]]) b.rock(x, z, 1.6);
     b.car(9, 13, "racefuture"); b.car(-12, 7, "sportscar"); b.car(2, -15, "race"); // fast sports cars in the clear drop zone (press E)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
