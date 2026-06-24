@@ -1,20 +1,19 @@
 import * as THREE from "three";
 import { makeHero } from "./actors/operator.js";
 
-// Helldivers-style insertion: the operator rides a sci-fi drop pod down through a fiery re-entry, the
-// camera chasing it, a ground-impact shockwave, then the pod cracks open and the operator stands —
-// cut to first-person. Same interface as Intro ({ start(), update(dt), done, dispose() }).
+// Cinematic Helldivers/Star-Wars insertion: a slow-mo high-altitude descent while a yellow story CRAWL
+// scrolls into the sky, then the pod ACCELERATES and plummets, slamming down in a big BLAST + shockwave —
+// the operator emerges and it cuts to first-person. Interface: { start(), update(dt), done, dispose() }.
 export class DropPodIntro {
-  constructor(scene, camera, spawn, groundY = 0, tint = null, vfx = null, audio = null, onImpact = null, onStory = null) {
-    this.scene = scene; this.camera = camera; this.vfx = vfx; this.audio = audio; this.onImpact = onImpact; this.onStory = onStory;
-    this._story = [
-      { t: 0.3, text: "Reality is <b>fracturing</b>." },
-      { t: 1.2, text: "<b>THE VAULT</b> has stolen the 12 Arcs." },
-      { t: 2.2, text: "Recover them. <b>Seal the breach.</b>" },
-    ];
-    this._storyIdx = 0;
+  constructor(scene, camera, spawn, groundY = 0, tint = null, vfx = null, audio = null, onImpact = null, onCrawl = null, onCrawlEnd = null) {
+    this.scene = scene; this.camera = camera; this.vfx = vfx; this.audio = audio;
+    this.onImpact = onImpact; this.onCrawl = onCrawl; this.onCrawlEnd = onCrawlEnd;
     this.spawn = new THREE.Vector3(spawn.x, groundY, spawn.z);
-    this.t = 0; this.dur = 3.0; this.done = false; this.startY = 175; this.impacted = false; this.hold = 0;
+    this.phase = "crawl"; this.t = 0; this.hold = 0; this.done = false; this.impacted = false;
+    this._calledCrawl = false; this._endedCrawl = false;
+    this.crawlDur = 9.5;   // slow-mo crawl descent
+    this.fallDur = 1.7;    // hard plummet
+    this.startY = 330; this.hoverY = 250;
     this.pos = new THREE.Vector3(spawn.x, this.startY, spawn.z);
     this.group = new THREE.Group(); this.scene.add(this.group);
 
@@ -39,44 +38,58 @@ export class DropPodIntro {
   start() {}
 
   update(dt) {
-    this.t += dt;
-    while (this._storyIdx < this._story.length && this.t >= this._story[this._storyIdx].t) { // story crawl during the fall
-      this.onStory && this.onStory(this._story[this._storyIdx].text); this._storyIdx++;
-    }
-    if (!this.impacted) {
-      const k = Math.min(this.t / this.dur, 1), ease = k * k; // accelerate as it falls
-      this.pos.y = this.startY + (this.spawn.y - this.startY) * ease;
+    if (this.phase === "crawl") {
+      if (!this._calledCrawl) { this._calledCrawl = true; this.onCrawl && this.onCrawl(); this.audio && this.audio.dropWhoosh && this.audio.dropWhoosh(); }
+      this.t += dt;
+      const k = Math.min(this.t / this.crawlDur, 1);
+      this.pos.y = this.startY + (this.hoverY - this.startY) * k; // slow drift down
       this.group.position.copy(this.pos);
-      this.pod.rotation.y += dt * 1.8;
-      if (this.vfx) { // fiery re-entry trail streaming up off the pod
-        for (let i = 0; i < 2; i++) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.2, this.pos.y + 2.4 + Math.random() * 2.0, this.pos.z + (Math.random() - 0.5) * 1.2));
-      }
-      // chase cam: behind + above, easing down to watch the pod streak into the island
-      this.camera.position.set(this.pos.x - 3.5, this.pos.y + 5 + 7 * (1 - ease), this.pos.z - 12);
-      this._look.set(this.pos.x, this.pos.y - 5 * ease, this.pos.z);
+      this.pod.rotation.y += dt * 0.5;
+      // slow cinematic orbit, looking up at the pod against the crawling sky
+      const a = this.t * 0.16;
+      this.camera.position.set(this.pos.x + Math.cos(a) * 9, this.pos.y - 3.5, this.pos.z + Math.sin(a) * 9 - 5);
+      this._look.set(this.pos.x, this.pos.y + 1.6, this.pos.z);
       this.camera.lookAt(this._look);
-      if (k >= 1) {
-        this.impacted = true;
-        if (this.vfx) {
-          for (let i = 0; i < 4; i++) this.vfx.explosion(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 5, this.spawn.y + 0.6, this.spawn.z + (Math.random() - 0.5) * 5), 1.7);
-          for (let i = 0; i < 6; i++) this.vfx.dustBurst(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 8, this.spawn.y + 0.4, this.spawn.z + (Math.random() - 0.5) * 8));
-        }
-        this.audio && this.audio.explosion && this.audio.explosion();
-        this.onImpact && this.onImpact();
-        this.pod.position.y = -0.7; // pod buries its nose
-        if (this.hero) this.hero.visible = true; // operator emerges
-      }
+      if (this.vfx && Math.random() < 0.3) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.6, this.pos.y + 3, this.pos.z + (Math.random() - 0.5) * 1.6));
+      if (k >= 1) { this.phase = "fall"; this.t = 0; this._endCrawl(); }
+    } else if (this.phase === "fall") {
+      if (!this._endedCrawl) this._endCrawl();
+      this.t += dt;
+      const k = Math.min(this.t / this.fallDur, 1), ease = k * k * k; // hard accelerate into the ground
+      this.pos.y = this.hoverY + (this.spawn.y - this.hoverY) * ease;
+      this.group.position.copy(this.pos);
+      this.pod.rotation.y += dt * (3 + ease * 9);
+      if (this.vfx) for (let i = 0; i < 3; i++) this.vfx.rocketTrail(this._tmp.set(this.pos.x + (Math.random() - 0.5) * 1.4, this.pos.y + 2.4 + Math.random() * 3, this.pos.z + (Math.random() - 0.5) * 1.4));
+      this.camera.position.set(this.pos.x - 3.5, this.pos.y + 4 + 6 * (1 - ease), this.pos.z - 12);
+      this._look.set(this.pos.x, this.pos.y - 4 * ease, this.pos.z);
+      this.camera.lookAt(this._look);
+      if (k >= 1) { this._blast(); this.phase = "reveal"; this.hold = 0; }
     } else {
       this.hold += dt;
       const c = Math.min(1, this.hold / 0.9);
       this.pod.scale.setScalar(1 - c * 0.25);
-      // hero reveal shot
       this.camera.position.set(this.spawn.x + 3.4, this.spawn.y + 2.1, this.spawn.z + 4.6);
       this._look.set(this.spawn.x, this.spawn.y + 1.3, this.spawn.z);
       this.camera.lookAt(this._look);
-      if (this.hold > 1.4) this.done = true;
+      if (this.hold > 1.6) this.done = true;
     }
   }
 
-  dispose() { this.scene.remove(this.group); }
+  _endCrawl() { if (this._endedCrawl) return; this._endedCrawl = true; this.onCrawlEnd && this.onCrawlEnd(); }
+
+  // the big finish: a cluster of explosions + a ground shockwave + heavy shake; the operator emerges
+  _blast() {
+    this.impacted = true;
+    if (this.vfx) {
+      for (let i = 0; i < 9; i++) this.vfx.explosion(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 7, this.spawn.y + 0.6 + Math.random() * 1.6, this.spawn.z + (Math.random() - 0.5) * 7), 2.3);
+      for (let i = 0; i < 12; i++) this.vfx.dustBurst(this._tmp.set(this.spawn.x + (Math.random() - 0.5) * 13, this.spawn.y + 0.4, this.spawn.z + (Math.random() - 0.5) * 13));
+      if (this.vfx._shockwave) this.vfx._shockwave(this._tmp.set(this.spawn.x, this.spawn.y + 0.3, this.spawn.z));
+    }
+    if (this.audio && this.audio.explosion) { this.audio.explosion(); setTimeout(() => this.audio.explosion(), 90); }
+    this.onImpact && this.onImpact();
+    this.pod.position.y = -0.7; // pod buries its nose
+    if (this.hero) this.hero.visible = true; // operator emerges
+  }
+
+  dispose() { this._endCrawl(); this.scene.remove(this.group); }
 }

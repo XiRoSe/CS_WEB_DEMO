@@ -145,6 +145,7 @@ export class Audio {
   splash() { this._noiseBurst(0.32, 1300, 0.7, 0.32); } // water entry
   shotgun() { if (this.playBuf("shotgun", 0.6, 0.9 + Math.random() * 0.1)) return; this._noiseBurst(0.3, 500, 0.6, 0.5); this._tone(80, 0.2, "sawtooth", 0.3, 40); }
   swimStroke() { this._noiseBurst(0.22, 680, 0.6, 0.14, "bandpass"); } // swim swish
+  dropWhoosh() { this._noiseBurst(7.0, 440, 0.4, 0.34); this._tone(190, 7.0, "sawtooth", 0.13, 64); } // descent rush + rocket rumble
   creature() { this._tone(120, 0.34, "sawtooth", 0.3, 64); this._noiseBurst(0.18, 360, 0.8, 0.14); } // growl/bite
   arcGet() { // ascending recovered-arc chime
     this._tone(660, 0.12, "sine", 0.32);

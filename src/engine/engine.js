@@ -172,7 +172,41 @@ export class Engine {
     this._bolt = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xe9d6ff, transparent: true }));
     this._bolt.visible = false; this._bolt.frustumCulled = false; scene.add(this._bolt);
     this._boltT = 0; this._strikeIn = 3 + Math.random() * 4;
+    // shooting stars: a pool of bright streaks that arc across the sky
+    this._meteors = [];
+    for (let i = 0; i < 5; i++) {
+      const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const m = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xdff0ff, transparent: true, opacity: 0 }));
+      m.frustumCulled = false; m.visible = false; scene.add(m);
+      this._meteors.push({ line: m, t: 0, dur: 0, from: new THREE.Vector3(), to: new THREE.Vector3() });
+    }
+    this._meteorIn = 1 + Math.random() * 2;
     return sun;
+  }
+
+  // drive meteors each frame: occasionally launch a streak that arcs down across the sky with a fading tail
+  shootingStars(dt) {
+    if (!this._meteors) return;
+    if ((this._meteorIn -= dt) <= 0) {
+      this._meteorIn = 1.4 + Math.random() * 3;
+      const m = this._meteors.find((x) => !x.line.visible);
+      if (m) {
+        const sx = (Math.random() - 0.5) * 820, sz = (Math.random() - 0.5) * 820;
+        m.from.set(sx, 270 + Math.random() * 90, sz);
+        m.to.set(sx + (Math.random() - 0.5) * 340, 120 + Math.random() * 60, sz + (Math.random() - 0.5) * 340);
+        m.t = 0; m.dur = 0.7 + Math.random() * 0.5; m.line.visible = true;
+      }
+    }
+    const head = this._v0 || (this._v0 = new THREE.Vector3()), tail = this._v1 || (this._v1 = new THREE.Vector3());
+    for (const m of this._meteors) {
+      if (!m.line.visible) continue;
+      const f = (m.t += dt) / m.dur;
+      if (f >= 1) { m.line.visible = false; continue; }
+      head.copy(m.from).lerp(m.to, f); tail.copy(m.from).lerp(m.to, Math.max(0, f - 0.14));
+      const pos = m.line.geometry.attributes.position;
+      pos.setXYZ(0, tail.x, tail.y, tail.z); pos.setXYZ(1, head.x, head.y, head.z); pos.needsUpdate = true;
+      m.line.material.opacity = Math.sin(f * Math.PI);
+    }
   }
 
   // drive the lightning storm each frame: periodic strikes flash the scene + show a bolt + cue thunder

@@ -6,19 +6,22 @@ export class CollectObjective {
     this.game = game;
     this.total = game.cfg.objective.count || 12; // arcs are placed during level build (after this runs)
     this.collected = 0;
-    // story beats fired as Arcs are recovered
+    // story beats fired as Arcs are recovered — each names a tribe whose territory holds the next Arcs
     this.beats = {
       1: "ARC ONLINE — THE VAULT HAS NOTICED YOU",
-      4: "THE VAULT UNLEASHES ITS LEGION",
-      8: "THE BREACH DESTABILIZES — RECOVER THE REST",
+      3: "NW · THE SAURIAN BROOD WAKES IN THE RUINS",
+      5: "NE · THE IRON LEGION MOBILIZES",
+      7: "SE · THE HOLLOW WATCH LOCKS ONTO YOU",
+      9: "S · THE VAULT GARRISON RINGS THE PALACE",
       11: "ONE ARC REMAINS — THE GUARDIAN STIRS",
     };
   }
 
   brief() {
-    return `The rogue AI <b>THE VAULT</b> shattered reality into 12 Arcs and scattered them across this guardian island — ` +
-      `defended by its robot legion and ancient beasts. You're the last operator standing. ` +
-      `Recover all ${this.total} Arcs to seal the breach and save reality.`;
+    return `The rogue AI <b>THE VAULT</b> shattered reality into 12 Arcs and scattered them across this island — ` +
+      `held by four tribes: the <b>Saurian Brood</b> (NW), the <b>Iron Legion</b> (NE), the <b>Hollow Watch</b> (SE), ` +
+      `and the <b>Vault Garrison</b> guarding the palace. You're the last operator standing. ` +
+      `Recover all ${this.total} Arcs to seal the breach.`;
   }
 
   onPlayStart() {

@@ -675,6 +675,7 @@ export class LevelBuilder {
       vertexColors: true, flatShading: false, metalness: 0.35, roughness: 0.06, envMapIntensity: 1.25, transparent: true, opacity: 0.68, // clear + glossy + smooth
     })));
     water.position.y = 0; this.scene.add(water); this._sea = water; this._seaPos = wpos;
+    this._seaBase = Float32Array.from(wcol); this._seaColAttr = waterGeo.attributes.color; // base tint, for bold white XIII wave crests
     const foam = new THREE.Mesh(new THREE.RingGeometry(R - 4, R + 6, 110),
       noOutline(new THREE.MeshBasicMaterial({ color: 0xf2fbff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })));
     foam.rotation.x = -Math.PI / 2; foam.position.y = 0.3; this.scene.add(foam);
@@ -721,15 +722,22 @@ export class LevelBuilder {
 
   update(t) {
     this._updateSpots(t);
-    if (this._seaPos) { // smooth rolling swell with analytic normals (cheap, no computeVertexNormals)
-      const p = this._seaPos, n = this._sea.geometry.attributes.normal;
+    if (this._seaPos) { // smooth rolling swell + analytic normals + bold white XIII foam crests
+      const p = this._seaPos, n = this._sea.geometry.attributes.normal, col = this._seaColAttr, base = this._seaBase;
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), z = p.getZ(i);
-        p.setY(i, Math.sin(x * 0.02 + t * 1.0) * 0.8 + Math.cos(z * 0.017 + t * 0.8) * 0.8);
+        const wy = Math.sin(x * 0.02 + t * 1.0) * 0.8 + Math.cos(z * 0.017 + t * 0.8) * 0.8;
+        const ripple = Math.sin((x + z) * 0.09 + t * 2.2) * 0.18; // small chop riding the swell → sharper crests
+        p.setY(i, wy + ripple);
         const dydx = Math.cos(x * 0.02 + t * 1.0) * 0.02 * 0.8, dydz = -Math.sin(z * 0.017 + t * 0.8) * 0.017 * 0.8;
         const inv = 1 / Math.hypot(dydx, 1, dydz); n.setXYZ(i, -dydx * inv, inv, -dydz * inv);
+        // bold white foam on the wave crests (cel/XIII look)
+        const crest = Math.max(0, Math.min(1, (wy + ripple - 0.55) * 1.5)), k = i * 3;
+        col.array[k] = base[k] + (1 - base[k]) * crest;
+        col.array[k + 1] = base[k + 1] + (1 - base[k + 1]) * crest;
+        col.array[k + 2] = base[k + 2] + (1 - base[k + 2]) * crest;
       }
-      p.needsUpdate = true; n.needsUpdate = true;
+      p.needsUpdate = true; n.needsUpdate = true; col.needsUpdate = true;
     }
     for (const a of this.arcs) {
       if (a.taken) continue;

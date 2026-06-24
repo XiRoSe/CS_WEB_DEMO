@@ -223,6 +223,26 @@ export class HUD {
   setGrenades(n) { const e = this.root.querySelector("#ammo .nades"); if (e) e.textContent = `✦ GRENADES ${n}`; }
   setWeaponName(name) { const e = this.root.querySelector("#ammo .gun"); if (e) e.textContent = name; }
   showPrompt(html, dur = 4) { const el = this.root.querySelector("#prompt"); el.querySelector(".p").innerHTML = html; el.classList.add("on"); this._promptT = dur; }
+  // Star-Wars-style perspective story crawl (used during the drop-pod descent)
+  showCrawl(title, paragraphs, dur = 9500) {
+    this.hideCrawl();
+    const wrap = document.createElement("div");
+    wrap.id = "crawl";
+    wrap.style.cssText = "position:fixed;inset:0;z-index:60;overflow:hidden;pointer-events:none;perspective:380px;perspective-origin:50% 0%;";
+    const fade = document.createElement("div"); // top fade so text dissolves into the sky
+    fade.style.cssText = "position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,2,24,0.95) 0%,rgba(10,2,24,0) 42%);";
+    const inner = document.createElement("div");
+    inner.style.cssText = "position:absolute;top:100%;left:50%;width:62%;transform-origin:50% 0%;transform:translateX(-50%) rotateX(32deg);color:#ffd23a;font-weight:800;text-align:center;text-shadow:0 0 18px rgba(255,170,30,0.55);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.5;";
+    inner.innerHTML = `<div style="font-size:5.2vw;letter-spacing:0.14em;margin-bottom:0.6em;">${title}</div>`
+      + paragraphs.map((p) => `<p style="font-size:2.5vw;margin:0 0 1.1em;">${p}</p>`).join("");
+    wrap.appendChild(inner); wrap.appendChild(fade); document.body.appendChild(wrap);
+    inner.animate(
+      [{ transform: "translateX(-50%) rotateX(32deg) translateY(0%)" }, { transform: "translateX(-50%) rotateX(32deg) translateY(-205%)" }],
+      { duration: dur, easing: "linear", fill: "forwards" },
+    );
+    this._crawl = wrap;
+  }
+  hideCrawl() { if (this._crawl) { this._crawl.remove(); this._crawl = null; } }
   // generic top-left counter (e.g. "Hostiles" remaining, or "Eliminated" kill count)
   setCounter(label, value) { this.root.querySelector("#hostiles .lbl").textContent = label; this.hostiles.textContent = value; }
   setObjective(html) { const o = this.root.querySelector("#objective .obj"); if (o) o.innerHTML = html; }

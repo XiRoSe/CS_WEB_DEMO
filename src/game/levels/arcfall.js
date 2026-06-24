@@ -38,23 +38,21 @@ export const arcfall = {
     b.giftCrate(-50, 70, "laser");   // LASER RIFLE out by the lake
     b.giftCrate(64, 30, "shotgun");  // PULSE SHOTGUN
 
-    // hostiles — kept clear of the ~55m drop zone, spread around the island
-    const raptors = [[62, -34], [-72, 22], [42, 84], [-54, -74], [98, 44]];   // raptors
-    for (const [x, z] of raptors) b.enemy({ kind: "monster", x, z });
-    b.enemy({ kind: "trex", x: -122, z: 70 });   // T-Rex mini-boss roaming the far side
-    // the robot legion — giant mechs + heavies + walking gun-bots + hovering drones (no spiders)
-    const heavies = [[-92, -32], [82, -72], [-32, 98]];
-    for (const [x, z] of heavies) b.enemy({ kind: "heavy", x, z });
-    const sentries = [[70, 10], [-40, -60], [20, -90]];
-    for (const [x, z] of sentries) b.enemy({ kind: "sentry", x, z });
-    const drones = [[-20, 64], [86, -20]];
-    for (const [x, z] of drones) b.enemy({ kind: "drone", x, z });
-    b.enemy({ kind: "robot", x: 126, z: 56 });   // giant mech guarding a far arc
-    b.enemy({ kind: "robot", x: 112, z: -12 });   // a second giant mech
-    // the Vault's corrupted human garrison (soldiers), guarding key arcs
-    const soldiers = [[36, 46], [-66, -10], [88, 28], [-30, -50], [60, -78]];
-    for (const [x, z] of soldiers) b.enemy({ x, z, hp: 100, speed: 2.6, patrol: [{ x, z }, { x: x + 6, z: z + 5 }] });
-    // THE GUARDIAN — a colossal boss mech standing before the palace (Vault core)
+    // ─── THE FOUR TRIBES — each faction holds a different region of the island ───
+    // NW · THE SAURIAN BROOD — beasts the anomaly twisted; they overran the old northern ruins
+    b.enemy({ kind: "trex", x: -122, z: 70 });   // the Brood's apex predator
+    for (const [x, z] of [[-72, 56], [-96, 30], [-54, 78], [-112, 48], [-80, 90]]) b.enemy({ kind: "monster", x, z });
+    // NE · THE IRON LEGION — the Vault's heavy war-machines, guarding the richest Arcs
+    b.enemy({ kind: "robot", x: 126, z: 56 }); b.enemy({ kind: "robot", x: 112, z: 22 });
+    for (const [x, z] of [[92, 70], [120, 36], [78, 92]]) b.enemy({ kind: "heavy", x, z });
+    // SE · THE HOLLOW WATCH — automated sentinels + drones patrolling the southern flats
+    for (const [x, z] of [[70, -40], [104, -64], [44, -86]]) b.enemy({ kind: "sentry", x, z });
+    for (const [x, z] of [[86, -22], [56, -70]]) b.enemy({ kind: "drone", x, z });
+    // S / CENTRE · THE VAULT GARRISON — corrupted human soldiers ringing the palace (Vault core)
+    for (const [x, z] of [[36, -46], [-30, -50], [60, -78], [12, -64], [-14, -38]]) {
+      b.enemy({ x, z, hp: 100, speed: 2.6, patrol: [{ x, z }, { x: x + 6, z: z + 5 }] });
+    }
+    // THE GUARDIAN — a colossal boss mech standing before the palace
     b.enemy({ kind: "robot", x: 40, z: -48, hp: 1600, scale: 2.0, boss: true });
   },
 };

@@ -210,7 +210,15 @@ class Game {
     const sp = this.level.playerSpawn;
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     this.intro = style === "droppod"
-      ? new DropPodIntro(this.scene, this.camera, sp, groundY, HERO_TINT[this.hero], this.vfx, this.audio, () => { this.hud._shake = Math.max(this.hud._shake || 0, 18); }, (text) => this.hud.showPrompt(text, 1.8))
+      ? new DropPodIntro(this.scene, this.camera, sp, groundY, HERO_TINT[this.hero], this.vfx, this.audio,
+        () => { this.hud._shake = Math.max(this.hud._shake || 0, 28); }, // big blast shake on impact
+        () => { this.voice.deploy(); this.hud.showCrawl("ARCFALL", [ // radio call + Star-Wars story crawl during the fall
+          "Reality is <b>fracturing</b>.",
+          "<b>THE VAULT</b> — a rogue intelligence — has shattered the world into <b>twelve Arcs</b> and scattered them across a dying island.",
+          "Its tribes and war-machines guard the fragments.",
+          "One operator falls from the storm. Recover the Arcs — <b>seal the breach.</b>",
+        ]); },
+        () => this.hud.hideCrawl())
       : style === "parachute"
         ? new ParachuteIntro(this.scene, this.camera, sp, groundY, this.hero)
         : new Intro(this.scene, this.camera, sp);
@@ -517,8 +525,9 @@ class Game {
   update(dt, t) {
     this.hud.update(dt);
     this.vfx.update(dt); // always fade effects (even while paused) so trails clear
-    if (this.engine.cloudGroup) this.engine.cloudGroup.rotation.y += dt * 0.006; // clouds drift across the sky
+    if (this.engine.cloudGroup) this.engine.cloudGroup.rotation.y += dt * 0.016; // clouds drift across the sky
     this.engine.skyStorm && this.engine.skyStorm(dt); // purple-storm lightning
+    this.engine.shootingStars && this.engine.shootingStars(dt); // meteors streak the storm sky
     this.level.update(t); // wave the objective flag
     this.laser.hide(); // re-shown each frame during play
     if (this.state === "intro") {
