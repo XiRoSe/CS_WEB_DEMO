@@ -190,17 +190,23 @@ export class Audio {
     boom.connect(bg); bg.connect(this.master); boom.start(t + 0.1); boom.stop(t + 0.78);
     this.playBuf?.("zap", 0.5);                               // electric zap layer (CC0) if present
   }
-  rewind() { // ARC-SAND time-warp: a descending warble + airy reverse shimmer + low rumble
+  rewind() { // ARC-SAND time-warp — iconic tape-rewind: descending warble + STUTTERING granular tremolo + shimmer + rumble
     if (!this.ctx) return;
     const t = this.ctx.currentTime, dur = 1.7;
-    const o = this.ctx.createOscillator(); o.type = "triangle";
-    o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(170, t + dur);
-    const vib = this.ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 9;
-    const vg = this.ctx.createGain(); vg.gain.value = 60; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur);
-    const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.15); g.gain.setValueAtTime(0.2, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
-    this._noiseBurst(dur, 5200, 0.4, 0.1, "highpass"); // airy shimmer
-    this._tone(58, dur, "sine", 0.16, 40);             // deep rumble
+    // descending pitched warble (vibrato) — the "unwinding" tone
+    const o = this.ctx.createOscillator(); o.type = "sawtooth";
+    o.frequency.setValueAtTime(1050, t); o.frequency.exponentialRampToValueAtTime(150, t + dur);
+    const vib = this.ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 11;
+    const vg = this.ctx.createGain(); vg.gain.value = 80; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur);
+    const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2600;
+    // STUTTER: a fast square-wave tremolo on the gain → the chattery "rrrrr" of a tape spinning back, speeding up
+    const env = this.ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.26, t + 0.12); env.gain.setValueAtTime(0.24, t + dur * 0.72); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const stut = this.ctx.createOscillator(); stut.type = "square"; stut.frequency.setValueAtTime(14, t); stut.frequency.exponentialRampToValueAtTime(38, t + dur); // chatter accelerates
+    const sg = this.ctx.createGain(); sg.gain.value = 0.5; stut.connect(sg); sg.connect(env.gain); stut.start(t); stut.stop(t + dur);
+    o.connect(lp); lp.connect(env); env.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+    this._noiseBurst(dur, 5400, 0.4, 0.09, "highpass"); // airy reverse shimmer
+    this._tone(56, dur, "sine", 0.16, 40);              // deep rumble
+    setTimeout(() => { this._tone(1320, 0.18, "sine", 0.18); this._tone(1760, 0.22, "sine", 0.12); }, dur * 1000 - 60); // bright "snap back" chime on settle
   }
   wade() { // a wet footstep: bright surface splash + a sloosh + a couple of droplet bloops
     this._noiseBurst(0.18, 2600, 0.4, 0.2, "lowpass");
