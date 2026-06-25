@@ -37,8 +37,8 @@ export const arcfall = {
     for (const [x, z] of [[96, 40], [112, 58], [84, 66], [100, 76]]) b.obelisk(x, z);
     b.ruin(106, 48);
     // TIME-BROKEN LANDMARKS — eras collided: real skyscrapers (some leaning), pyramids + a frozen Big Ben, SCATTERED
-    b.clockTower(120, 26);                                             // NE · Big Ben, hands frozen (time broke)
-    b.skyscraper(132, 70, "b6", 0);                                   // NE · upright tower
+    b.clockTower(0, 6);                                                // ISLAND CENTRE · Big Ben, hands frozen — the centrepiece dead ahead of the drop
+    b.skyscraper(112, 128, "b6", 0);                                  // front (player-facing) face of the NE mountain — in view
     b.skyscraper(-120, 80, "b2", 0.13);                               // NW · toppling tower
     b.skyscraper(-128, -58, "b4", -0.12);                             // SW · toppling tower
     b.skyscraper(66, -120, "b1", 0.1);                                // S  · toppling tower

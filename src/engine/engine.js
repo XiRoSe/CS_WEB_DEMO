@@ -13,7 +13,7 @@ export class Engine {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 0.85; // kept a bit dark for mood
     container.appendChild(this.renderer.domElement);
 
     // comic/anime "XIII" look: bold black ink outlines around everything (cel-shaded edges)
@@ -233,11 +233,11 @@ export class Engine {
     if (this._boltT > 0) {
       this._boltT -= dt;
       const f = Math.max(0, this._boltT / 0.26), flick = f * (0.7 + 0.3 * Math.sin(this._boltT * 90)); // flicker
-      this.renderer.toneMappingExposure = 1.1 + flick * 2.3;        // brighter flash
-      if (this._hemi) this._hemi.intensity = 0.95 + flick * 3.4;     // strong light pop
-      if (this._sun) this._sun.intensity = 2.1 + flick * 2.0;
+      this.renderer.toneMappingExposure = 0.85 + flick * 3.2;        // big flash lights the whole stage
+      if (this._hemi) this._hemi.intensity = 0.95 + flick * 6.0;     // strong ambient light pop
+      if (this._sun) this._sun.intensity = 2.1 + flick * 4.0;
       this._bolt.material.opacity = Math.min(1, f * 1.6);
-      if (this._boltT <= 0) { this._bolt.visible = false; this.renderer.toneMappingExposure = 1.1; if (this._hemi) this._hemi.intensity = 0.95; if (this._sun) this._sun.intensity = 2.1; }
+      if (this._boltT <= 0) { this._bolt.visible = false; this.renderer.toneMappingExposure = 0.85; if (this._hemi) this._hemi.intensity = 0.95; if (this._sun) this._sun.intensity = 2.1; }
     } else if ((this._strikeIn -= dt) <= 0) {
       this._strikeIn = 5 + Math.random() * 20; this._boltT = 0.26; // next strike in 5–25s
       const bx = (Math.random() - 0.5) * 540, bz = (Math.random() - 0.5) * 540, pos = this._bolt.geometry.attributes.position;
