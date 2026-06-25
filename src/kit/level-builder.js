@@ -579,6 +579,26 @@ export class LevelBuilder {
   }
 
   // ── TIME-BROKEN LANDMARKS (the anomaly tore eras together) — real CC0 building GLBs ──
+  // median roof-surface height over a building's footprint — raycast a grid straight down, take the median
+  // (so thin spires/chimneys/dormers don't make the player float, and the eaves don't make them sink)
+  _roofTop(group, cx, cz, half) {
+    const rc = this._roofRay || (this._roofRay = new THREE.Raycaster()); rc.far = 600;
+    const down = new THREE.Vector3(0, -1, 0), ys = [];
+    group.updateMatrixWorld(true);
+    for (let ix = -2; ix <= 2; ix++) for (let iz = -2; iz <= 2; iz++) { // 5x5 grid over the footprint
+      rc.set(new THREE.Vector3(cx + ix * half * 0.36, 500, cz + iz * half * 0.36), down);
+      const h = rc.intersectObject(group, true);
+      if (h.length) ys.push(h[0].point.y);
+    }
+    if (!ys.length) return null;
+    ys.sort((a, b) => a - b);
+    // stand on the HIGHEST broad surface (never sink inside the roof) but ignore a thin spike (chimney/antenna)
+    let top = ys[ys.length - 1];
+    const p75 = ys[Math.floor((ys.length - 1) * 0.75)];
+    if (top - p75 > 2.5) top = p75;
+    return top;
+  }
+
   // a real skyscraper (Quaternius), optionally leaning to read as time-fractured. Bullets hit it, blocks
   // movement, and the player can stand on its footprint top.
   skyscraper(x, z, kind = "b1", tilt = 0) {
@@ -590,7 +610,9 @@ export class LevelBuilder {
     const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.solidMeshes.push(g);                                          // bullets hit it
-    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, sz.y * 0.99)).baseY = gy; // oversized footprint + stand at the PEAK → always ON TOP, never inside the roof
+    const half = sz.x * 0.53;
+    const roofY = this._roofTop(g, x, z, half) ?? (gy + sz.y * 0.9);   // stand on the ACTUAL roof surface (not the bbox peak)
+    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, roofY - gy)).baseY = gy;
   }
 
   // a weathered stone pyramid (ancient era) — climbable faces, bullets hit it
@@ -618,7 +640,7 @@ export class LevelBuilder {
     }
     this.scene.add(g); this.solidMeshes.push(g);
     const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
-    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, sz.y * 0.99)).baseY = gy; // oversized footprint + stand at the peak (never inside)
+    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, sz.y * 0.98)).baseY = gy; // a tower: stand on the spire pinnacle (on top of everything)
   }
 
   // A grand open temple/palace the player can climb into: a stepped stone base reached by a front
