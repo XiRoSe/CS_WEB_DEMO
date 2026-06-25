@@ -590,7 +590,7 @@ export class LevelBuilder {
     const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.solidMeshes.push(g);                                          // bullets hit it
-    (this.collide(x, z, sz.x * 1.04, sz.z * 1.04, sz.y * 0.82)).baseY = gy; // footprint fully covers the building (no gap to slip inside) → always land on the roof
+    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, sz.y * 0.99)).baseY = gy; // oversized footprint + stand at the PEAK → always ON TOP, never inside the roof
   }
 
   // a weathered stone pyramid (ancient era) — climbable faces, bullets hit it
@@ -608,17 +608,17 @@ export class LevelBuilder {
   clockTower(x, z) {
     const g = makeBuilding("bell"); if (!g || !g.children.length) return;
     const gy = this._lowGround(x, z, 4);
-    g.position.set(x, gy, z); g.rotation.y = Math.random() * 6.28; g.rotation.z = 0.04;
+    g.position.set(x, gy, z); g.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
+    g.scale.multiplyScalar(2); // Big Ben — TWICE as tall
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const faceMat = noOutline(new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe39a, emissiveIntensity: 1.3 }));
-    for (const [dx, dz, ry] of [[2.0, 0, Math.PI / 2], [-2.0, 0, Math.PI / 2], [0, 2.0, 0], [0, -2.0, 0]]) {
+    for (const [dx, dz, ry] of [[2.0, 0, Math.PI / 2], [-2.0, 0, Math.PI / 2], [0, 2.0, 0], [0, -2.0, 0]]) { // local coords (scaled x2 by the group → faces ride up the taller tower)
       const face = new THREE.Mesh(new THREE.CircleGeometry(1.3, 20), faceMat); face.position.set(dx, 22, dz); face.rotation.y = ry; g.add(face);
       const hand = box(0.14, 1.0, 0.06, 0x201810); hand.position.set(dx, 22, dz); hand.rotation.set(0, ry, 1.4); g.add(hand); // hands frozen — time broke
     }
     this.scene.add(g); this.solidMeshes.push(g);
     const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
-    const half = Math.max(3, Math.min(sz.x, sz.z) * 0.4);
-    (this.collide(x, z, half * 2, half * 2, sz.y * 0.92)).baseY = gy; // full-height collider so you land on the roof, not fall inside
+    (this.collide(x, z, sz.x * 1.06, sz.z * 1.06, sz.y * 0.99)).baseY = gy; // oversized footprint + stand at the peak (never inside)
   }
 
   // A grand open temple/palace the player can climb into: a stepped stone base reached by a front
