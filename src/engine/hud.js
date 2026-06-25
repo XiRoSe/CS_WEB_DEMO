@@ -95,6 +95,10 @@ const CSS = `
 #ammo .nades{ font-size:13px; color:var(--hz); letter-spacing:.14em; margin-top:5px; }
 /* center action prompt (e.g. gunship inbound -> use the launcher) */
 #jetfuel{ position:fixed; top:86px; left:0; right:0; text-align:center; z-index:54; pointer-events:none; font-weight:800; letter-spacing:.2em; color:#ffd23a; text-shadow:0 2px 12px rgba(0,0,0,.75); font-size:1.7vw; opacity:0; transition:opacity .15s; }
+#rewindfx{ position:fixed; inset:0; z-index:60; pointer-events:none; opacity:0; transition:opacity .18s; background:radial-gradient(circle at 50% 48%, transparent 24%, rgba(90,210,235,.18) 62%, rgba(210,160,70,.42) 100%); }
+#rewindfx::after{ content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 2px, transparent 2px 5px); mix-blend-mode:overlay; }
+#rewindfx .rw-label{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; font-weight:900; letter-spacing:.4em; font-size:3vw; color:#bff0ff; text-shadow:0 0 24px rgba(120,220,255,.9), 0 4px 14px rgba(0,0,0,.7); animation:rwpulse .7s ease-in-out infinite; }
+@keyframes rwpulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
 #jetfuel .fi{ filter:saturate(3.2) brightness(1.25) hue-rotate(14deg); } /* tint the flame emoji to match the gold text */
 #prompt{ position:absolute; left:50%; top:44%; transform:translateX(-50%); text-align:center; pointer-events:none;
   background:rgba(18,22,16,.7); border:1px solid var(--hz); padding:10px 24px; opacity:0; transition:opacity .25s; }
@@ -123,6 +127,7 @@ export class HUD {
       <div id="ammo" class="panel"><div class="gun">MK-4 CARBINE</div><div class="count"><b>30</b><s> / 150</s></div><div class="nades">✦ GRENADES 5</div></div>
       <div id="prompt"><div class="p"></div></div>
       <div id="jetfuel"></div>
+      <div id="rewindfx"><div class="rw-label">⏪ ARC-SAND</div></div>
       <div id="feed"></div>
       <div id="defuse" class="hidden"><div class="box">
         <div class="ttl">⚠ Bomb · Enter Disarm Code</div>
@@ -231,6 +236,7 @@ export class HUD {
     this.hpBar.style.width = pct + "%";
     this.hpBar.style.background = pct > 50 ? "var(--ok)" : pct > 25 ? "var(--hz)" : "var(--danger)";
   }
+  rewindFx(on) { const el = this._rwEl || (this._rwEl = this.root.querySelector("#rewindfx")); if (el) el.style.opacity = on ? "1" : "0"; }
   setJetFuel(sec, max) {
     const el = this._jetEl || (this._jetEl = this.root.querySelector("#jetfuel")); if (!el) return;
     if (sec < max - 0.05) { el.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-2px"><path fill="#ffd23a" d="M12 23a7 7 0 01-7-7c0-3 2-5 3-7 1 2 2 2 3 2-1-4 0-7 3-11 0 4 2 5 4 8 1 2 1 3 1 5a7 7 0 01-7 10z"/></svg> JETPACK ${sec.toFixed(1)}`; el.style.opacity = "1"; }

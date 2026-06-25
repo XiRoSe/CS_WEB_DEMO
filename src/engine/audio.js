@@ -190,6 +190,18 @@ export class Audio {
     boom.connect(bg); bg.connect(this.master); boom.start(t + 0.1); boom.stop(t + 0.78);
     this.playBuf?.("zap", 0.5);                               // electric zap layer (CC0) if present
   }
+  rewind() { // ARC-SAND time-warp: a descending warble + airy reverse shimmer + low rumble
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, dur = 1.7;
+    const o = this.ctx.createOscillator(); o.type = "triangle";
+    o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(170, t + dur);
+    const vib = this.ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 9;
+    const vg = this.ctx.createGain(); vg.gain.value = 60; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur);
+    const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.15); g.gain.setValueAtTime(0.2, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+    this._noiseBurst(dur, 5200, 0.4, 0.1, "highpass"); // airy shimmer
+    this._tone(58, dur, "sine", 0.16, 40);             // deep rumble
+  }
   wade() { // a wet footstep: bright surface splash + a sloosh + a couple of droplet bloops
     this._noiseBurst(0.18, 2600, 0.4, 0.2, "lowpass");
     this._noiseBurst(0.26, 760, 0.7, 0.15, "lowpass");

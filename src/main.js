@@ -668,6 +668,10 @@ class Game {
     if (this.input.touch.suspended) { this.input.drainPresses(); return; } // portrait gate on mobile
     const presses = this.input.drainPresses();
 
+    // ARC-SAND rewind: T winds the last ~5s backwards in a cool time-warp, then resumes from there
+    if (presses.includes("t")) this._startRewind();
+    if (this._rewinding) { this._updateRewind(dt); return; }
+
     // enter / exit a driveable car with E
     if (presses.includes("r") && (this.driving || (this.level.cars && this.level.cars.some((v) => (v.pos.x - this.camera.position.x) ** 2 + (v.pos.z - this.camera.position.z) ** 2 < (v.r + 1.5) ** 2)))) {
       if (this.driving) this._exitCar();
@@ -847,6 +851,70 @@ class Game {
     }
 
     this.objective.update(dt, t, presses);
+    this._recordRewind(t); // arc-sand: keep the last ~5s of state
+  }
+
+  // ARC-SAND ── record a lightweight snapshot of the world every ~60ms (ring buffer, ~5s)
+  _recordRewind(t) {
+    if (this.driving) return;
+    if (this._lastRec !== undefined && t - this._lastRec < 0.06) return;
+    this._lastRec = t;
+    const buf = this._rewindBuf || (this._rewindBuf = []);
+    buf.push({
+      t, px: this.camera.position.x, py: this.controller.feetY, pz: this.camera.position.z,
+      qx: this.camera.quaternion.x, qy: this.camera.quaternion.y, qz: this.camera.quaternion.z, qw: this.camera.quaternion.w,
+      health: this.health, armor: this.armor,
+      enemies: this.combat.enemies.map((e) => ({ e, x: e.pos.x, y: e.group.position.y, z: e.pos.z, ry: e.group.rotation.y, hp: e.hp, dead: e.dead })),
+    });
+    while (buf.length > 2 && t - buf[0].t > 5.2) buf.shift();
+  }
+
+  _startRewind() {
+    if (this._rewinding || this.driving) return;
+    const buf = this._rewindBuf;
+    if (!buf || buf.length < 8) return;                       // need some history
+    if (this._rewindCd && this._playTime < this._rewindCd) { this.hud.notify("ARC-SAND RECHARGING"); return; }
+    this._rewinding = true;
+    this._rewindClip = buf.slice();                           // newest last, oldest first (~5s ago)
+    this._rewindP = 1;                                        // 1 = now → 0 = 5s ago
+    this._rewindDur = 1.7;                                    // real seconds to play the 5s backwards (brisk slow-mo)
+    this.audio.rewind?.();
+    this.hud.rewindFx?.(true);
+    this._slerpA = this._slerpA || new THREE.Quaternion(); this._slerpB = this._slerpB || new THREE.Quaternion();
+  }
+
+  _applyRewindFrame(s) { // place player + enemies at snapshot s
+    this.controller.feetY = s.py; this.controller.vy = 0;
+    this.camera.position.set(s.px, s.py + (this.controller.eye || 1.6), s.pz);
+    this.camera.quaternion.set(s.qx, s.qy, s.qz, s.qw);
+    this.controller._euler && this.controller._euler.setFromQuaternion(this.camera.quaternion);
+    this.health = s.health; this.armor = s.armor;
+    for (const r of s.enemies) {
+      const e = r.e; if (!e || !this.combat.enemies.includes(e)) continue;
+      e.pos.x = r.x; e.pos.z = r.z; e.group.position.set(r.x, r.y, r.z); e.group.rotation.y = r.ry; e.hp = r.hp;
+      if (e.dead && !r.dead) { e.dead = false; e.removable = false; if (e.hitbox) { e.hitbox.visible = true; e.hitbox.userData.enemy = e; } } // revive ones that died in the window
+    }
+  }
+
+  _updateRewind(dt) {
+    const clip = this._rewindClip;
+    this._rewindP -= dt / this._rewindDur;
+    if (this._rewindP <= 0 || !clip || clip.length < 2) { // settle on the 5s-ago frame, resume
+      if (clip && clip.length) this._applyRewindFrame(clip[0]);
+      this._rewinding = false; this._rewindBuf = []; this._lastRec = undefined;
+      this._rewindCd = (this._playTime || 0) + 8;             // 8s cooldown
+      this.hud.rewindFx?.(false);
+      return;
+    }
+    const fi = this._rewindP * (clip.length - 1), i0 = Math.floor(fi), i1 = Math.min(clip.length - 1, i0 + 1), f = fi - i0;
+    const a = clip[i0], b = clip[i1], L = (u, v) => u + (v - u) * f;
+    this.controller.feetY = L(a.py, b.py); this.controller.vy = 0;
+    this.camera.position.set(L(a.px, b.px), L(a.py, b.py) + (this.controller.eye || 1.6), L(a.pz, b.pz));
+    this._slerpA.set(a.qx, a.qy, a.qz, a.qw); this._slerpB.set(b.qx, b.qy, b.qz, b.qw);
+    this._slerpA.slerp(this._slerpB, f); this.camera.quaternion.copy(this._slerpA);
+    for (const r of a.enemies) { const e = r.e; if (!e || !this.combat.enemies.includes(e)) continue; e.pos.x = r.x; e.pos.z = r.z; e.group.position.set(r.x, r.y, r.z); e.group.rotation.y = r.ry; }
+    this.hud._shake = Math.max(this.hud._shake || 0, 3); // subtle time-warp rumble
+    if (Math.random() < 0.5) this.vfx.dustBurst(new THREE.Vector3(this.camera.position.x + (Math.random() - 0.5) * 3, this.camera.position.y - 1 + Math.random() * 2, this.camera.position.z + (Math.random() - 0.5) * 3)); // sand swirl
   }
 }
 
