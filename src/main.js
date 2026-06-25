@@ -123,7 +123,7 @@ class Game {
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
     const sp = this.level.playerSpawn;
-    this.hero = "assault";
+    this.hero = "heavy";
     this._heroLobby = HERO_LOADOUT[this.hero] != null && this.cfg.intro && (this.cfg.intro.style === "parachute" || this.cfg.intro.style === "droppod");
     if (this._heroLobby) this._setupLobby(); // hero-select lobby on the start screen
     else this.camera.position.set(sp.x, this.controller.eye, sp.z);
@@ -191,8 +191,8 @@ class Game {
     inst.model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this._lobby.add(inst.model); this._lobbyHero = inst.model;
     const anims = inst.animations || [];
-    const idle = anims.find((c) => /idle/i.test(c.name)) || anims[0];
-    if (idle) { this._lobbyMixer = new THREE.AnimationMixer(inst.model); this._lobbyMixer.clipAction(idle).play(); }
+    const clip = anims.find((c) => /run/i.test(c.name)) || anims.find((c) => /idle/i.test(c.name)) || anims[0]; // run firmly in place
+    if (clip) { this._lobbyMixer = new THREE.AnimationMixer(inst.model); this._lobbyMixer.clipAction(clip).play(); }
     else this._lobbyMixer = null; // static operator pose
   }
   _disposeLobby() { if (this._lobby) { this.scene.remove(this._lobby); this._lobby = null; this._lobbyHero = null; this._lobbyMixer = null; } }

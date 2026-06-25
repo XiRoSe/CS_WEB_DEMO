@@ -20,10 +20,7 @@ export function preloadCreatures() { return Promise.all(Object.values(CREATURES)
 // model itself is preloaded via preloadOperator(); makeHero(tint) builds the tinted instance.
 // each hero carries a DISTINCT weapon loadout (cycle with Q); loadout[0] is equipped on deploy
 export const HERO_LIST = [
-  { id: "assault", label: "Assault", tag: "Carbine + Arc Blade", tint: 0x55603e, loadout: ["rifle", "sword"] },
-  { id: "recon", label: "Recon", tag: "Laser Rifle + Arc Blade", tint: 0x35505e, loadout: ["laser", "sword"] },
-  { id: "heavy", label: "Heavy", tag: "Missile Launcher + Plasma", tint: 0x4a382c, loadout: ["launcher", "plasma"] },
-  { id: "marksman", label: "Marksman", tag: "Plasma Cannon + Laser", tint: 0x2c2c34, loadout: ["plasma", "laser"] },
+  { id: "heavy", label: "Slade", tag: "Arc Blade — scavenge guns on the island", tint: 0x4a382c, loadout: ["sword"] },
 ];
 export const HERO_TINT = Object.fromEntries(HERO_LIST.map((h) => [h.id, h.tint]));
 export const HERO_LOADOUT = Object.fromEntries(HERO_LIST.map((h) => [h.id, h.loadout]));

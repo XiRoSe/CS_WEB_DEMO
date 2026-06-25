@@ -590,7 +590,7 @@ export class LevelBuilder {
     const bb = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); bb.getSize(sz);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.solidMeshes.push(g);                                          // bullets hit it
-    (this.collide(x, z, sz.x * 0.92, sz.z * 0.92, sz.y * 0.8)).baseY = gy; // snug footprint + flat standable top near the roof
+    (this.collide(x, z, sz.x * 1.04, sz.z * 1.04, sz.y * 0.82)).baseY = gy; // footprint fully covers the building (no gap to slip inside) → always land on the roof
   }
 
   // a weathered stone pyramid (ancient era) — climbable faces, bullets hit it
