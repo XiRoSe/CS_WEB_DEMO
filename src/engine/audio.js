@@ -48,6 +48,9 @@ export class Audio {
       pickup: "/audio/pickup.ogg",
       splash: "/audio/splash.ogg",
       car_engine: "/audio/car_engine.ogg",
+      dino_roar: "/audio/dino_roar.mp3",       // real dinosaur growl (replaces the formant synth)
+      grenade_launch: "/audio/grenade_launch.mp3", // real rocket/grenade launch (plasma cannon)
+      railgun: "/audio/railgun.mp3",           // real railgun shot
       battle_theme: "/audio/battle_theme.mp3", // big file — loaded last so the SFX are ready first
     };
     for (const [name, url] of Object.entries(clips)) {
@@ -154,7 +157,8 @@ export class Audio {
   }
   // --- ARCFALL: synth sci-fi + creature + pickup sounds ---
   plasma() { if (this.playBuf("plasma", 0.5, 0.9 + Math.random() * 0.12)) return; this._tone(560, 0.2, "sawtooth", 0.3, 150); this._noiseBurst(0.12, 1400, 1, 0.12, "bandpass"); }
-  grenadeLaunch() { // grenade-launcher THOOMP — a hollow low pop with a fast pitch drop, an airy body + a mechanical click
+  grenadeLaunch() { // real rocket/grenade launcher (synth THOOMP fallback below)
+    if (this.playBuf("grenade_launch", 0.6, 0.97 + Math.random() * 0.06)) return;
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator(); o.type = "sine"; o.frequency.setValueAtTime(340, t); o.frequency.exponentialRampToValueAtTime(68, t + 0.13);
@@ -191,7 +195,8 @@ export class Audio {
       setTimeout(() => { try { j.src.stop(); } catch { /* stopped */ } try { j.o.stop(); } catch { /* stopped */ } }, 340);
     }
   }
-  railgun() { // BADASS railgun: rising charge whine → sharp electric crack → deep booming tail
+  railgun() { // real railgun shot (synth fallback below)
+    if (this.playBuf("railgun", 0.6, 0.97 + Math.random() * 0.06)) return;
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const charge = this.ctx.createOscillator(); charge.type = "sawtooth";
@@ -255,7 +260,8 @@ export class Audio {
     if (!this._whoosh) return; const list = this._whoosh; this._whoosh = null;
     for (const w of list) { try { w.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.06); } catch { /* gone */ } setTimeout(() => { try { w.src.stop(); } catch { /* stopped */ } }, 180); }
   }
-  creature() { // DINOSAUR ROAR via FORMANT SYNTHESIS — a glottal growl shaped by vocal-tract resonances (sounds like a throat, not a tone)
+  creature() { // real dinosaur growl (formant-synth fallback below)
+    if (this.playBuf("dino_roar", 0.65, 0.92 + Math.random() * 0.14)) return;
     if (!this.ctx) return;
     const t = this.ctx.currentTime, dur = 1.15;
     // glottal source: low sawtooth with a roar pitch arc (huff → open bellow → fall)

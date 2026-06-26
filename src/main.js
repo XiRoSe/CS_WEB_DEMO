@@ -416,9 +416,9 @@ class Game {
     for (const e of this.combat.enemies) if (!e.dead) { e.hitbox.updateWorldMatrix(true, false); targets.push(e.hitbox); }
     const hits = this._ray.intersectObjects(targets, true);
     if (!hits.length) return null;
-    // GRACE: an enemy counts as hit if it's no more than this far behind the nearest wall/ground —
-    // so shots aimed at an enemy standing on the terrain register even though the ground is technically nearer.
-    const GRACE = 4.5;
+    // GRACE: an enemy counts as hit if it's no more than this far behind the nearest wall/ground — so shots
+    // aimed at an enemy (esp. big mechs at range over undulating terrain) register even though a low rise is technically nearer.
+    const GRACE = 9;
     let wallDist = Infinity; const out = [];
     for (const h of hits) {
       let o = h.object; while (o && !(o.userData && o.userData.enemy)) o = o.parent;
