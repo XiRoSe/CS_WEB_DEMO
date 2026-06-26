@@ -455,8 +455,11 @@ export class LevelBuilder {
     for (let i = 0; i < bpos.count; i++) { const a = Math.max(0, 1 - (bpos.getY(i) + beamH / 2) / beamH); bcol.push(a, a, a); }
     beamGeo.setAttribute("color", new THREE.Float32BufferAttribute(bcol, 3));
     const beam = new THREE.Mesh(beamGeo, noOutline(new THREE.MeshBasicMaterial({ color: C, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, fog: false })));
-    beam.position.y = beamH / 2 - 0.4;
-    g.add(ring, core, halo, beam);
+    beam.position.y = beamH / 2 - 2.2; // base reaches the GROUND (slightly below, so the arc's bob never lifts it off)
+    // a soft glow puddle on the ground where the beam lands
+    const foot = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    foot.scale.setScalar(5); foot.position.y = -1.5; // on the ground under the floating relic
+    g.add(ring, core, halo, beam, foot);
     this.scene.add(g);
     this.arcs.push({ x, z, r: 2.6, baseY: g.position.y, group: g, ring, core, halo, beam, taken: false });
   }
