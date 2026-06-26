@@ -447,9 +447,18 @@ export class LevelBuilder {
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: C, emissiveIntensity: 2.2, roughness: 0.2 }));
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex(), color: C, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     halo.scale.setScalar(3.6);
-    g.add(ring, core, halo);
+    // a tall light BEAM shooting to the sky — visible from afar so arcs are easy to find. Additive + an RGB
+    // gradient (bright at the base → fading to nothing at the top) gives a clean alpha falloff.
+    const beamH = 85;
+    const beamGeo = new THREE.CylinderGeometry(0.5, 0.95, beamH, 14, 1, true);
+    const bpos = beamGeo.attributes.position, bcol = [];
+    for (let i = 0; i < bpos.count; i++) { const a = Math.max(0, 1 - (bpos.getY(i) + beamH / 2) / beamH); bcol.push(a, a, a); }
+    beamGeo.setAttribute("color", new THREE.Float32BufferAttribute(bcol, 3));
+    const beam = new THREE.Mesh(beamGeo, noOutline(new THREE.MeshBasicMaterial({ color: C, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, fog: false })));
+    beam.position.y = beamH / 2 - 0.4;
+    g.add(ring, core, halo, beam);
     this.scene.add(g);
-    this.arcs.push({ x, z, r: 2.6, baseY: g.position.y, group: g, ring, core, halo, taken: false });
+    this.arcs.push({ x, z, r: 2.6, baseY: g.position.y, group: g, ring, core, halo, beam, taken: false });
   }
 
   // a loot gift crate (kind = "ammo" | "grenade" | "health"); collected on proximity by the runner.
@@ -804,11 +813,12 @@ export class LevelBuilder {
     for (const L of lakes) L.level = baseAt(L.x, L.z);                    // each lake's flat rim reference level
     const h = (x, z) => {
       let y = baseAt(x, z);
-      for (const L of lakes) { // carve a LEVEL-rimmed bowl so the flat water disc seats cleanly (no floating on slopes)
-        const d = Math.hypot(x - L.x, z - L.z); if (d >= L.r) continue;
-        const t = d / L.r, flat = Math.min(1, (1 - t) / 0.25);           // interior flattens to the rim level; outer 25% blends to natural terrain
-        const basin = L.level - L.depth * (0.5 + 0.5 * Math.cos(t * Math.PI)); // bowl, deepest at the centre
-        y = y * (1 - flat) + basin * flat;
+      for (const L of lakes) { // a fully LEVEL-rimmed bowl (rim = L.level) so the flat disc never floats on a slope; ease to natural terrain just OUTSIDE the rim
+        const d = Math.hypot(x - L.x, z - L.z), trans = L.r * 0.4;
+        if (d >= L.r + trans) continue;
+        const basin = L.level - L.depth * (0.5 + 0.5 * Math.cos(Math.min(1, d / L.r) * Math.PI)); // bowl; at d>=L.r this is exactly L.level (flat rim)
+        if (d <= L.r) y = basin;                                          // inside: the leveled bowl, overriding the slope
+        else { const k = (d - L.r) / trans; y = basin * (1 - k) + y * k; } // outside: ease the rim back into natural terrain
       }
       return y;
     };
@@ -928,6 +938,12 @@ export class LevelBuilder {
       a.group.position.y = a.baseY + Math.sin(t * 1.6 + a.x) * 0.18;
       a.ring.rotation.y = t * 1.2; a.ring.rotation.z = t * 0.6; a.core.rotation.y = -t * 2;
       a.halo.material.opacity = 0.6 + Math.sin(t * 3) * 0.25;
+      if (a.beam) { // subtle living beam: gentle brightness pulse, slow spin, width breathe + a faint hue drift
+        a.beam.material.opacity = 0.22 + Math.sin(t * 1.4 + a.x) * 0.1;
+        a.beam.rotation.y = t * 0.25;
+        const s = 1 + Math.sin(t * 0.8 + a.z) * 0.09; a.beam.scale.set(s, 1, s);
+        a.beam.material.color.setHSL(0.53 + Math.sin(t * 0.5 + a.x) * 0.035, 0.95, 0.62);
+      }
     }
     for (const gf of this.gifts) {
       if (gf.taken) continue;
