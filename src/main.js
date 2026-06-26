@@ -228,7 +228,7 @@ class Game {
     const groundY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     this.intro = style === "droppod"
       ? new DropPodIntro(this.scene, this.camera, sp, groundY, this.hero, this.vfx, this.audio,
-        () => { this.hud._shake = Math.max(this.hud._shake || 0, 28); }, // big blast shake on impact
+        () => { this.hud._shake = Math.max(this.hud._shake || 0, 28); this.audio.stopDropWhoosh?.(); }, // impact: shake + cut the falling whoosh
         () => { this.voice.deploy(); this.audio.stopLobbyMusic?.(); this.audio.startBattleMusic?.(); this.hud.showCrawl("ARCFALL", [ // rock kicks in + the Star-Wars story crawl during the fall
           "An unexpected <b>anomaly</b> has shattered <b>TIME</b> itself.",
           "The twelve <b>ARCS</b> that anchor the timeline now lie scattered across a broken island — torn loose from their own eras.",
@@ -276,6 +276,7 @@ class Game {
     this.objective.onPlayStart();
     this.hud.setGrenades(this.grenades);
     this.touch.show();
+    this.audio.stopDropWhoosh?.(); // safety: ensure the plummet whoosh isn't still ringing
     this.audio.stopLobbyMusic?.(); this.audio.startBattleMusic?.(); // swap the chill select-screen groove for driving battle rock
     if (!this._deployed) { this._deployed = true; this.voice.deploy(); this._timeLeft = 300; } // 5:00 mission clock
     this.state = "play";
@@ -786,7 +787,7 @@ class Game {
     this._updateProjectiles(dt);
     // enemy reinforcements: drop a fresh enemy in a different section every 3s
     this._reinfT = (this._reinfT || 0) + dt;
-    if (this._reinfT >= 5 && this.combat.enemies.filter((e) => !e.dead).length < 60) { this._reinfT = 0; this._dropReinforcement(); }
+    if (this._reinfT >= 15 && this.combat.enemies.filter((e) => !e.dead).length < 60) { this._reinfT = 0; this._dropReinforcement(); }
     this._updateReinforcements(dt);
     this.level.updateDynamics(dt); // explosion-flung props (barrels, etc.)
 

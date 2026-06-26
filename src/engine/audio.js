@@ -225,16 +225,21 @@ export class Audio {
     this._noiseBurst(0.34, 1000, 0.6, 0.15, "lowpass");
     this._noiseBurst(0.2, 440, 0.7, 0.1, "lowpass");
   }
-  dropWhoosh() { // a HUGE capsule-plummet: real whoosh sample + a rising wind sweep (faster as it falls) + deep rumble
-    this.playBuf("whoosh", 0.7, 0.78);
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime, dur = 2.8;
+  dropWhoosh() { // a HUGE capsule-plummet: real whoosh sample + a rising wind sweep + deep rumble (stoppable on impact)
+    this.stopDropWhoosh(); if (!this.ctx) return;
+    const t = this.ctx.currentTime, dur = 2.8, parts = this._whoosh = [];
+    const add = (src, g) => parts.push({ src, g });
+    if (this.buffers.whoosh) { const s = this.ctx.createBufferSource(); s.buffer = this.buffers.whoosh; s.playbackRate.value = 0.78; const g = this.ctx.createGain(); g.gain.value = 0.7; s.connect(g); g.connect(this.master); s.start(t); add(s, g); }
     const ns = this.ctx.createBufferSource(); ns.buffer = this._noise; ns.loop = true;
     const bp = this.ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 0.8;
     bp.frequency.setValueAtTime(240, t); bp.frequency.exponentialRampToValueAtTime(3600, t + dur);
-    const g = this.ctx.createGain(); g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.42, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    ns.connect(bp); bp.connect(g); g.connect(this.master); ns.start(t); ns.stop(t + dur + 0.05);
-    this._tone(140, dur, "sawtooth", 0.2, 48); // deep falling rumble
+    const ng = this.ctx.createGain(); ng.gain.setValueAtTime(0.05, t); ng.gain.exponentialRampToValueAtTime(0.42, t + dur * 0.8); ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(bp); bp.connect(ng); ng.connect(this.master); ns.start(t); ns.stop(t + dur + 0.05); add(ns, ng);
+    const o = this.ctx.createOscillator(); o.type = "sawtooth"; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(48, t + dur); const og = this.ctx.createGain(); og.gain.setValueAtTime(0.2, t); og.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(og); og.connect(this.master); o.start(t); o.stop(t + dur + 0.05); add(o, og);
+  }
+  stopDropWhoosh() { // cut the plummet whoosh the instant the capsule lands
+    if (!this._whoosh) return; const list = this._whoosh; this._whoosh = null;
+    for (const w of list) { try { w.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.06); } catch { /* gone */ } setTimeout(() => { try { w.src.stop(); } catch { /* stopped */ } }, 180); }
   }
   creature() { // DINOSAUR ROAR via FORMANT SYNTHESIS — a glottal growl shaped by vocal-tract resonances (sounds like a throat, not a tone)
     if (!this.ctx) return;
