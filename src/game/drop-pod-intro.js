@@ -17,17 +17,18 @@ export class DropPodIntro {
     this.pos = new THREE.Vector3(spawn.x, this.startY, spawn.z);
     this.group = new THREE.Group(); this.scene.add(this.group);
 
-    // the pod — a riveted steel capsule with a glowing heat ring + thruster base
+    // the pod — a steel capsule whose body/dome/nose all share radius 1.1 + 8 segments so the facets seam cleanly
     this.pod = new THREE.Group();
-    const steel = new THREE.MeshStandardMaterial({ color: 0x6a7078, metalness: 0.7, roughness: 0.45 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x32363c, metalness: 0.6, roughness: 0.5 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0x6a7078, metalness: 0.7, roughness: 0.45, flatShading: true });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x32363c, metalness: 0.6, roughness: 0.5, flatShading: true });
     const glow = new THREE.MeshStandardMaterial({ color: 0xffb45a, emissive: 0xff5a1a, emissiveIntensity: 2.2 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.0, 2.0, 8), steel); body.position.y = 1.5; this.pod.add(body);
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.3, 8), dark); nose.position.y = 0.0; nose.rotation.x = Math.PI; this.pod.add(nose);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.8, 8), steel); cap.position.y = 2.9; this.pod.add(cap);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.18, 0.09, 8, 16), glow); ring.rotation.x = Math.PI / 2; ring.position.y = 0.6; this.pod.add(ring);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 0.4, 8), glow); base.position.y = -0.5; this.pod.add(base); // thruster
-    this.pod.scale.setScalar(1.25); // big enough that the operator plausibly rides + climbs out of it
+    const R = 1.1;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 2.0, 8), steel); body.position.y = 1.6; this.pod.add(body);        // straight body 0.6→2.6
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(R, 0.9, 8), steel); cap.position.y = 3.05; this.pod.add(cap);                 // top dome, base seams to body top (2.6)
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(R, 1.4, 8), dark); nose.position.y = -0.1; nose.rotation.x = Math.PI; this.pod.add(nose); // bottom point, base seams to body bottom (0.6)
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.06, 0.1, 8, 16), glow); ring.rotation.x = Math.PI / 2; ring.position.y = 0.85; this.pod.add(ring);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.8, 0.4, 8), glow); base.position.y = -0.7; this.pod.add(base);   // thruster
+    this.podScale = 1.25; this.pod.scale.setScalar(this.podScale); // big enough that the operator plausibly rides it
     this.pod.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.group.add(this.pod);
 
@@ -74,7 +75,7 @@ export class DropPodIntro {
     } else {
       this.hold += dt;
       const c = Math.min(1, this.hold / 0.9);
-      this.pod.scale.setScalar(1 - c * 0.25);
+      this.pod.scale.setScalar(this.podScale * (1 - c * 0.08)); // settle slightly, keeping the bigger 1.25x base (no shrink-jump)
       this.camera.position.set(this.spawn.x + 3.4, this.spawn.y + 2.1, this.spawn.z + 4.6);
       this._look.set(this.spawn.x, this.spawn.y + 1.3, this.spawn.z);
       this.camera.lookAt(this._look);
@@ -100,7 +101,7 @@ export class DropPodIntro {
     if (this.audio && this.audio.splash) this.audio.splash();
     this.onImpact && this.onImpact();
     this.pod.position.y = -0.7; // pod buries its nose
-    if (this.hero) this.hero.visible = true; // operator emerges
+    // hero stays hidden — you ARE the operator (first-person); showing the 3rd-person model just popped a head out the top
   }
 
   dispose() { this._endCrawl(); this.scene.remove(this.group); }

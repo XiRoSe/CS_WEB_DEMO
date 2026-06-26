@@ -631,7 +631,7 @@ export class LevelBuilder {
     const g = makeBuilding("bell"); if (!g || !g.children.length) return;
     const gy = this._lowGround(x, z, 4);
     g.position.set(x, gy, z); g.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
-    g.scale.multiplyScalar(2); // Big Ben — TWICE as tall
+    g.scale.multiplyScalar(4); // Big Ben — towering centrepiece (2x the previous height)
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const faceMat = noOutline(new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffe39a, emissiveIntensity: 1.3 }));
     for (const [dx, dz, ry] of [[2.0, 0, Math.PI / 2], [-2.0, 0, Math.PI / 2], [0, 2.0, 0], [0, -2.0, 0]]) { // local coords (scaled x2 by the group → faces ride up the taller tower)
