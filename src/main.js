@@ -65,8 +65,10 @@ class Game {
     this.level = new LevelBuilder(this.scene, this.cfg.balance); // built in _boot, once assets are loaded
     this.controller = new Controller(this.camera, this.engine.renderer.domElement, this.level);
     this.controller.onStep = () => {
-      const sea = this.level.seaLevel, th = this.level.terrainHeight;
-      if (sea !== undefined && th && th(this.camera.position.x, this.camera.position.z) < sea + 0.4) this.audio.wade?.(); // splashy steps in shallow water
+      const sea = this.level.seaLevel, th = this.level.terrainHeight, cx = this.camera.position.x, cz = this.camera.position.z;
+      const inSea = sea !== undefined && th && th(cx, cz) < sea + 0.4;
+      const inPond = (this.level._lakes || []).some((L) => Math.hypot(cx - L.x, cz - L.z) < L.r && th(cx, cz) < L.level - 0.05); // wading a lake/pond
+      if (inSea || inPond) this.audio.wade?.(); // splashy steps in shallow water
       else this.audio.step();
     };
     this.weapon = new Weapon(this.camera, this.audio);

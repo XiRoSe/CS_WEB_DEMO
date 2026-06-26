@@ -10,7 +10,7 @@ export class Monster {
     this.kind = spawn.kind === "spider" ? "spider" : spawn.kind === "trex" ? "trex" : "raptor";
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.hp = spawn.hp || (this.kind === "trex" ? 420 : this.kind === "spider" ? 90 : 70);
-    this.speed = spawn.speed || (this.kind === "trex" ? 2.6 : this.kind === "spider" ? 3.6 : 4.6);
+    this.speed = spawn.speed || (this.kind === "trex" ? 4.4 : this.kind === "spider" ? 5.6 : 7.2); // much faster — dinos really chase you down
     this.melee = this.kind === "trex" ? 24 : this.kind === "spider" ? 9 : 11;
     this.reach = this.kind === "trex" ? 5.0 : 2.6;
     this.dead = false; this.counted = false; this.removable = false;

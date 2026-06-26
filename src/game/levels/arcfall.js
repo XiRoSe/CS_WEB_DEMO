@@ -43,8 +43,8 @@ export const arcfall = {
     b.pyramid(-150, 14, 27); b.pyramid(40, -120, 23); b.pyramid(52, 122, 26); // pyramids spread W / S / N (the N one fills the open ground where the leaning tower stood)
 
     // the 12 lost arcs, scattered wide (each beams to the sky so it's findable from a hilltop)
-    const arcs = [[0, -44], [44, -22], [-38, -26], [74, 22], [-68, 16], [32, 58],
-                  [-44, 64], [90, -58], [-86, -52], [118, 42], [-118, -32], [16, 96]];
+    const arcs = [[0, -44], [44, -22], [-30, -18], [74, 22], [-68, 16], [32, 58],
+                  [-44, 64], [90, -58], [-86, -52], [112, 48], [-118, -32], [16, 96]];
     for (const [x, z] of arcs) b.arc(x, z);
 
     // No pre-placed enemies — the island starts empty; reinforcements DROP from the sky every 10s into a

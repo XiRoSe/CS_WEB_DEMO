@@ -31,7 +31,9 @@ export class Robot {
     const inst = CREATURES[cfg.asset].make();
     if (inst) {
       this.model = inst.model;
-      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+      const strayLights = [];
+      this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } else if (o.isLight) strayLights.push(o); });
+      for (const L of strayLights) L.parent && L.parent.remove(L); // the drone GLB ships embedded directional lights — they'd globally brighten the whole level per spawn
       this.group.add(this.model);
       this.mixer = new THREE.AnimationMixer(this.model);
       this._actions = {}; for (const c of inst.animations) this._actions[c.name] = this.mixer.clipAction(c);
