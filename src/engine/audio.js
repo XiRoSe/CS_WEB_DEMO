@@ -191,23 +191,29 @@ export class Audio {
     boom.connect(bg); bg.connect(this.master); boom.start(t + 0.1); boom.stop(t + 0.78);
     this.playBuf?.("zap", 0.5);                               // electric zap layer (CC0) if present
   }
-  rewind() { // ARC-SAND time-warp — iconic tape-rewind: descending warble + STUTTERING granular tremolo + shimmer + rumble
+  rewind() { // ARC-SAND time-warp — reverse-SWELL whoosh + descending warble + accelerating tape stutter + snap-back
     if (!this.ctx) return;
-    const t = this.ctx.currentTime, dur = 1.7;
-    // descending pitched warble (vibrato) — the "unwinding" tone
+    const t = this.ctx.currentTime, dur = 1.8;
+    if (!this._noiseBuf) { const n = this.ctx.sampleRate * 2, b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; this._noiseBuf = b; }
+    // REVERSE-SWELL: band-passed noise that rises in pitch + volume — the unmistakable "rewind whoosh"
+    const ns = this.ctx.createBufferSource(); ns.buffer = this._noiseBuf; ns.loop = true;
+    const nf = this.ctx.createBiquadFilter(); nf.type = "bandpass"; nf.Q.value = 1.1;
+    nf.frequency.setValueAtTime(350, t); nf.frequency.exponentialRampToValueAtTime(6800, t + dur);
+    const ng = this.ctx.createGain(); ng.gain.setValueAtTime(0.02, t); ng.gain.exponentialRampToValueAtTime(0.34, t + dur * 0.86); ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    ns.connect(nf); nf.connect(ng); ng.connect(this.master); ns.start(t); ns.stop(t + dur + 0.05);
+    // descending pitched warble
     const o = this.ctx.createOscillator(); o.type = "sawtooth";
-    o.frequency.setValueAtTime(1050, t); o.frequency.exponentialRampToValueAtTime(150, t + dur);
+    o.frequency.setValueAtTime(1100, t); o.frequency.exponentialRampToValueAtTime(150, t + dur);
     const vib = this.ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 11;
-    const vg = this.ctx.createGain(); vg.gain.value = 80; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur);
-    const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2600;
-    // STUTTER: a fast square-wave tremolo on the gain → the chattery "rrrrr" of a tape spinning back, speeding up
-    const env = this.ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.26, t + 0.12); env.gain.setValueAtTime(0.24, t + dur * 0.72); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    const stut = this.ctx.createOscillator(); stut.type = "square"; stut.frequency.setValueAtTime(14, t); stut.frequency.exponentialRampToValueAtTime(38, t + dur); // chatter accelerates
+    const vg = this.ctx.createGain(); vg.gain.value = 85; vib.connect(vg); vg.connect(o.frequency); vib.start(t); vib.stop(t + dur);
+    const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2800;
+    // accelerating square-wave stutter (tape chatter spinning faster)
+    const env = this.ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.24, t + 0.12); env.gain.setValueAtTime(0.22, t + dur * 0.72); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const stut = this.ctx.createOscillator(); stut.type = "square"; stut.frequency.setValueAtTime(13, t); stut.frequency.exponentialRampToValueAtTime(44, t + dur);
     const sg = this.ctx.createGain(); sg.gain.value = 0.5; stut.connect(sg); sg.connect(env.gain); stut.start(t); stut.stop(t + dur);
     o.connect(lp); lp.connect(env); env.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
-    this._noiseBurst(dur, 5400, 0.4, 0.09, "highpass"); // airy reverse shimmer
-    this._tone(56, dur, "sine", 0.16, 40);              // deep rumble
-    setTimeout(() => { this._tone(1320, 0.18, "sine", 0.18); this._tone(1760, 0.22, "sine", 0.12); }, dur * 1000 - 60); // bright "snap back" chime on settle
+    this._tone(54, dur, "sine", 0.16, 38); // deep rumble
+    setTimeout(() => { this._tone(1320, 0.2, "sine", 0.2); this._tone(1760, 0.24, "sine", 0.12); }, dur * 1000 - 60); // bright snap-back chime
   }
   wade() { // a wet footstep: bright surface splash + a sloosh + a couple of droplet bloops
     this._noiseBurst(0.18, 2600, 0.4, 0.2, "lowpass");
@@ -220,22 +226,30 @@ export class Audio {
     this._noiseBurst(0.2, 440, 0.7, 0.1, "lowpass");
   }
   dropWhoosh() { if (this.playBuf("whoosh", 0.55, 0.8)) return; this._noiseBurst(7.0, 440, 0.4, 0.34); this._tone(190, 7.0, "sawtooth", 0.13, 64); } // descent rush
-  creature() { // a full DINOSAUR ROAR — deep bellow with throaty vibrato, guttural sub-growl + raspy snarl
+  creature() { // DINOSAUR ROAR via FORMANT SYNTHESIS — a glottal growl shaped by vocal-tract resonances (sounds like a throat, not a tone)
     if (!this.ctx) return;
-    const t = this.ctx.currentTime, dur = 0.9;
-    // main bellow: rises then falls, with a low-frequency vibrato that gives the throaty "roar" texture
-    const o = this.ctx.createOscillator(); o.type = "sawtooth";
-    o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(220, t + 0.14); o.frequency.exponentialRampToValueAtTime(80, t + dur);
-    const vib = this.ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 17;
-    const vibG = this.ctx.createGain(); vibG.gain.value = 14; vib.connect(vibG); vibG.connect(o.frequency); vib.start(t); vib.stop(t + dur);
-    const lp = this.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1300;
-    const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.1); g.gain.setValueAtTime(0.48, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
-    // guttural sub-growl
-    const sub = this.ctx.createOscillator(); sub.type = "square"; sub.frequency.setValueAtTime(68, t); sub.frequency.exponentialRampToValueAtTime(38, t + dur);
-    const sg = this.ctx.createGain(); sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(0.24, t + 0.12); sg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const t = this.ctx.currentTime, dur = 1.15;
+    // glottal source: low sawtooth with a roar pitch arc (huff → open bellow → fall)
+    const src = this.ctx.createOscillator(); src.type = "sawtooth";
+    src.frequency.setValueAtTime(72, t); src.frequency.linearRampToValueAtTime(152, t + 0.2);
+    src.frequency.setValueAtTime(138, t + dur * 0.5); src.frequency.exponentialRampToValueAtTime(50, t + dur);
+    // master breath envelope, modulated by a ~24Hz growl rattle (rough vocal folds)
+    const amp = this.ctx.createGain();
+    amp.gain.setValueAtTime(0.0001, t); amp.gain.exponentialRampToValueAtTime(0.7, t + 0.13);
+    amp.gain.setValueAtTime(0.62, t + dur * 0.55); amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const growl = this.ctx.createOscillator(); growl.type = "sawtooth"; growl.frequency.setValueAtTime(21, t); growl.frequency.linearRampToValueAtTime(33, t + dur);
+    const gAmt = this.ctx.createGain(); gAmt.gain.value = 0.32; growl.connect(gAmt); gAmt.connect(amp.gain); growl.start(t); growl.stop(t + dur);
+    // three formant band-passes → an animal-throat timbre
+    for (const [f, q, gn] of [[400, 9, 1.0], [1080, 11, 0.55], [2500, 12, 0.22]]) {
+      const bp = this.ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q;
+      const fg = this.ctx.createGain(); fg.gain.value = gn; src.connect(bp); bp.connect(fg); fg.connect(amp);
+    }
+    amp.connect(this.master); src.start(t); src.stop(t + dur + 0.05);
+    // chest sub-bass body
+    const sub = this.ctx.createOscillator(); sub.type = "sine"; sub.frequency.setValueAtTime(56, t); sub.frequency.exponentialRampToValueAtTime(31, t + dur);
+    const sg = this.ctx.createGain(); sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(0.32, t + 0.15); sg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     sub.connect(sg); sg.connect(this.master); sub.start(t); sub.stop(t + dur + 0.05);
-    this._noiseBurst(0.6, 620, 1.4, 0.16, "bandpass"); // throaty rasp
+    this._noiseBurst(0.55, 720, 1.8, 0.13, "bandpass"); // throaty rasp
   }
   arcGet() { if (this.playBuf("pickup", 0.6)) return; this._tone(660, 0.12, "sine", 0.32); setTimeout(() => this._tone(990, 0.16, "sine", 0.32), 90); setTimeout(() => this._tone(1320, 0.26, "sine", 0.3), 185); }
   arcFanfare() { // BIG triumphant victory fanfare — rising run, a major-chord bloom, sparkle + deep boom

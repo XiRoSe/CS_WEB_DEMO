@@ -137,7 +137,7 @@ export class Controller {
       if (this.onGround) {
         this.bob += dt * (speed * 1.4);
         this._stepT += dt;
-        const interval = input.isDown("shift") ? 0.32 : 0.45;
+        const interval = input.isDown("shift") ? 0.23 : 0.34; // brisk footstep cadence — faster again when sprinting
         if (this._stepT > interval) { this._stepT = 0; this.onStep?.(); }
       }
     } else {

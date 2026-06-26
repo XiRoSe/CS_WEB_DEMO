@@ -176,7 +176,7 @@ export class HUD {
       <h1 class="mil-title">${title}</h1>
       ${heroRow}
       <button class="cta" id="deploy">▶ Click to Deploy</button>
-      <div class="controls"><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>C</kbd> duck &nbsp; <kbd>E</kbd> drive &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
+      <div class="controls"><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint &nbsp; <kbd>SPACE</kbd> jump &nbsp; <kbd>E</kbd> jetpack &nbsp; <kbd>Q</kbd> weapon &nbsp; <kbd>T</kbd> rewind &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK</kbd> fire &nbsp; <kbd>R</kbd> reload<br>
       ${brief}</div>`);
     o.querySelector("#deploy").addEventListener("click", () => onDeploy());
     if (heroes) o.querySelectorAll(".herocard").forEach((b) => b.addEventListener("click", () => {
