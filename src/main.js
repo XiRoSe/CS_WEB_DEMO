@@ -71,6 +71,13 @@ class Game {
       if (inSea || inPond) this.audio.wade?.(); // splashy steps in shallow water
       else this.audio.step();
     };
+    // landing from a jump/jetpack — a footstep (or splash) the moment the feet hit the ground
+    this.controller.onLand = () => {
+      const sea = this.level.seaLevel, th = this.level.terrainHeight, cx = this.camera.position.x, cz = this.camera.position.z;
+      const inSea = sea !== undefined && th && th(cx, cz) < sea + 0.4;
+      const inPond = (this.level._lakes || []).some((L) => Math.hypot(cx - L.x, cz - L.z) < L.r && th(cx, cz) < L.level - 0.05);
+      if (inSea || inPond) this.audio.wade?.(); else this.audio.step();
+    };
     this.weapon = new Weapon(this.camera, this.audio);
     this.vfx = new VFX(this.scene);
     this.vfx.setCamera(this.camera);

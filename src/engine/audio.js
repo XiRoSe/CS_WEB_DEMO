@@ -48,6 +48,7 @@ export class Audio {
       pickup: "/audio/pickup.ogg",
       splash: "/audio/splash.ogg",
       car_engine: "/audio/car_engine.ogg",
+      wade: "/audio/wade.mp3",                  // real "walking on a wet surface" — sliced per step for water walking/swimming
       dino_roar: "/audio/dino_roar.mp3",       // real dinosaur growl (replaces the formant synth)
       grenade_launch: "/audio/grenade_launch.mp3", // real rocket/grenade launch (plasma cannon)
       railgun: "/audio/railgun.mp3",           // real railgun shot
@@ -76,6 +77,18 @@ export class Audio {
     g.gain.value = vol;
     s.connect(g); g.connect(this.master);
     s.start();
+    return true;
+  }
+  // play a short random window of a longer clip (e.g. one wet footstep out of a long walking recording), with a tail fade so it doesn't click
+  playSlice(name, vol = 0.5, dur = 0.32, rate = 1) {
+    if (!this.ctx || !this.buffers[name]) return false;
+    const b = this.buffers[name], t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.setValueAtTime(vol, t + dur - 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(g); g.connect(this.master);
+    const off = Math.random() * Math.max(0, b.duration - dur - 0.05);
+    s.start(t, off, dur + 0.02);
     return true;
   }
   resume() { this.ensure(); if (this.ctx.state === "suspended") this.ctx.resume(); }
@@ -234,13 +247,15 @@ export class Audio {
     this._tone(54, dur, "sine", 0.16, 38); // deep rumble
     setTimeout(() => { this._tone(1320, 0.2, "sine", 0.2); this._tone(1760, 0.24, "sine", 0.12); }, dur * 1000 - 60); // bright snap-back chime
   }
-  wade() { // a wet footstep: bright surface splash + a sloosh + a couple of droplet bloops
+  wade() { // a wet footstep — a short slice of the real "wet surface" walking clip (synth fallback below)
+    if (this.playSlice("wade", 0.6, 0.34, 0.95 + Math.random() * 0.12)) return;
     this._noiseBurst(0.18, 2600, 0.4, 0.2, "lowpass");
     this._noiseBurst(0.26, 760, 0.7, 0.15, "lowpass");
     this._tone(540, 0.1, "sine", 0.07, 230);
     setTimeout(() => this._tone(660, 0.08, "sine", 0.05, 300), 55);
   }
-  swimStroke() { // gentle water swish of a stroke
+  swimStroke() { // gentle water swish of a stroke — a longer, slower slice of the wet-walking clip
+    if (this.playSlice("wade", 0.4, 0.55, 0.78 + Math.random() * 0.1)) return;
     this._noiseBurst(0.34, 1000, 0.6, 0.15, "lowpass");
     this._noiseBurst(0.2, 440, 0.7, 0.1, "lowpass");
   }

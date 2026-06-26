@@ -14,6 +14,7 @@ export class Controller {
     this.bob = 0;
     this.moving = false;
     this.onStep = null;
+    this.onLand = null;
     this._stepT = 0;
     this.sensitivity = 0.0022;
     this.locked = false;
@@ -160,13 +161,17 @@ export class Controller {
     const sea = this.level.seaLevel;
     if (sea !== undefined && groundY < sea - 1.0) {
       // over deep water → swim: ease smoothly to the surface (head above water), no jitter
-      this.swimming = true; this.onGround = false; this.vy = 0;
+      this.swimming = true; this.onGround = false; this.vy = 0; this._airT = 0;
       this.feetY += ((sea - 0.9) - this.feetY) * Math.min(1, dt * 6);
     } else {
       this.swimming = false;
-      if (this.feetY <= groundY) { this.feetY = groundY; this.vy = 0; this.onGround = true; }
-      else this.onGround = false;
+      if (this.feetY <= groundY) {
+        this.feetY = groundY; this.vy = 0; this.onGround = true;
+        if (this._airT > 0.22) { this._stepT = 0; this.onLand?.(); } // landed after a real jump/jetpack (not a 1-frame terrain bump)
+        this._airT = 0;
+      } else this.onGround = false;
     }
+    if (!this.onGround && !this.swimming) this._airT = (this._airT || 0) + dt; // accumulate airborne time
     if ((this.onGround || this.swimming) && !this.jetting) this._jetFuel = this.jetMax; // recharge jetpack on the ground/water
 
     const bobAmt = this.swimming ? Math.sin(this.bob * 0.8) * 0.08 : (this.moving && this.onGround) ? Math.sin(this.bob) * 0.045 : Math.sin(this.bob) * 0.012;
