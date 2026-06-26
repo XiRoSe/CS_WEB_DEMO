@@ -233,9 +233,9 @@ export class Engine {
     if (this._boltT > 0) {
       this._boltT -= dt;
       const f = Math.max(0, this._boltT / 0.26), flick = f * (0.7 + 0.3 * Math.sin(this._boltT * 90)); // flicker
-      this.renderer.toneMappingExposure = 0.85 + flick * 3.2;        // big flash lights the whole stage
-      if (this._hemi) this._hemi.intensity = 0.95 + flick * 6.0;     // strong ambient light pop
-      if (this._sun) this._sun.intensity = 2.1 + flick * 4.0;
+      this.renderer.toneMappingExposure = 0.85 + flick * 4.8;        // big flash lights the whole stage (1.5x)
+      if (this._hemi) this._hemi.intensity = 0.95 + flick * 9.0;     // strong ambient light pop (1.5x)
+      if (this._sun) this._sun.intensity = 2.1 + flick * 6.0;
       this._bolt.material.opacity = Math.min(1, f * 1.6);
       if (this._boltT <= 0) { this._bolt.visible = false; this.renderer.toneMappingExposure = 0.85; if (this._hemi) this._hemi.intensity = 0.95; if (this._sun) this._sun.intensity = 2.1; }
     } else if ((this._strikeIn -= dt) <= 0) {

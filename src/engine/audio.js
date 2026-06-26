@@ -167,7 +167,7 @@ export class Audio {
   laser(vol = 0.5) { if (this.playBuf("laser", vol, 1.4 + Math.random() * 0.15)) return; this._tone(880, 0.09, "square", 0.16 * (vol / 0.5), 300); this._noiseBurst(0.05, 2200, 1, 0.05); }
   beam(vol = 0.5) { if (this.playBuf("plasma", vol, 1.5 + Math.random() * 0.2)) return; this._tone(700, 0.16, "sawtooth", 0.2 * (vol / 0.5), 170); this._noiseBurst(0.1, 1800, 1, 0.06, "bandpass"); } // sci-fi laser BEAM
   swordSwing() { if (this.playBuf("sword", 0.6, 0.95 + Math.random() * 0.1)) return; this._noiseBurst(0.2, 760, 0.6, 0.18, "bandpass"); }
-  thunder() { if (this.playBuf("thunder", 0.35, 0.7 + Math.random() * 0.2)) return; this._noiseBurst(0.9, 220, 0.5, 0.22); this._tone(52, 0.8, "sawtooth", 0.16, 26); } // storm rumble (quieter)
+  thunder() { if (this.playBuf("thunder", 0.52, 0.7 + Math.random() * 0.2)) return; this._noiseBurst(0.9, 220, 0.5, 0.33); this._tone(52, 0.8, "sawtooth", 0.24, 26); } // storm rumble (1.5x louder)
   splash() { // water entry — a bright plume + a downward watery "bloop"
     this._noiseBurst(0.36, 2200, 0.5, 0.3, "lowpass");
     this._noiseBurst(0.28, 700, 0.8, 0.2, "lowpass");
