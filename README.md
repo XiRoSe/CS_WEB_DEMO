@@ -10,7 +10,11 @@ build your **own** FPS level or game on top of it fast.
 > walls, towers, vehicles, fuel barrels on purpose); `game/` is one shipped game. Reuse just the
 > engine, or the whole kit, or fork the game — see [Architecture](#architecture-at-a-glance).
 
-**Live demo:** https://nightops-first-fps.up.railway.app
+**Live demo:** https://nightops-first-fps.up.railway.app/?level=arcfall
+
+![ARCFALL gameplay](media/gameplay.gif)
+
+> *ARCFALL — drop onto a time-fractured island and recover the 12 lost Arcs while fighting the dinosaurs and giant mechs that guard them.*
 
 > **Two games ship on the same engine** — proof the kit generalizes:
 > - **NightOps** (`?level=desert-base`) — a night military raid: clear the base / defuse the bomb.
