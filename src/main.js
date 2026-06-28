@@ -277,13 +277,14 @@ class Game {
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
-    // everyone starts with ONLY the melee staff — find the guns scattered across the island
+    // ARCFALL starts with ONLY the Arc Blade (scavenge guns); other levels keep the standard arsenal (rifle + launcher)
     if (!this._loadoutGiven) {
       this._loadoutGiven = true;
-      this.weapon.owned = ["sword"];
-      this.weapon.mode = "sword";
+      const loadout = this.cfg.player.startLoadout;
+      if (loadout) { this.weapon.owned = loadout.slice(); this.weapon.mode = loadout[0]; }
+      else { this.weapon.mode = "rifle"; } // military default; this.weapon.owned already = [rifle, sword, launcher]
       this.weapon._showViewmodel();
-      this.hud.setWeaponName(this._weaponName("sword"));
+      this.hud.setWeaponName(this._weaponName(this.weapon.mode));
     }
     this.objective.onPlayStart();
     this.hud.setGrenades(this.grenades);

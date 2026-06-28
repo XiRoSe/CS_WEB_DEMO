@@ -8,7 +8,7 @@ export const arcfall = {
     intro: { enabled: true, style: "droppod", spottedCalloutAt: 4.5 },
     objective: { type: "collect", count: 12 },
     helicopter: { spawnDelay: 99999 }, // no gunship boss on the island (for now)
-    player: { grenades: 4 },
+    player: { grenades: 4, startLoadout: ["sword"] }, // ARCFALL only: start with the Arc Blade, scavenge guns on the island
     messages: { deployHint: "DROP POD INBOUND — click to skip" },
   },
 

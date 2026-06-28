@@ -10,16 +10,21 @@ build your **own** FPS level or game on top of it fast.
 > walls, towers, vehicles, fuel barrels on purpose); `game/` is one shipped game. Reuse just the
 > engine, or the whole kit, or fork the game — see [Architecture](#architecture-at-a-glance).
 
-**Live demo:** https://nightops-first-fps.up.railway.app/?level=arcfall
+## Two games, one engine
 
-![ARCFALL gameplay](media/gameplay.gif)
+**▶ [Play ARCFALL](https://nightops-first-fps.up.railway.app/?level=arcfall)** — a *daytime* island survival hunt: drop onto a time-fractured island, recover the **12 lost Arcs**, and survive the dinosaurs and giant mechs that guard them.
 
-> *ARCFALL — drop onto a time-fractured island and recover the 12 lost Arcs while fighting the dinosaurs and giant mechs that guard them.*
+| | |
+|:-:|:-:|
+| ![ARCFALL — action](media/arcfall-1.jpg) | ![ARCFALL — the island](media/arcfall-2.jpg) |
 
-> **Two games ship on the same engine** — proof the kit generalizes:
-> - **NightOps** (`?level=desert-base`) — a night military raid: clear the base / defuse the bomb.
-> - **The Lost Arcs** (`?level=arc-island`) — a *daytime* island survival hunt: **parachute** in and
->   recover the **12 lost arcs** while fighting monsters, raiders and a **giant robot**.
+**▶ [Play NightOps](https://nightops-first-fps.up.railway.app/?level=desert-base)** — a *night* military raid: infiltrate the desert base and **reach & disarm the bomb** before detonation.
+
+| | |
+|:-:|:-:|
+| ![NightOps — the gate](media/nightops-1.jpg) | ![NightOps — the base](media/nightops-2.jpg) |
+
+> Both ship on the same engine + kit — proof it generalizes (reuse just `engine/`, the whole `kit/`, or fork a `game/`).
 
 ---
 
