@@ -469,7 +469,7 @@ export class Audio {
     if (!this.buffers.game_theme) return;
     const s = this.ctx.createBufferSource(); s.buffer = this.buffers.game_theme; s.loop = true;
     const bus = this.ctx.createGain(); bus.gain.value = 0; bus.connect(this.master);
-    bus.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 1.0);
+    bus.gain.linearRampToValueAtTime(0.625, this.ctx.currentTime + 1.0); // in-game track, +25% louder
     s.connect(bus); s.start();
     this._game = { bus, src: s };
   }
