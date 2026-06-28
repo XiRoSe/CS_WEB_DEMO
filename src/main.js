@@ -312,9 +312,9 @@ class Game {
     this.hud.showTimer(false); this.hud.hideDefuse();
     this.controller.unlock();
     this.audio.stopRotor();
-    if (extra.cinematic) { // ARCFALL ending: the Great Unwind → collapse to a dot → Star-Wars victory crawl
-      this.state = "winseq"; this._winPhase = "unwind"; this._winT = 0; this._flashCd = 0; this._reSfx = 0;
-      this.hud.rewindFx(true); // battle music keeps playing through the whole ending until Redeploy
+    if (extra.cinematic) { // ARCFALL ending: shrink the whole world to a point of light → Star-Wars victory crawl (no rewind)
+      this.state = "winseq"; this._winPhase = "collapse"; this._winT = 0;
+      this.hud.collapseToDot(3200); // battle music keeps playing through the whole ending until Redeploy
       return;
     }
     this.audio.stopBattleMusic?.(); // non-cinematic win: cut the music for the sting
@@ -328,17 +328,9 @@ class Game {
   // the end-of-mission cinematic, driven from update() each frame so the engine renders the soaring camera
   _victoryStep(dt) {
     const cam = this.camera; this._winT += dt;
-    if (this._winPhase === "unwind") {            // THE GREAT UNWIND — slowly soar up, spin, flash-cut, rewind the world
-      const UNWIND = 8.5;
-      cam.position.y += dt * (7 + this._winT * 4); cam.rotation.y += dt * 0.28; cam.updateMatrixWorld(true);
-      this._flashCd -= dt; if (this._flashCd <= 0) { this._flashCd = 0.4 + Math.random() * 0.4; this.hud.flashCut(); } // big-gap stutter
-      this._reSfx = (this._reSfx || 0) - dt; if (this._reSfx <= 0) { this._reSfx = 1.7; this.audio.rewind?.(); } // keep the rewind warble going through the long unwind
-      const clip = this._rewindBuf;
-      if (clip && clip.length) { const s = clip[Math.max(0, Math.floor((1 - Math.min(1, this._winT / UNWIND)) * (clip.length - 1)))]; if (s) for (const r of s.enemies) if (r.e && this.combat.enemies.includes(r.e)) r.e.group.position.set(r.x, r.y, r.z); }
-      if (this._winT >= UNWIND) { this._winPhase = "collapse"; this._winT = 0; this.hud.rewindFx(false); this.hud.collapseToDot(2200); }
-    } else if (this._winPhase === "collapse") {   // implode to a single point of light
-      cam.position.y += dt * 14; cam.rotation.y += dt * 0.22; cam.updateMatrixWorld(true);
-      if (this._winT >= 2.4) {
+    if (this._winPhase === "collapse") {          // SHRINK THE WORLD — soar up gently while it all implodes to a point of light
+      cam.position.y += dt * 10; cam.rotation.y += dt * 0.18; cam.updateMatrixWorld(true);
+      if (this._winT >= 3.2) {
         this._winPhase = "crawl"; this._winT = 0;
         this.hud.showEndCrawl("A NEW DAWN", VICTORY_CRAWL, () => this.hud.showEndButton());
       }

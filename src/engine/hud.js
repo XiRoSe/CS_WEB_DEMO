@@ -311,16 +311,26 @@ export class HUD {
     inner.style.cssText = "position:absolute;top:100%;left:50%;width:66%;transform-origin:50% 0%;transform:translateX(-50%) rotateX(34deg);color:#ffd23a;font-weight:800;text-align:center;text-shadow:0 0 24px rgba(255,180,40,.6);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.6;";
     inner.innerHTML = `<div style="font-size:5vw;letter-spacing:.16em;margin-bottom:.8em;">${title}</div>` + paragraphs.map((p) => `<p style="font-size:2.35vw;margin:0 0 1.25em;">${p}</p>`).join("");
     wrap.appendChild(inner); this.root.appendChild(wrap); this._endCrawl = wrap;
-    inner.animate([{ transform: "translateX(-50%) rotateX(34deg) translateY(0%)", opacity: 1 }, { offset: 0.92, transform: "translateX(-50%) rotateX(34deg) translateY(-330%)", opacity: 1 }, { transform: "translateX(-50%) rotateX(34deg) translateY(-380%)", opacity: 0 }], { duration: dur, easing: "linear", fill: "forwards" });
-    if (onDone) this._endCrawlT = setTimeout(onDone, dur * 0.66);
+    const crawlAnim = inner.animate([{ transform: "translateX(-50%) rotateX(34deg) translateY(0%)", opacity: 1 }, { offset: 0.92, transform: "translateX(-50%) rotateX(34deg) translateY(-330%)", opacity: 1 }, { transform: "translateX(-50%) rotateX(34deg) translateY(-380%)", opacity: 0 }], { duration: dur, easing: "linear", fill: "forwards" });
+    if (onDone) crawlAnim.finished.then(onDone).catch(() => {}); // reveal the REDEPLOY card only AFTER the crawl text animation has fully finished (clean starfield)
   }
   showEndButton(line = "The Arc-bearer's name passes into legend") {
-    const w = document.createElement("div"); w.style.cssText = "position:fixed;inset:0;z-index:73;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:9vh;pointer-events:none;";
-    w.innerHTML = `<div style="color:#bff0ff;font-weight:800;letter-spacing:.3em;text-align:center;margin-bottom:1.3em;text-shadow:0 0 18px rgba(120,220,255,.85);font-size:1.5vw;opacity:0;" class="el">${line}</div>`
-      + `<button id="enddeploy" style="pointer-events:auto;opacity:0;background:#ffd23a;color:#1a1206;border:none;padding:.7em 1.6em;font-weight:900;letter-spacing:.15em;font-size:1.2vw;cursor:pointer;border-radius:3px;box-shadow:0 4px 18px rgba(0,0,0,.5);" class="el">▶ REDEPLOY</button>`;
+    // CENTERED end card: a soft radial glow blooms in, the line + button rise and scale into place, the button breathes
+    const w = document.createElement("div"); w.style.cssText = "position:fixed;inset:0;z-index:73;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;";
+    const glow = document.createElement("div");
+    glow.style.cssText = "position:absolute;left:50%;top:50%;width:60vw;height:60vw;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(120,200,255,.16) 0%,transparent 60%);opacity:0;";
+    w.appendChild(glow);
+    w.insertAdjacentHTML("beforeend",
+      `<div class="el" style="position:relative;color:#cdf3ff;font-weight:800;letter-spacing:.32em;text-align:center;margin-bottom:1.7em;text-shadow:0 0 26px rgba(120,220,255,.95);font-size:1.7vw;opacity:0;">${line}</div>`
+      + `<button id="enddeploy" class="el" style="position:relative;pointer-events:auto;opacity:0;background:#ffd23a;color:#1a1206;border:none;padding:.78em 1.8em;font-weight:900;letter-spacing:.16em;font-size:1.28vw;cursor:pointer;border-radius:4px;box-shadow:0 0 22px rgba(255,210,60,.5);">▶ REDEPLOY</button>`);
     this.root.appendChild(w);
-    w.querySelectorAll(".el").forEach((e, i) => e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1200, delay: 300 + i * 400, fill: "forwards" }));
-    w.querySelector("#enddeploy").addEventListener("click", () => location.reload());
+    glow.animate([{ opacity: 0, transform: "translate(-50%,-50%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 1600, easing: "ease-out", fill: "forwards" });
+    w.querySelectorAll(".el").forEach((e, i) => e.animate(
+      [{ opacity: 0, transform: "scale(.9) translateY(16px)" }, { opacity: 1, transform: "scale(1) translateY(0)" }],
+      { duration: 950, delay: 250 + i * 380, easing: "cubic-bezier(.2,.7,.2,1)", fill: "forwards" }));
+    const btn = w.querySelector("#enddeploy");
+    btn.animate([{ boxShadow: "0 0 16px rgba(255,210,60,.4)" }, { boxShadow: "0 0 36px rgba(255,210,60,.95)" }, { boxShadow: "0 0 16px rgba(255,210,60,.4)" }], { duration: 2000, iterations: Infinity, delay: 1100 });
+    btn.addEventListener("click", () => location.reload());
   }
   // clean centered XIII-style banner (map-section entry etc.): bold text on a gold rule, sweeps in + fades
   showBanner(title, sub = "", dur = 2600) {
