@@ -288,7 +288,7 @@ class Game {
     this.hud.setGrenades(this.grenades);
     this.touch.show();
     this.audio.stopDropWhoosh?.(); // safety: ensure the plummet whoosh isn't still ringing
-    this.audio.stopLobbyMusic?.(); this.audio.startBattleMusic?.(); // swap the chill select-screen groove for driving battle rock
+    this.audio.stopLobbyMusic?.(); this.audio.stopBattleMusic?.(); this.audio.startGameMusic?.(); // gameplay loop: Oliver Tree "Alien Boy" (Pacific Rim returns at the finale)
     if (!this._deployed) { this._deployed = true; this.voice.deploy(); this._timeLeft = 300; } // 5:00 mission clock
     this.state = "play";
   }
@@ -314,10 +314,11 @@ class Game {
     this.audio.stopRotor();
     if (extra.cinematic) { // ARCFALL ending: shrink the whole world to a point of light → Star-Wars victory crawl (no rewind)
       this.state = "winseq"; this._winPhase = "collapse"; this._winT = 0;
-      this.hud.collapseToDot(3200); // battle music keeps playing through the whole ending until Redeploy
+      this.audio.stopGameMusic?.(); this.audio.startBattleMusic?.(); // Alien Boy ends; the Pacific Rim theme swells back FROM THE START for the finale
+      this.hud.collapseToDot(3200);
       return;
     }
-    this.audio.stopBattleMusic?.(); // non-cinematic win: cut the music for the sting
+    this.audio.stopGameMusic?.(); this.audio.stopBattleMusic?.(); // non-cinematic win: cut the music for the sting
     this.state = "win";
     const acc = this.shotsFired ? Math.round((this.shotsHit / this.shotsFired) * 100) : 0;
     this.hud.showWin({ kills: this.combat.killCount, total: extra.disarmed ? 0 : this.combat.totalEnemies, acc, ...extra });
@@ -341,7 +342,7 @@ class Game {
     if (this.state === "lose") return;
     trackEnd(); // session ended (defeat)
     this.state = "lose";
-    this.audio.jetpack?.(false); this.audio.stopBattleMusic?.();
+    this.audio.jetpack?.(false); this.audio.stopBattleMusic?.(); this.audio.stopGameMusic?.();
     this.audio.stopRotor();
     this.hud.setCombatVisible(false);
     this.hud.showTimer(false); this.hud.hideDefuse();
