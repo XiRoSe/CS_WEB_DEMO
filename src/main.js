@@ -12,6 +12,7 @@ import { TouchControls } from "./engine/touch.js";
 import { LaserSight } from "./engine/laser-sight.js";
 import { trackStart, trackEnd } from "./engine/analytics.js";
 import { makeRick } from "./game/actors/rick.js";
+import { preloadRickMorty } from "./game/actors/rickmorty-assets.js";
 import { LevelBuilder } from "./kit/level-builder.js";
 import { Destructibles } from "./kit/destructibles.js";
 // game — this game's content + rules
@@ -136,6 +137,7 @@ class Game {
     // load models progressively (async, off the main thread) with a progress readout
     const jobs = [preloadEnemies(), preloadHeli(), preloadOperator(), preloadVehicles(), preloadPickups(), preloadWeapons(), preloadCreatures(), preloadNature(), preloadFpWeapons(), preloadBuildings(),
       this.audio.clipsReady || Promise.resolve()]; // also wait for all audio (incl. the Pacific Rim + Alien Boy tracks) so music is ready the moment the mission begins
+    if (this.cfg.view === "third") jobs.push(preloadRickMorty()); // Rick + Meeseeks GLBs (if dropped into public/models/; 404s fall back to procedural)
     let done = 0; this.hud.setLoadingProgress(0, jobs.length + 1);
     jobs.forEach((p) => p.then(() => this.hud.setLoadingProgress(++done, jobs.length + 1)));
     await Promise.all(jobs);
@@ -568,6 +570,7 @@ class Game {
     ];
     const s = SECTIONS[(this._reinfIdx = (this._reinfIdx || 0) + 1) % SECTIONS.length];
     const spec = { ...s.tribe[Math.floor(Math.random() * s.tribe.length)] };
+    if (this.cfg.reinforce === "meeseeks") { delete spec.hp; delete spec.speed; spec.kind = "meeseeks"; if (Math.random() < 0.15) spec.huge = true; } // Rick level: drops are Meeseeks (mostly regular, some huge)
     const a = Math.random() * 6.28, r = Math.random() * 26;
     spec.x = s.c[0] + Math.cos(a) * r; spec.z = s.c[1] + Math.sin(a) * r;
     const gy = this.level.terrainHeight ? this.level.terrainHeight(spec.x, spec.z) : 0;
