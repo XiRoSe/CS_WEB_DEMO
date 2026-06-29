@@ -42,6 +42,13 @@ export class Controller {
     this._euler = new THREE.Euler(0, 0, 0, "YXZ"); // face into the compound (-Z), not the wall behind
     this.camera.quaternion.setFromEuler(this._euler);
 
+    // VIEW MODE (engine-level): "first" = camera sits at the eye; "third" = camera orbits behind a body
+    // point so a game can show a visible avatar. Movement/collision always run on the body point `this.pos`.
+    this.view = "first";
+    this.thirdDist = 5.0; this.thirdLift = 0.6;   // 3rd-person camera distance + height
+    this.pos = new THREE.Vector3(level.playerSpawn.x, 0, level.playerSpawn.z); // body XZ (feetY = height)
+    this.headPos = new THREE.Vector3(level.playerSpawn.x, this.eye, level.playerSpawn.z); // player head world point (what enemies/pickups target)
+
     this._onMove = (e) => {
       if (!this.locked) return;
       this._euler.setFromQuaternion(this.camera.quaternion);
@@ -88,6 +95,10 @@ export class Controller {
   }
 
   update(dt, input) {
+    // first-person: camera.position IS the body, so keep `pos` synced (lets external code teleport the player
+    // by writing camera.position — spawn, respawn, drive-exit). Third-person: `pos` is authoritative (the camera
+    // is the orbit cam, not the body), so don't read it back.
+    if (this.view !== "third") { this.pos.x = this.camera.position.x; this.pos.z = this.camera.position.z; }
     // movement basis from camera yaw (flattened)
     this.camera.getWorldDirection(this._fwd);
     this._fwd.y = 0; this._fwd.normalize();
@@ -129,11 +140,11 @@ export class Controller {
 
     if (this.moving) {
       dir.normalize().multiplyScalar(speed * dt);
-      let x = this.camera.position.x, z = this.camera.position.z;
+      let x = this.pos.x, z = this.pos.z;
       if (!this._blocked(x + dir.x, z)) x += dir.x;
       if (!this._blocked(x, z + dir.z)) z += dir.z;
-      this.camera.position.x = x;
-      this.camera.position.z = z;
+      this.pos.x = x;
+      this.pos.z = z;
 
       if (this.onGround) {
         this.bob += dt * (speed * 1.4);
@@ -157,7 +168,7 @@ export class Controller {
     // vertical physics against the surface beneath us (lets you land on crates/platforms)
     this.feetY += this.vy * dt;
     this.vy -= this.gravity * dt;
-    const groundY = this._groundUnder(this.camera.position.x, this.camera.position.z);
+    const groundY = this._groundUnder(this.pos.x, this.pos.z);
     const sea = this.level.seaLevel;
     if (sea !== undefined && groundY < sea - 1.0) {
       // over deep water → swim: ease smoothly to the surface (head above water), no jitter
@@ -174,7 +185,15 @@ export class Controller {
     if (!this.onGround && !this.swimming) this._airT = (this._airT || 0) + dt; // accumulate airborne time
     if ((this.onGround || this.swimming) && !this.jetting) this._jetFuel = this.jetMax; // recharge jetpack on the ground/water
 
-    const bobAmt = this.swimming ? Math.sin(this.bob * 0.8) * 0.08 : (this.moving && this.onGround) ? Math.sin(this.bob) * 0.045 : Math.sin(this.bob) * 0.012;
-    this.camera.position.y = this.feetY + this.eyeCur + bobAmt;
+    const bobAmt = (this.view === "third") ? 0 // no head-bob on a far orbit camera (the avatar has its own walk bob)
+      : this.swimming ? Math.sin(this.bob * 0.8) * 0.08 : (this.moving && this.onGround) ? Math.sin(this.bob) * 0.045 : Math.sin(this.bob) * 0.012;
+    const eyeY = this.feetY + this.eyeCur + bobAmt;
+    this.headPos.set(this.pos.x, eyeY, this.pos.z); // the player's head — what enemies/pickups target (both views)
+    if (this.view === "third") {
+      this._fwd.set(0, 0, -1).applyEuler(this._euler); // full look dir (incl. pitch) for the orbit
+      this.camera.position.set(this.pos.x - this._fwd.x * this.thirdDist, eyeY - this._fwd.y * this.thirdDist + this.thirdLift, this.pos.z - this._fwd.z * this.thirdDist);
+    } else {
+      this.camera.position.set(this.pos.x, eyeY, this.pos.z);
+    }
   }
 }

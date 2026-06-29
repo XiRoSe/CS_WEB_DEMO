@@ -11,6 +11,7 @@ import { VFX } from "./engine/vfx.js";
 import { TouchControls } from "./engine/touch.js";
 import { LaserSight } from "./engine/laser-sight.js";
 import { trackStart, trackEnd } from "./engine/analytics.js";
+import { makeRick } from "./game/actors/rick.js";
 import { LevelBuilder } from "./kit/level-builder.js";
 import { Destructibles } from "./kit/destructibles.js";
 // game — this game's content + rules
@@ -143,6 +144,8 @@ class Game {
     // build the level now that all prop models are loaded, then seat the camera at the spawn
     this.levelDef.build(this.level);
     const sp = this.level.playerSpawn;
+    // 3rd-person mode (e.g. the Rick & Morty level): a visible player avatar the camera orbits behind
+    if (this.cfg.view === "third") { this.playerModel = makeRick(); this.scene.add(this.playerModel.group); this._thirdPerson = true; this.controller.view = "third"; }
     this.hero = "heavy";
     this._heroLobby = HERO_LOADOUT[this.hero] != null && this.cfg.intro && (this.cfg.intro.style === "parachute" || this.cfg.intro.style === "droppod");
     if (this._heroLobby) this._setupLobby(); // hero-select lobby on the start screen
@@ -393,7 +396,19 @@ class Game {
   }
 
   _weaponName(mode) {
-    return { rifle: "MK-4 CARBINE", smg: "SMG", minigun: "MINIGUN", burst: "BURST RIFLE", railgun: "RAILGUN", sword: "ARC BLADE", shotgun: "PULSE SHOTGUN", flak: "FLAK CANNON", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", laser: "LASER RIFLE" }[mode] || "MK-4 CARBINE";
+    return { rifle: "MK-4 CARBINE", smg: "SMG", minigun: "MINIGUN", burst: "BURST RIFLE", railgun: "RAILGUN", sword: "ARC BLADE", shotgun: "PULSE SHOTGUN", flak: "FLAK CANNON", launcher: "MISSILE LAUNCHER", plasma: "PLASMA CANNON", laser: "PORTAL GUN" }[mode] || "MK-4 CARBINE";
+  }
+
+  // 3rd-person: the engine controller already orbits the camera (controller.view === "third"). Here we just
+  // place the visible avatar at the body point facing the look direction, and hide the 1st-person viewmodel.
+  _updateThirdPerson(dt) {
+    const c = this.controller;
+    const fwd = this._tpFwd || (this._tpFwd = new THREE.Vector3());
+    this.camera.getWorldDirection(fwd);
+    this.playerModel.group.position.set(c.pos.x, c.feetY, c.pos.z);
+    this.playerModel.group.rotation.y = Math.atan2(fwd.x, fwd.z); // face the look dir (we see Rick's back)
+    this.playerModel.update(dt, c.moving && c.onGround, 1);
+    for (const g of [this.weapon.group, this.weapon.launcher, this.weapon.energy, this.weapon.laserGun, this.weapon.shotgunGun, this.weapon.sword]) if (g) g.visible = false;
   }
 
   // Plasma Cannon: a glowing energy bolt that detonates in a big blue blast.
@@ -743,6 +758,7 @@ class Game {
       }
     } else {
       this.controller.update(dt, this.input);
+      if (this._thirdPerson) this._updateThirdPerson(dt);
       // swim audio: splash on entering water, periodic strokes while swimming
       if (this.controller.swimming && !this._wasSwimming) this.audio.splash && this.audio.splash();
       if (this.controller.swimming && this.controller.moving) { this._swimT = (this._swimT || 0) + dt; if (this._swimT > 0.55) { this._swimT = 0; this.audio.swimStroke && this.audio.swimStroke(); } }
@@ -778,7 +794,7 @@ class Game {
       }
     }
 
-    const pp = this.driving ? this.driving.pos : this.camera.position; // "player position" for combat/pickups
+    const pp = this.driving ? this.driving.pos : (this._thirdPerson ? this.controller.headPos : this.camera.position); // "player position" for combat/pickups (the body, not the orbit cam)
     this.combat.update(dt, t, pp);
     // minimap: player (facing arrow), enemies (red), arcs (gold)
     if (this.hud.drawMinimap) {
