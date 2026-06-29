@@ -15,16 +15,8 @@ export function makeRick() {
     buildProcedural(group, (l, r, al, ar) => { legL = l; legR = r; armL = al; armR = ar; });
   }
 
-  // held gun — a simple low-poly blaster at the right hand, pointing forward (avatar faces the aim dir)
-  const gun = new THREE.Group();
-  const gmat = new THREE.MeshStandardMaterial({ color: 0x2b2f36, metalness: 0.6, roughness: 0.4, flatShading: true });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.5), gmat); gun.add(body);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.4, 8), gmat); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.02, 0.42); gun.add(barrel);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.12), gmat); grip.position.set(0, -0.16, -0.12); gun.add(grip);
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.02, 0.1, 8), new THREE.MeshStandardMaterial({ color: 0x7CFC00, emissive: 0x66dd33, emissiveIntensity: 1.6 })); glow.rotation.x = Math.PI / 2; glow.position.set(0, 0.02, 0.64); gun.add(glow);
-  gun.position.set(0.34, 1.25, 0.35); gun.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  group.add(gun);
-
+  // (no added gun prop — the Rick GLB already comes holding his portal gun; for the procedural fallback we
+  // leave him empty-handed rather than attach a mismatched blaster.)
   let phase = 0;
   return {
     group,
