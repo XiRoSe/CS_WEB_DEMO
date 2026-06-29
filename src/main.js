@@ -166,6 +166,7 @@ class Game {
     this.hud.setLoadingProgress(jobs.length + 1, jobs.length + 1);
     this.combat = new Combat(this.scene, this.camera, this.level, this.weapon, this.vfx, this.audio, {
       onPlayerHit: (dmg) => this._onPlayerHit(dmg),
+      onEnemyFire: (o) => this._enemyFire(o), // ranged enemies (gun/rocket Meeseeks) shoot at the player
       onBossBeam: () => { this.hud._shake = Math.max(this.hud._shake || 0, 22); }, // GUARDIAN beam screen shake
       onKill: (count, left) => { this.hud.killFeed(this.cfg.messages.hostileDown); this.hud.setHostiles(left); this.voice.enemyDown(); },
       onHitmarker: (killed) => { this.shotsHit++; this.hud.hitmarker(killed); this.audio.hitmarker(killed); },
@@ -407,10 +408,31 @@ class Game {
     const c = this.controller;
     const fwd = this._tpFwd || (this._tpFwd = new THREE.Vector3());
     this.camera.getWorldDirection(fwd);
+    this.playerModel.setWeapon(this.weapon.mode);                 // Rick holds the weapon he's actually using
     this.playerModel.group.position.set(c.pos.x, c.feetY, c.pos.z);
     this.playerModel.group.rotation.y = Math.atan2(fwd.x, fwd.z); // face the look dir (we see Rick's back)
     this.playerModel.update(dt, c.moving && c.onGround, 1);
+    if (this.input.mouseDown && this.weapon.mode !== "sword") this.playerModel.fireKick(); // recoil while shooting
     for (const g of [this.weapon.group, this.weapon.launcher, this.weapon.energy, this.weapon.laserGun, this.weapon.shotgunGun, this.weapon.sword]) if (g) g.visible = false;
+  }
+
+  // a ranged enemy (e.g. a gun/rocket Meeseeks) fires at the player. o = { from:{x,y,z}, to:{x,y,z}, kind, dmg }
+  _enemyFire(o) {
+    const from = new THREE.Vector3(o.from.x, o.from.y, o.from.z);
+    const to = new THREE.Vector3(o.to.x, o.to.y, o.to.z);
+    if (o.kind === "rocket") { // a real travelling rocket that explodes near Rick
+      const dir = to.clone().sub(from).normalize();
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x551006, emissive: 0xd23a1a, emissiveIntensity: 1.3, flatShading: true }));
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      const rocket = new Projectile(this.scene, mesh, from.clone().addScaledVector(dir, 0.8), dir.multiplyScalar(24), { gravity: 2.5, fuse: 5, detonateOnHit: true });
+      rocket.enemyRocket = true; rocket.radius = 5; rocket.playerDmg = o.dmg || 30;
+      this._projectiles.push(rocket);
+      this.audio.explosion?.();
+    } else { // hitscan blaster bolt + tracer
+      this.vfx.enemyLaser?.(from, to, 0x88ff55);
+      this._onPlayerHit(o.dmg || 7);
+      this.audio.heliShot?.();
+    }
   }
 
   // Plasma Cannon: a glowing energy bolt that detonates in a big blue blast.
@@ -570,7 +592,11 @@ class Game {
     ];
     const s = SECTIONS[(this._reinfIdx = (this._reinfIdx || 0) + 1) % SECTIONS.length];
     const spec = { ...s.tribe[Math.floor(Math.random() * s.tribe.length)] };
-    if (this.cfg.reinforce === "meeseeks") { delete spec.hp; delete spec.speed; spec.kind = "meeseeks"; if (Math.random() < 0.15) spec.huge = true; } // Rick level: drops are Meeseeks (mostly regular, some huge)
+    if (this.cfg.reinforce === "meeseeks") { // Rick level: drops are Meeseeks — mostly regular, some huge, mixed weapons
+      delete spec.hp; delete spec.speed; spec.kind = "meeseeks";
+      if (Math.random() < 0.15) spec.huge = true;
+      const w = Math.random(); spec.weapon = w < 0.18 ? "rocket" : w < 0.55 ? "gun" : "melee";
+    }
     const a = Math.random() * 6.28, r = Math.random() * 26;
     spec.x = s.c[0] + Math.cos(a) * r; spec.z = s.c[1] + Math.sin(a) * r;
     const gy = this.level.terrainHeight ? this.level.terrainHeight(spec.x, spec.z) : 0;
@@ -627,6 +653,13 @@ class Game {
         }
       }
       if (p.done) {
+        if (p.enemyRocket) { // a Meeseeks rocket — explode + damage RICK if he's in the blast (not the Meeseeks)
+          const c = p.pos.clone(); this.vfx.explosion(c, 1.2); this.vfx._fireball?.(c, 0.9); this.audio.explosion?.();
+          const pp = this._thirdPerson ? this.controller.headPos : this.camera.position;
+          const R = p.radius || 5, dx = pp.x - c.x, dy = pp.y - c.y, dz = pp.z - c.z;
+          if (dx * dx + dy * dy + dz * dz < R * R) { this._onPlayerHit(p.playerDmg || 32); this.hud._shake = Math.max(this.hud._shake || 0, 14); }
+          p.dispose(); this._projectiles.splice(i, 1); continue;
+        }
         const c = p.pos.clone();
         if (p.energy) this.vfx.energyBoom(c, p.scale || 1);
         else if (p.isRocket) { // BIG bazooka blast — a cluster of explosions + fireballs + shockwave + shake

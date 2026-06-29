@@ -1,33 +1,60 @@
 import * as THREE from "three";
-import { RICK_MODEL } from "./rickmorty-assets.js";
+import { RICK_MODEL, RICK_SHOOT, RM_HAND_BONE, clipsOf } from "./rickmorty-assets.js";
+import { makeHeldGun, gunKindForMode } from "./heldguns.js";
 
-// The 3rd-person player avatar (RICK). Uses the dropped-in /models/rick.glb when available, else a
-// procedural homage. Adds a held gun prop in front of the right hand (the 1st-person viewmodel is hidden
-// in 3rd-person). Returns { group, update(dt, moving) } so the runner can place/orient + animate it.
+// 3rd-person RICK avatar. Now SKELETALLY ANIMATED (Mesh2Motion rig): Walk_Loop plays while moving, the
+// held weapon is parented to the right-hand bone so it follows the hands, and Pistol_Shoot fires on demand.
+// Falls back to a procedural homage if the rigged GLB isn't present. Returns { group, update, setWeapon, fireKick }.
 export function makeRick() {
   const group = new THREE.Group();
-  let legL, legR, armL, armR, glb = false;
+  let mixer = null, walk = null, shoot = null, hand = null, glb = false;
+  let legL, legR, armL, armR; // procedural fallback handles
 
   if (RICK_MODEL.ready) {
-    group.add(RICK_MODEL.make());                 // real GLB, normalized + seated on the ground
+    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE });
+    group.add(inst.model);
+    mixer = new THREE.AnimationMixer(inst.model);
+    for (const c of inst.animations) if (/walk/i.test(c.name)) walk = mixer.clipAction(c);
+    const sc = clipsOf(RICK_SHOOT).find((c) => /shoot|pistol/i.test(c.name));
+    if (sc) shoot = mixer.clipAction(sc);
+    hand = inst.bones.rightHand;
+    if (walk) { walk.play(); walk.setEffectiveWeight(0); }
     glb = true;
   } else {
     buildProcedural(group, (l, r, al, ar) => { legL = l; legR = r; armL = al; armR = ar; });
   }
 
-  // (no added gun prop — the Rick GLB already comes holding his portal gun; for the procedural fallback we
-  // leave him empty-handed rather than attach a mismatched blaster.)
-  let phase = 0;
+  // held weapon — parented to the hand bone when rigged (moves with the animation), else to the body
+  const holder = hand || group;
+  const invScale = (RICK_MODEL._asset ? 1 / RICK_MODEL._asset.scale : 1);
+  let gun = null, gunKind = null;
+  const setWeapon = (mode) => {
+    const k = gunKindForMode(mode); if (k === gunKind) return; gunKind = k;
+    if (gun) holder.remove(gun);
+    gun = makeHeldGun(k);
+    holder.add(gun);
+    if (hand) { // size the gun to the bone's real world scale so it's ~0.55m regardless of rig scale; aim it down the arm
+      hand.updateWorldMatrix(true, false);
+      const ws = new THREE.Vector3(); hand.getWorldScale(ws); const kk = 0.55 / (ws.x || 1);
+      gun.scale.setScalar(kk); gun.position.set(0, 0, 0); gun.rotation.set(Math.PI / 2, 0, 0);
+    } else { gun.scale.setScalar(1); gun.position.set(0.34, 1.16, 0.34); gun.rotation.set(0, 0, 0); }
+  };
+  setWeapon("sword");
+
+  let phase = 0, walkW = 0;
   return {
-    group,
+    group, setWeapon,
+    fireKick() { if (shoot) { shoot.reset(); shoot.setLoop(THREE.LoopOnce, 1); shoot.clampWhenFinished = true; shoot.setEffectiveWeight(0.9).play(); } },
     update(dt, moving, speed = 1) {
-      phase += dt * (moving ? 9 * speed : 2.2);
-      const sw = Math.sin(phase);
-      if (!glb && legL) { // animate the procedural rig's walk cycle
+      if (mixer) {
+        mixer.update(dt);
+        walkW += ((moving ? 1 : 0) - walkW) * Math.min(1, dt * 10); // crossfade walk in/out by movement
+        if (walk) { walk.setEffectiveWeight(walkW); walk.setEffectiveTimeScale(4 * speed); } // 4x → reads as a run
+      } else if (legL) { // procedural fallback walk
+        phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
-        else { legL.rotation.x *= 0.8; legR.rotation.x *= 0.8; }
+        else { legL.rotation.x *= 0.85; legR.rotation.x *= 0.85; }
       }
-      if (moving) group.position.y += Math.abs(sw) * (glb ? 0.025 : 0.04); // subtle body bob either way
     },
   };
 }

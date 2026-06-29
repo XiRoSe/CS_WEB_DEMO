@@ -19,8 +19,10 @@ export const meeseeks = {
 
   build(b) {
     buildArcfallIsland(b, { bossKind: "meeseeks" });            // the full ARCFALL island + arcs + weapons, with a HUGE Meeseeks guardian
-    // a welcome party near the south-shore drop: regular Meeseeks + a couple of huge ones
-    for (const [x, z] of [[10, 122], [-14, 118], [22, 104], [-30, 100], [2, 96], [36, 110], [-44, 106], [16, 108]]) b.enemy({ kind: "meeseeks", x, z });
-    for (const [x, z] of [[26, 90], [-26, 88]]) b.enemy({ kind: "meeseeks", huge: true, x, z });
+    // a welcome party near the south-shore drop — a mix of melee swarmers, blaster gunners + a rocketeer
+    const party = [[10, 122, "melee"], [-14, 118, "gun"], [22, 104, "melee"], [-30, 100, "rocket"], [2, 96, "gun"],
+                   [36, 110, "melee"], [-44, 106, "gun"], [16, 108, "melee"], [-6, 112, "gun"]];
+    for (const [x, z, weapon] of party) b.enemy({ kind: "meeseeks", x, z, weapon });
+    for (const [x, z, weapon] of [[26, 90, "rocket"], [-26, 88, "gun"]]) b.enemy({ kind: "meeseeks", huge: true, x, z, weapon });
   },
 };

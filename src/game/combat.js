@@ -113,6 +113,7 @@ export class Combat {
       vfx: this.vfx,
       audio: this.audio,
       onPlayerHit: (dmg) => this.hooks.onPlayerHit?.(dmg),
+      enemyFire: (o) => this.hooks.onEnemyFire?.(o), // enemies call ctx.enemyFire(...) → routes to the runner
       onBossBeam: () => this.hooks.onBossBeam?.(),
       airborne: (playerPos.y - groundUnderPlayer) > 20, // flying high (jetpack) — enemies can't hit you
     };

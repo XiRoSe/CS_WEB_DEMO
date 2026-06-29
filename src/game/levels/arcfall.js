@@ -51,7 +51,7 @@ export function buildArcfallIsland(b, { bossKind = "robot" } = {}) {
 
   // THE GUARDIAN boss waits at the palace; reinforcements DROP from the sky during play (main._dropReinforcement)
   b.enemy(bossKind === "meeseeks"
-    ? { kind: "meeseeks", x: 44, z: -24, hp: 650, huge: true, boss: true }
+    ? { kind: "meeseeks", x: 44, z: -24, hp: 650, huge: true, weapon: "rocket", boss: true }
     : { kind: "robot", x: 44, z: -24, hp: 1600, scale: 2.0, boss: true });
 
   // gift crates (loot: ammo / health / grenades + sci-fi weapons to find)
