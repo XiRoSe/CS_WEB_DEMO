@@ -7,11 +7,11 @@ import { makeHeldGun, gunKindForMode } from "./heldguns.js";
 // Falls back to a procedural homage if the rigged GLB isn't present. Returns { group, update, setWeapon, fireKick }.
 export function makeRick() {
   const group = new THREE.Group();
-  let mixer = null, walk = null, shoot = null, aim = null, hand = null, glb = false;
+  let mixer = null, walk = null, shoot = null, aim = null, hand = null, spineBone = null, spineBase = null, glb = false;
   let legL, legR, armL, armR; // procedural fallback handles
 
   if (RICK_MODEL.ready) {
-    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE });
+    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE, spine: "spine_02" });
     group.add(inst.model);
     mixer = new THREE.AnimationMixer(inst.model);
     for (const c of inst.animations) if (/walk/i.test(c.name)) walk = mixer.clipAction(c);
@@ -22,6 +22,7 @@ export function makeRick() {
       aim.play(); aim.paused = true; aim.time = sc.duration * 0.5; aim.setEffectiveWeight(0);
     }
     hand = inst.bones.rightHand;
+    spineBone = inst.bones.spine; if (spineBone) spineBase = spineBone.quaternion.clone(); // rest pose, for aim-pitch lean
     if (walk) { walk.play(); walk.setEffectiveWeight(0); }
     glb = true;
   } else {
@@ -42,7 +43,7 @@ export function makeRick() {
   const trackGun = () => {
     if (!hand || !gun) return;
     hand.updateWorldMatrix(true, false); hand.getWorldPosition(_tmp); group.worldToLocal(_tmp);
-    gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(0, 0, 0); // sit slightly forward, barrel pointing ahead
+    gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(gunPitch, 0, 0); // pitch barrel to match the vertical aim
   };
 
   // JETPACK on Rick's back (back = -z local, which the 3rd-person camera sees) — rounded tank build (not boxy),
@@ -55,20 +56,12 @@ export function makeRick() {
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), JM(0xb0432a)); cap.position.set(sx, 0.26, 0); jetpack.add(cap);
     const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.085, 0.14, 10), JM(0x14161a)); noz.position.set(sx, -0.3, 0); jetpack.add(noz);
   }
-  const flames = [];
-  const flameMat = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const sx of [-0.13, 0.13]) {
-    const layers = [[0.09, 0.62, 0xff4d1a, 0.5], [0.06, 0.42, 0xffc23a, 0.7], [0.035, 0.24, 0xcfe6ff, 0.95]]; // outer→core
-    for (const [r, h, c, op] of layers) {
-      const f = new THREE.Mesh(new THREE.ConeGeometry(r, h, 10), flameMat(c, op));
-      f.rotation.x = Math.PI; f.position.set(sx, -0.34 - h / 2, 0); f.visible = false; f.userData.op = op;
-      jetpack.add(f); flames.push(f);
-    }
-  }
   jetpack.traverse((o) => { if (o.isMesh && o.material.metalness !== undefined) o.castShadow = true; });
+  const thruster = makeThruster();                             // additive particle plume from the two nozzles
+  jetpack.add(thruster.points);
 
-  let phase = 0, walkW = 0, jetSway = 0;
-  const _muzzleV = new THREE.Vector3();
+  let phase = 0, walkW = 0, jetSway = 0, gunPitch = 0;
+  const _muzzleV = new THREE.Vector3(), _spineQ = new THREE.Quaternion(), _xAxis = new THREE.Vector3(1, 0, 0);
   return {
     group, setWeapon,
     getMuzzle() { if (!gun) return null; gun.updateWorldMatrix(true, false); return gun.localToWorld(_muzzleV.set(0, 0, 0.7)); }, // barrel tip in world space
@@ -78,17 +71,18 @@ export function makeRick() {
         shoot.reset(); shoot.setLoop(THREE.LoopOnce, 1); shoot.clampWhenFinished = true; shoot.setEffectiveWeight(1).play();
       }
     },
-    update(dt, moving, speed = 1, jetting = false) {
-      for (const fl of flames) { fl.visible = jetting; if (jetting) { fl.scale.set(0.85 + Math.random() * 0.3, 0.7 + Math.random() * 0.8, 0.85 + Math.random() * 0.3); fl.material.opacity = fl.userData.op * (0.7 + Math.random() * 0.5); } }
-      jetSway += dt * (moving ? 9 * speed : 1.5);                // jetpack rocks side-to-side with the stride for natural motion
-      const amt = moving ? 0.14 : 0.03;
-      jetpack.rotation.z = Math.sin(jetSway) * amt; jetpack.position.x = Math.sin(jetSway) * amt * 0.2;
+    update(dt, moving, speed = 1, jetting = false, aimPitch = 0) {
+      gunPitch = aimPitch;                                       // barrel follows the vertical aim (so shots leave the muzzle correctly)
+      thruster.update(dt, jetting);                              // particle plume
+      jetSway += dt * (moving ? 16 * speed : 2.5);               // fast but SUBTLE side-to-side jiggle with the stride
+      jetpack.rotation.z = Math.sin(jetSway) * (moving ? 0.05 : 0.012);
       if (mixer) {
         mixer.update(dt);
         walkW += ((moving ? 1 : 0) - walkW) * Math.min(1, dt * 10); // crossfade walk in/out by movement
         if (walk) { walk.setEffectiveWeight(walkW); walk.setEffectiveTimeScale(4 * speed); } // 4x → reads as a run
         const firing = shoot && shoot.isRunning() && shoot.time < shoot.getClip().duration - 0.02;
         if (aim) aim.setEffectiveWeight(firing ? 0 : 1 - walkW); // idle → weapon-up ready stance (not hands-down); moving → walk; firing → shoot
+        if (spineBone) { _spineQ.setFromAxisAngle(_xAxis, Math.max(-0.8, Math.min(0.8, aimPitch))); spineBone.quaternion.copy(spineBase).multiply(_spineQ); } // lean the whole upper body (arms + hands + gun) to the aim
       } else if (legL) { // procedural fallback walk
         phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
@@ -116,4 +110,59 @@ function buildProcedural(group, refs) {
   for (const [x, y, z, tilt] of [[0, 0, 0, 0], [-0.16, -0.02, 0.05, 0.4], [0.16, -0.02, 0.05, -0.4], [-0.1, 0, -0.16, 0.2], [0.1, 0, -0.16, -0.2], [0, 0.04, 0.16, 0]]) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 7), mat(HAIR)); s.position.set(x, y + 0.18, z); s.rotation.z = tilt; hair.add(s); }
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   refs(legL, legR, armL, armR);
+}
+
+// soft round particle sprite (radial gradient → glowing dot) for additive flames
+function makeSoftTex() {
+  const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.45, "rgba(255,255,255,0.55)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+}
+
+// GPU thruster plume: a pool of additive soft sprites emitted from the two nozzles, falling + spreading and
+// fading through a hot→cool color ramp (blue-white core → yellow → orange → smoulder). update(dt, jetting).
+function makeThruster() {
+  const N = 130, NOZ = [[-0.13, -0.36], [0.13, -0.36]];
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), siz = new Float32Array(N), alp = new Float32Array(N);
+  const vel = new Float32Array(N * 3), age = new Float32Array(N).fill(99), life = new Float32Array(N);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+  geo.setAttribute("aSize", new THREE.BufferAttribute(siz, 1));
+  geo.setAttribute("aAlpha", new THREE.BufferAttribute(alp, 1));
+  // alpha-blended (not additive) so the flame reads as solid even over the bright daytime scene
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: makeSoftTex() } },
+    transparent: true, depthWrite: false,
+    vertexShader: "attribute float aSize; attribute vec3 aColor; attribute float aAlpha; varying vec3 vC; varying float vA; void main(){ vC=aColor; vA=aAlpha; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aSize*(340.0/max(0.1,-mv.z)); gl_Position=projectionMatrix*mv; }",
+    fragmentShader: "uniform sampler2D uTex; varying vec3 vC; varying float vA; void main(){ float a=texture2D(uTex,gl_PointCoord).a; gl_FragColor=vec4(vC,a*vA); }",
+  });
+  const points = new THREE.Points(geo, mat); points.frustumCulled = false;
+  // hot blue-white core → white → yellow → orange → red smoulder (core contrasts the orange scene)
+  const ramp = (t) => t < 0.15 ? [0.75, 0.92, 1.0] : t < 0.35 ? [1.0, 0.98, 0.85] : t < 0.6 ? [1.0, 0.82, 0.3] : t < 0.85 ? [1.0, 0.42, 0.12] : [0.7, 0.16, 0.05];
+  let acc = 0;
+  return {
+    points,
+    update(dt, jetting) {
+      if (jetting) { acc += dt; while (acc > 0.0035) { acc -= 0.0035; // dense emission while flying
+        for (let i = 0; i < N; i++) if (age[i] >= life[i]) {
+          const n = NOZ[(Math.random() * 2) | 0];
+          pos[i * 3] = n[0] + (Math.random() - 0.5) * 0.05; pos[i * 3 + 1] = n[1]; pos[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
+          vel[i * 3] = (Math.random() - 0.5) * 0.5; vel[i * 3 + 1] = -(2.6 + Math.random() * 2.0); vel[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+          age[i] = 0; life[i] = 0.22 + Math.random() * 0.2; break;
+        }
+      } }
+      for (let i = 0; i < N; i++) {
+        if (age[i] >= life[i]) { siz[i] = 0; alp[i] = 0; continue; }
+        age[i] += dt; const tn = age[i] / life[i];
+        pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+        const c = ramp(tn); col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+        alp[i] = Math.min(1, tn * 6) * (1 - tn) * 1.3;          // fade in fast, fade out toward the tail
+        siz[i] = 0.3 + 0.4 * tn;                                 // grows along the plume
+      }
+      geo.attributes.position.needsUpdate = geo.attributes.aColor.needsUpdate = geo.attributes.aSize.needsUpdate = geo.attributes.aAlpha.needsUpdate = true;
+    },
+  };
 }

@@ -414,7 +414,8 @@ class Game {
     this.playerModel.setWeapon(this.weapon.mode);                 // Rick holds the weapon he's actually using
     this.playerModel.group.position.set(c.pos.x, c.feetY, c.pos.z);
     this.playerModel.group.rotation.y = Math.atan2(fwd.x, fwd.z); // face the look dir (we see Rick's back)
-    this.playerModel.update(dt, c.moving && c.onGround, this.input.isDown("shift") ? 2 : 1, c.jetting); // sprint → 2x (8x anim); jetting → thruster flames
+    const aimPitch = -Math.asin(Math.max(-1, Math.min(1, fwd.y))); // barrel pitches with the camera's vertical aim
+    this.playerModel.update(dt, c.moving && c.onGround, this.input.isDown("shift") ? 2 : 1, c.jetting, aimPitch); // sprint → 2x (8x anim); jetting → thruster flames
     if (c.jetting && this.vfx.dustBurst && Math.random() < 0.7) this.vfx.dustBurst(new THREE.Vector3(c.pos.x + (Math.random() - 0.5) * 0.5, c.feetY + 0.25, c.pos.z + (Math.random() - 0.5) * 0.5)); // exhaust/smoke kicked up below
     if (this.input.mouseDown && this.weapon.mode !== "sword") this.playerModel.fireKick(); // recoil while shooting
   }

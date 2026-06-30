@@ -4,7 +4,7 @@ import { buildArcfallIsland } from "./arcfall.js";
 // scavenged-weapon economy, but you're RICK (3rd-person, visible, holding a gun) and the guardians are
 // Mr. MEESEEKS — regular ones plus HUGE tanky ones. Existing weapons only (Arc Blade + scattered guns).
 export const meeseeks = {
-  id: "arcfall_rick_and_morty",
+  id: "meeseeks_mayhem",
   name: "MEESEEKS MAYHEM",
   config: {
     view: "third",                                              // 3rd-person: you see Rick + his gun

@@ -12,7 +12,7 @@ export class Meeseeks {
     this.huge = !!spawn.huge;
     this.weapon = spawn.weapon === "melee" ? "gun" : (spawn.weapon || "gun"); // every Meeseeks is armed (no melee)
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
-    this.hp = spawn.hp || (this.huge ? 170 : 45);
+    this.hp = spawn.hp || (this.huge ? 510 : 135); // 3x tankier — Meeseeks take longer to put down
     this.speed = spawn.speed || (this.huge ? 4.2 + Math.random() : 6.5 + Math.random() * 1.5);
     this.melee = this.huge ? 18 : 8;
     this.reach = this.weapon === "rocket" ? 22 : this.weapon === "gun" ? 14 : (this.huge ? 3.4 : 2.2);

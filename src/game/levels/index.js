@@ -8,6 +8,7 @@ export const levels = {
   compound,
   "desert-base": desertBase,
   arcfall,
-  arcfall_rick_and_morty: meeseeks,
+  meeseeks_mayhem: meeseeks,
+  arcfall_rick_and_morty: meeseeks, // legacy alias so old links still resolve
 };
 export const DEFAULT_LEVEL = "desert-base";
