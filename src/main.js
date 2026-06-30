@@ -439,10 +439,10 @@ class Game {
       rocket.enemyRocket = true; rocket.radius = 5; rocket.playerDmg = o.dmg || 30;
       this._projectiles.push(rocket);
       this.audio.explosion?.();
-    } else { // hitscan blaster bolt + tracer
-      this.vfx.enemyLaser?.(from, to, 0x88ff55);
+    } else { // energy LASER bolt (green) — Meeseeks fire lasers, not bullets
+      this.vfx.laserBeam(from, to, 0x66ff44);
       this._onPlayerHit(o.dmg || 7);
-      this.audio.heliShot?.();
+      this.audio.zap?.();
     }
   }
 
