@@ -19,7 +19,7 @@ export class Meeseeks {
     this.dead = false; this.counted = false; this.removable = false;
     this.aggro = false; this.aggroRange = spawn.aggro || (this.huge ? 46 : 34);
     this.yaw = 0; this._atkCd = Math.random() * 1.5; this._t = Math.random() * 6; this._walkW = 0;
-    this.sc = this.huge ? 1.9 : 1.0;
+    this.sc = this.huge ? 3.8 : 1.0; // huge Meeseeks are 2x bigger (towering)
 
     this.group = new THREE.Group(); this.group.position.copy(this.pos); scene.add(this.group);
     this._invScale = 1;

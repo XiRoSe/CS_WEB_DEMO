@@ -20,11 +20,7 @@ export const meeseeks = {
 
   build(b) {
     buildArcfallIsland(b, { bossKind: "meeseeks" });            // the full ARCFALL island + arcs + weapons, with a HUGE Meeseeks guardian
-    // a welcome party near the south-shore drop — a mix of melee swarmers, blaster gunners + a rocketeer
-    const party = [[10, 122, "gun"], [-14, 118, "gun"], [22, 104, "rocket"], [-30, 100, "rocket"], [2, 96, "gun"],
-                   [36, 110, "gun"], [-44, 106, "rocket"], [16, 108, "gun"], [-6, 112, "gun"]];
-    for (const [x, z, weapon] of party) b.enemy({ kind: "meeseeks", x, z, weapon });
-    for (const [x, z, weapon] of [[26, 90, "rocket"], [-26, 88, "gun"]]) b.enemy({ kind: "meeseeks", huge: true, x, z, weapon });
+    // no welcome party — Meeseeks rain from the sky every 5s during play (main._dropReinforcement)
     // extra ammo caches dotted across the island (Rick burns through the arsenal fast)
     for (const [x, z] of [[0, 60], [-50, 4], [50, 6], [-30, -40], [42, -42], [-80, 34], [82, 30], [4, -72], [-110, -8], [122, 22], [-22, 130], [62, 112], [102, -50], [-92, 82], [18, 14], [-58, -64]]) b.giftCrate(x, z, "ammo");
   },
