@@ -63,8 +63,8 @@ export class Weapon {
     // generic hitscan guns (one shared viewmodel slot; model swapped per mode)
     this.guns = {
       smg:     { model: "smg",     rate: 0.075, ammo: 96,  dmg: 16,  pellets: 1, spread: 0.03, sound: "shoot",   pitch: 1.25, beam: 0xfff0bf, kick: 0.05 },
-      minigun: { model: "minigun", rate: 0.05,  ammo: 150, dmg: 12,  pellets: 1, spread: 0.06, sound: "shoot",   pitch: 0.78, beam: 0xfff0bf, ecolor: 0x66ff44, kick: 0.04 },
-      burst:   { model: "smg",     rate: 0.32,  ammo: 72,  dmg: 22,  pellets: 3, spread: 0.02, sound: "shoot",   pitch: 1.0,  beam: 0xfff0bf, ecolor: 0xc06bff, kick: 0.1 },
+      minigun: { model: "minigun", rate: 0.05,  ammo: 150, dmg: 12,  pellets: 1, spread: 0.06, sound: "shoot",   pitch: 0.78, beam: 0xfff0bf, ecolor: 0x66ff44, esound: "zap",   kick: 0.04 },
+      burst:   { model: "smg",     rate: 0.32,  ammo: 72,  dmg: 22,  pellets: 3, spread: 0.02, sound: "shoot",   pitch: 1.0,  beam: 0xfff0bf, ecolor: 0xc06bff, esound: "laser", kick: 0.1 },
       railgun: { model: "railgun", rate: 1.1,   ammo: 14,  dmg: 240, pellets: 1, spread: 0,    sound: "railgun", pitch: 0.7,  beam: 0x46ff5a, kick: 0.16, pierce: true },
       flak:    { model: "minigun", rate: 0.45,  ammo: 36,  dmg: 18,  pellets: 6, spread: 0.16, sound: "shotgun", pitch: 1.0,  beam: 0xffcaa0, kick: 0.16 },
     };
@@ -239,7 +239,7 @@ export class Weapon {
     this.rockets = Math.min(8, this.rockets + Math.round(2 * mult));
   }
   canFireGun(t) { const g = this.guns[this.mode], a = this.A[this.mode]; return !!g && !this.reloading && a.mag > 0 && (t - this._gunLast[this.mode]) >= g.rate; }
-  fireGun(t) { const g = this.guns[this.mode], a = this.A[this.mode]; this._gunLast[this.mode] = t; a.mag--; this.kick = g.kick; this.kickRot = g.kick * 1.2; this.audio && this.audio[g.sound] && this.audio[g.sound](g.pitch || 1); if (a.mag === 0) this.reload(); }
+  fireGun(t) { const g = this.guns[this.mode], a = this.A[this.mode]; this._gunLast[this.mode] = t; a.mag--; this.kick = g.kick; this.kickRot = g.kick * 1.2; const snd = (this._energyBeam && g.esound) ? g.esound : g.sound; this.audio && this.audio[snd] && this.audio[snd](g.pitch || 1); if (a.mag === 0) this.reload(); }
 
   // cycle through owned weapons (Q)
   toggle() {
@@ -259,7 +259,7 @@ export class Weapon {
   }
 
   canFirePlasma(t) { return this.mode === "plasma" && !this.reloading && this.A.plasma.mag > 0 && (t - this._lastPlasma) >= this.plasmaRate; }
-  firePlasma(t) { this._lastPlasma = t; this.A.plasma.mag--; this.kick = 0.13; this.kickRot = 0.17; this.audio?.grenadeLaunch?.(); if (this.A.plasma.mag === 0) this.reload(); }
+  firePlasma(t) { this._lastPlasma = t; this.A.plasma.mag--; this.kick = 0.13; this.kickRot = 0.17; if (this._energyBeam) this.audio?.plasma?.(); else this.audio?.grenadeLaunch?.(); if (this.A.plasma.mag === 0) this.reload(); }
   canFireLaser(t) { return this.mode === "laser" && !this.reloading && this.A.laser.mag > 0 && (t - this._lastLaser) >= this.laserRate; }
   fireLaser(t) { this._lastLaser = t; this.A.laser.mag--; this.kick = 0.04; this.kickRot = 0.05; this.audio?.laser?.(); if (this.A.laser.mag === 0) this.reload(); }
   canFireSword(t) { return this.mode === "sword" && (t - this._lastSword) >= this.swordRate; }
@@ -286,7 +286,7 @@ export class Weapon {
     this.flash.scale.setScalar(0.7 + Math.random() * 0.6);
     this.flashLight.intensity = 6;
     this._flashT = 0.05;
-    this.audio?.shoot?.();
+    if (this._energyBeam) this.audio?.laser?.(0.5); else this.audio?.shoot?.(); // sci-fi energy carbine
     if (this.A.rifle.mag === 0) this.reload();
   }
 
