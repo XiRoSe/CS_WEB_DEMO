@@ -422,7 +422,7 @@ class Game {
     const gy = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     pm.setWeapon("launcher");                                   // bazooka in hand
     pm.group.position.set(sp.x, gy, sp.z);
-    pm.group.rotation.y = Math.sin(t * 0.5) * (Math.PI / 3);   // sway ±60° (120° front arc) facing the camera — no full spin
+    pm.group.rotation.y = Math.sin(t * 0.5) * (Math.PI / 6);   // sway ±30° (60° front arc) facing the camera
     pm.update(dt, false, 1);                                    // idle "weapon up" stance + gun snaps to the hand
     this.camera.position.set(sp.x, gy + 1.6, sp.z + 3.6);      // centered in front (not off to the side)
     this.camera.lookAt(sp.x, gy + 1.15, sp.z);
