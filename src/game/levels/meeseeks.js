@@ -12,8 +12,8 @@ export const meeseeks = {
     intro: { enabled: true, style: "droppod", spottedCalloutAt: 4.5 }, // same sky-fall drop-pod cinematic + story as the original ARCFALL
     objective: { type: "collect", count: 12 },                  // recover the 12 arcs, same as ARCFALL
     helicopter: { spawnDelay: 99999 },
-    // Rick starts with the WHOLE arsenal (Q to cycle) at full ammo; extra ammo caches dot the island to top up
-    player: { grenades: 4, startLoadout: ["rifle", "smg", "minigun", "burst", "railgun", "flak", "laser", "plasma", "launcher"] },
+    // Rick's arsenal (Q to cycle) at full ammo — no SMG / portal-gun (laser) / railgun; extra ammo caches dot the island
+    player: { grenades: 4, startLoadout: ["rifle", "minigun", "burst", "flak", "plasma", "launcher"], bannedWeapons: ["smg", "laser", "railgun"] },
     reinforce: "meeseeks",                                      // the sky-drop reinforcements are Meeseeks (mostly regular, some huge)
     messages: { deployHint: "CLICK TO DEPLOY — recover the arcs, survive the Meeseeks", hostileDown: "MEESEEKS POOFED" },
   },

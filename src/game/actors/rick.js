@@ -45,7 +45,29 @@ export function makeRick() {
     gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(0, 0, 0); // sit slightly forward, barrel pointing ahead
   };
 
-  let phase = 0, walkW = 0;
+  // JETPACK on Rick's back (back = -z local, which the 3rd-person camera sees) — rounded tank build (not boxy),
+  // with layered additive thruster flames (blue-white core → yellow → orange tail) that flicker while flying.
+  const jetpack = new THREE.Group(); jetpack.position.set(0, 1.34, -0.26); group.add(jetpack);
+  const JM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.6, roughness: 0.4, flatShading: true, ...o });
+  jetpack.add(Object.assign(new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.34, 6, 10), JM(0x3a3f47)), { position: new THREE.Vector3(0, 0, 0.05) })); // slim central spine
+  for (const sx of [-0.13, 0.13]) {                            // two rounded fuel tanks + red caps + nozzles
+    const tank = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.32, 6, 12), JM(0x59636f)); tank.position.set(sx, 0, 0); jetpack.add(tank);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), JM(0xb0432a)); cap.position.set(sx, 0.26, 0); jetpack.add(cap);
+    const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.085, 0.14, 10), JM(0x14161a)); noz.position.set(sx, -0.3, 0); jetpack.add(noz);
+  }
+  const flames = [];
+  const flameMat = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (const sx of [-0.13, 0.13]) {
+    const layers = [[0.09, 0.62, 0xff4d1a, 0.5], [0.06, 0.42, 0xffc23a, 0.7], [0.035, 0.24, 0xcfe6ff, 0.95]]; // outer→core
+    for (const [r, h, c, op] of layers) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(r, h, 10), flameMat(c, op));
+      f.rotation.x = Math.PI; f.position.set(sx, -0.34 - h / 2, 0); f.visible = false; f.userData.op = op;
+      jetpack.add(f); flames.push(f);
+    }
+  }
+  jetpack.traverse((o) => { if (o.isMesh && o.material.metalness !== undefined) o.castShadow = true; });
+
+  let phase = 0, walkW = 0, jetSway = 0;
   const _muzzleV = new THREE.Vector3();
   return {
     group, setWeapon,
@@ -56,7 +78,11 @@ export function makeRick() {
         shoot.reset(); shoot.setLoop(THREE.LoopOnce, 1); shoot.clampWhenFinished = true; shoot.setEffectiveWeight(1).play();
       }
     },
-    update(dt, moving, speed = 1) {
+    update(dt, moving, speed = 1, jetting = false) {
+      for (const fl of flames) { fl.visible = jetting; if (jetting) { fl.scale.set(0.85 + Math.random() * 0.3, 0.7 + Math.random() * 0.8, 0.85 + Math.random() * 0.3); fl.material.opacity = fl.userData.op * (0.7 + Math.random() * 0.5); } }
+      jetSway += dt * (moving ? 9 * speed : 1.5);                // jetpack rocks side-to-side with the stride for natural motion
+      const amt = moving ? 0.14 : 0.03;
+      jetpack.rotation.z = Math.sin(jetSway) * amt; jetpack.position.x = Math.sin(jetSway) * amt * 0.2;
       if (mixer) {
         mixer.update(dt);
         walkW += ((moving ? 1 : 0) - walkW) * Math.min(1, dt * 10); // crossfade walk in/out by movement

@@ -414,7 +414,8 @@ class Game {
     this.playerModel.setWeapon(this.weapon.mode);                 // Rick holds the weapon he's actually using
     this.playerModel.group.position.set(c.pos.x, c.feetY, c.pos.z);
     this.playerModel.group.rotation.y = Math.atan2(fwd.x, fwd.z); // face the look dir (we see Rick's back)
-    this.playerModel.update(dt, c.moving && c.onGround, this.input.isDown("shift") ? 2 : 1); // sprint → 2x (8x anim)
+    this.playerModel.update(dt, c.moving && c.onGround, this.input.isDown("shift") ? 2 : 1, c.jetting); // sprint → 2x (8x anim); jetting → thruster flames
+    if (c.jetting && this.vfx.dustBurst && Math.random() < 0.7) this.vfx.dustBurst(new THREE.Vector3(c.pos.x + (Math.random() - 0.5) * 0.5, c.feetY + 0.25, c.pos.z + (Math.random() - 0.5) * 0.5)); // exhaust/smoke kicked up below
     if (this.input.mouseDown && this.weapon.mode !== "sword") this.playerModel.fireKick(); // recoil while shooting
   }
 
@@ -897,10 +898,10 @@ class Game {
           if (gf.kind === "grenade") { this.grenades += 2; this.hud.setGrenades(this.grenades); this.hud.notify("+2 GRENADES · GIFT"); }
           else if (gf.kind === "health") { this.health = Math.min(this.cfg.player.maxHealth, this.health + 40); this.hud.setHealth(this.health, this.cfg.player.maxHealth); this.hud.notify("+40 HEALTH"); }
           else if (gf.kind === "armor") { this.armor = Math.min(this.maxArmor, this.armor + 50); this.hud.setArmor(this.armor, this.maxArmor); this.hud.notify("+50 ARMOR"); }
-          else if (this.weapon.allWeapons.includes(gf.kind)) {
+          else if (this.weapon.allWeapons.includes(gf.kind) && !(this.cfg.player.bannedWeapons || []).includes(gf.kind)) {
             this.weapon.give(gf.kind); this.hud.setWeaponName(this._weaponName(gf.kind));
             this.hud.notify(`✦ ${this._weaponName(gf.kind)} ACQUIRED — Q to cycle`);
-          } else { // ammo cache — resupply, then it respawns nearby after 10s
+          } else { // ammo cache (or a removed-weapon crate) — resupply, then it respawns nearby after 10s
             this.weapon.addAmmo(1.5); this.hud.notify("✦ AMMO CACHE — ALL WEAPONS REPLENISHED");
             (this._ammoRespawns || (this._ammoRespawns = [])).push({ gf, ox: gf.x, oz: gf.z, at: t + 10 });
           }
