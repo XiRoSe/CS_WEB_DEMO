@@ -81,6 +81,7 @@ export function makeRick() {
         walkW += ((moving ? 1 : 0) - walkW) * Math.min(1, dt * 10); // crossfade walk in/out by movement
         if (walk) { walk.setEffectiveWeight(walkW); walk.setEffectiveTimeScale(4 * speed); } // 4x → reads as a run
         const firing = shoot && shoot.isRunning() && shoot.time < shoot.getClip().duration - 0.02;
+        if (shoot) shoot.setEffectiveWeight(firing ? 1 : 0); // release the shoot pose once the shot finishes — clamped weight was corrupting the walk loop
         if (aim) aim.setEffectiveWeight(firing ? 0 : 1 - walkW); // idle → weapon-up ready stance (not hands-down); moving → walk; firing → shoot
         if (spineBone) { _spineQ.setFromAxisAngle(_xAxis, Math.max(-0.8, Math.min(0.8, aimPitch))); spineBone.quaternion.copy(spineBase).multiply(_spineQ); } // lean the whole upper body (arms + hands + gun) to the aim
       } else if (legL) { // procedural fallback walk
