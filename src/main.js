@@ -382,16 +382,7 @@ class Game {
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
     const pos = this.camera.position.clone().addScaledVector(dir, 0.8);
     const vel = dir.clone().multiplyScalar(50); // fast, flat trajectory
-    // a proper missile: olive body + red nose cone + tail fins, built along +Y then aimed along flight
-    const mesh = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 10), new THREE.MeshStandardMaterial({ color: 0x4b5320, metalness: 0.3, roughness: 0.6 }));
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x8a2b1a, metalness: 0.3, roughness: 0.5 })); nose.position.y = 0.38;
-    mesh.add(body, nose);
-    for (let i = 0; i < 4; i++) {
-      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.13, 0.12), new THREE.MeshStandardMaterial({ color: 0x2c2e26 }));
-      const a = i * Math.PI / 2; fin.position.set(Math.cos(a) * 0.08, -0.26, Math.sin(a) * 0.08); fin.rotation.y = -a;
-      mesh.add(fin);
-    }
+    const mesh = makeMissileMesh(0x4b5320, 0x8a2b1a);             // olive body + red nose + fins
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()); // point along flight
     const rocket = new Projectile(this.scene, mesh, pos, vel, { gravity: 2.5, fuse: 4, detonateOnHit: true });
     const rb = this.cfg.balance.rocket;
@@ -440,7 +431,7 @@ class Game {
     const to = new THREE.Vector3(o.to.x, o.to.y, o.to.z);
     if (o.kind === "rocket") { // a real travelling rocket that explodes near Rick
       const dir = to.clone().sub(from).normalize();
-      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x551006, emissive: 0xd23a1a, emissiveIntensity: 1.3, flatShading: true }));
+      const mesh = makeMissileMesh(0x6a7030, 0xb83020); // olive body + red nose + fins, aimed along flight
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
       const rocket = new Projectile(this.scene, mesh, from.clone().addScaledVector(dir, 0.8), dir.multiplyScalar(24), { gravity: 2.5, fuse: 5, detonateOnHit: true });
       rocket.enemyRocket = true; rocket.radius = 5; rocket.playerDmg = o.dmg || 30;
@@ -992,4 +983,21 @@ if (isMobileOrTablet()) {
   showDesktopOnlyScreen();
 } else {
   window.__game = new Game();
+}
+
+// a low-poly MISSILE mesh (body cylinder + nose cone + 4 tail fins), built along +Y so the caller can aim it
+// along the flight direction. Shared by Rick's launcher and the Meeseeks rockets.
+function makeMissileMesh(bodyColor = 0x4b5320, noseColor = 0x8a2b1a) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 10), new THREE.MeshStandardMaterial({ color: bodyColor, metalness: 0.3, roughness: 0.6 }));
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10), new THREE.MeshStandardMaterial({ color: noseColor, metalness: 0.3, roughness: 0.5 })); nose.position.y = 0.38;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.083, 0.083, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0xeae0d0, roughness: 0.7 })); band.position.y = 0.12;
+  g.add(body, nose, band);
+  for (let i = 0; i < 4; i++) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.13, 0.12), new THREE.MeshStandardMaterial({ color: 0x2c2e26 }));
+    const a = i * Math.PI / 2; fin.position.set(Math.cos(a) * 0.08, -0.26, Math.sin(a) * 0.08); fin.rotation.y = -a;
+    g.add(fin);
+  }
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; if (o.material) o.material.userData.outlineParameters = { visible: false }; } });
+  return g;
 }
