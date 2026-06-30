@@ -217,8 +217,8 @@ export class VFX {
   laserBeam(a, b, color = 0x34ffd6) {
     this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;
     const beam = this._next(this.enemyBeams);
-    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(1.8, len, 1.8);
-    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = 0.9; beam.life = beam.max = 0.12;
+    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(0.55, len, 0.55);
+    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = 0.85; beam.life = beam.max = 0.1;
     this.tracer(a, b); // bright white-hot core down the centre
     this._flash(a, 0.4, 0xffffff); this._flash(b, 0.75, color);
   }

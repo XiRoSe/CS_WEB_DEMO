@@ -273,7 +273,7 @@ class Game {
     this.camera.position.set(this.level.playerSpawn.x, this.controller.eye, this.level.playerSpawn.z);
     this.controller._euler.set(0, 0, 0);
     this.camera.quaternion.setFromEuler(this.controller._euler);
-    if (this._thirdPerson) { const sp = this.level.playerSpawn; this.controller.pos.set(sp.x, 0, sp.z); this.controller.feetY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0; } // Rick stands up exactly where the pod landed
+    if (this._thirdPerson) { const sp = this.level.playerSpawn; this.controller.pos.set(sp.x, 0, sp.z); this.controller.feetY = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0; setTimeout(() => this.audio.playBuf?.("rick_wabba", 0.95), 600); } // Rick stands up where the pod landed + his catchphrase
     this._startPlay();
   }
   _resume() {
@@ -298,7 +298,7 @@ class Game {
     this.hud.setGrenades(this.grenades);
     this.touch.show();
     this.audio.stopDropWhoosh?.(); // safety: ensure the plummet whoosh isn't still ringing
-    this.audio.stopLobbyMusic?.(); this.audio.stopBattleMusic?.(); this.audio.startGameMusic?.(); // gameplay loop: Oliver Tree "Alien Boy" (Pacific Rim returns at the finale)
+    this.audio.stopLobbyMusic?.(); this.audio.stopBattleMusic?.(); this.audio.startGameMusic?.(this.cfg.music); // gameplay loop (per-level track; default Oliver Tree "Alien Boy")
     if (!this._deployed) { this._deployed = true; this.voice.deploy(); this._timeLeft = 300; } // 5:00 mission clock
     this.state = "play";
   }
@@ -317,6 +317,7 @@ class Game {
   _win(extra = {}) {
     if (this.state === "win" || this.state === "winseq") return;
     trackEnd(true); // game FINISHED (victory)
+    if (this._thirdPerson) this.audio.playBuf?.("rick_wabba", 1.0); // Rick's victory catchphrase
     this.audio.jetpack?.(false);
     this.hud.setCombatVisible(false);
     this.hud.showTimer(false); this.hud.hideDefuse();
@@ -637,6 +638,10 @@ class Game {
         this.vfx._shockwave?.(c); for (let k = 0; k < 8; k++) this.vfx.dustBurst(c.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9 * ps, 0.3, (Math.random() - 0.5) * 9 * ps)));
         this.audio.explosion?.();
         this.combat.spawnEnemy(r.spec);
+        if (r.spec.kind === "meeseeks") { // Meeseeks announces itself on landing — quieter the farther from Rick
+          const dist = Math.hypot(r.spec.x - this.controller.pos.x, r.spec.z - this.controller.pos.z);
+          this.audio.playBuf?.("meeseeks_voice", Math.max(0.06, 1 - dist / 80) * 0.95);
+        }
       }
     }
   }

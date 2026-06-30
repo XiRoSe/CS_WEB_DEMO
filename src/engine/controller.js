@@ -45,7 +45,7 @@ export class Controller {
     // VIEW MODE (engine-level): "first" = camera sits at the eye; "third" = camera orbits behind a body
     // point so a game can show a visible avatar. Movement/collision always run on the body point `this.pos`.
     this.view = "first";
-    this.thirdDist = 5.0; this.thirdLift = 0.6;   // 3rd-person camera distance + height
+    this.thirdDist = 5.0; this.thirdLift = 0.6; this.thirdSide = 0.75;   // 3rd-person camera distance + height + over-the-shoulder offset
     this.pos = new THREE.Vector3(level.playerSpawn.x, 0, level.playerSpawn.z); // body XZ (feetY = height)
     this.headPos = new THREE.Vector3(level.playerSpawn.x, this.eye, level.playerSpawn.z); // player head world point (what enemies/pickups target)
 
@@ -191,7 +191,10 @@ export class Controller {
     this.headPos.set(this.pos.x, eyeY, this.pos.z); // the player's head — what enemies/pickups target (both views)
     if (this.view === "third") {
       this._fwd.set(0, 0, -1).applyEuler(this._euler); // full look dir (incl. pitch) for the orbit
-      this.camera.position.set(this.pos.x - this._fwd.x * this.thirdDist, eyeY - this._fwd.y * this.thirdDist + this.thirdLift, this.pos.z - this._fwd.z * this.thirdDist);
+      this.camera.position.set(
+        this.pos.x - this._fwd.x * this.thirdDist + this._right.x * this.thirdSide, // over-the-shoulder so the body doesn't block the crosshair
+        eyeY - this._fwd.y * this.thirdDist + this.thirdLift,
+        this.pos.z - this._fwd.z * this.thirdDist + this._right.z * this.thirdSide);
     } else {
       this.camera.position.set(this.pos.x, eyeY, this.pos.z);
     }

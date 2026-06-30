@@ -54,6 +54,9 @@ export class Audio {
       railgun: "/audio/railgun.mp3",           // real railgun shot
       battle_theme: "/audio/battle_theme.mp3", // Pacific Rim — opening crawl + victory finale (needed first)
       game_theme: "/audio/game_theme.mp3",     // Oliver Tree "Alien Boy" — the in-game loop (needed ~23s in)
+      schwifty: "/audio/schwifty.mp3",          // Rick & Morty level's in-game track
+      rick_wabba: "/audio/rick_wabba.mp3",      // Rick catchphrase (land + win)
+      meeseeks_voice: "/audio/meeseeks_voice.mp3", // Meeseeks announces itself on landing
     };
     for (const [name, url] of Object.entries(clips)) {
       try {
@@ -64,7 +67,7 @@ export class Audio {
         // battle theme just decoded: start (or upgrade from a synth fallback to) the real Pacific Rim track
         if (name === "battle_theme" && this._battleWanted && (!this._battle || !this._battle.real)) { if (this._battle) this.stopBattleMusic(); this._battleWanted = true; this.startBattleMusic(); }
         // game theme just decoded: start it if gameplay already asked for it
-        if (name === "game_theme" && this._gameWanted && !this._game) this.startGameMusic();
+        if (name === (this._gameTrack || "game_theme") && this._gameWanted && !this._game) this.startGameMusic();
       } catch (e) {
         if (name === "battle_theme") { this._battleThemeFailed = true; if (this._battleWanted && !this._battle) this.startBattleMusic(); } // only NOW use the synth fallback
       }
@@ -463,11 +466,13 @@ export class Audio {
     setTimeout(() => { try { m.src && m.src.stop(); } catch { /* stopped */ } try { m.bus.disconnect(); } catch { /* already gone */ } }, 900);
   }
   // in-game loop: Oliver Tree "Alien Boy", looped (no synth fallback — just silent until the mp3 decodes)
-  startGameMusic() {
+  startGameMusic(name) {
+    if (name) this._gameTrack = name;          // per-level track (e.g. "schwifty"); defaults to game_theme
+    const track = this._gameTrack || "game_theme";
     if (!this.ctx || this._game) return;
     this._gameWanted = true; // remember it; the loader starts it once decoded
-    if (!this.buffers.game_theme) return;
-    const s = this.ctx.createBufferSource(); s.buffer = this.buffers.game_theme; s.loop = true;
+    if (!this.buffers[track]) return;
+    const s = this.ctx.createBufferSource(); s.buffer = this.buffers[track]; s.loop = true;
     const bus = this.ctx.createGain(); bus.gain.value = 0; bus.connect(this.master);
     bus.gain.linearRampToValueAtTime(0.625, this.ctx.currentTime + 1.0); // in-game track, +25% louder
     s.connect(bus); s.start();

@@ -16,6 +16,7 @@ export const meeseeks = {
     player: { grenades: 4, startLoadout: ["rifle", "minigun", "burst", "plasma", "launcher"], bannedWeapons: ["smg", "laser", "railgun", "flak"] },
     // sci-fi blaster names (they fire energy/laser bolts)
     weaponNames: { rifle: "PHOTON CARBINE", minigun: "TACHYON REPEATER", burst: "ION BURSTER", plasma: "PLASMA CANNON", launcher: "FUSION LAUNCHER" },
+    music: "schwifty",                                          // this level's in-game track
     reinforce: "meeseeks",                                      // the sky-drop reinforcements are Meeseeks (mostly regular, some huge)
     messages: { deployHint: "CLICK TO DEPLOY — recover the arcs, survive the Meeseeks", hostileDown: "MEESEEKS POOFED" },
   },
