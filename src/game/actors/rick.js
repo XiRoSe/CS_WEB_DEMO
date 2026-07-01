@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { RICK_MODEL, RICK_WALK, RICK_RUN, RICK_GUN, RM_HAND_BONE, clipsOf } from "./rickmorty-assets.js";
+import { RICK_MODEL, RICK_WALK, RICK_RUN, RICK_GUN, RICK_DANCE, RM_HAND_BONE, clipsOf } from "./rickmorty-assets.js";
 import { makeHeldGun, gunKindForMode } from "./heldguns.js";
 import { makeGunModel } from "./gunmodels.js";
 
@@ -10,7 +10,7 @@ export function makeRick() {
   const group = new THREE.Group();
   let mixer = null, hand = null, handL = null;
   // Upper/lower-body split actions: legs run the locomotion clip, torso+arms crossfade to the Gunplay pose.
-  let idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp;
+  let idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp, dance;
   let legL, legR, armL, armR; // procedural fallback handles
 
   if (RICK_MODEL.ready) {
@@ -26,8 +26,9 @@ export function makeRick() {
     walkLo = mk(rWalk, false); walkUp = mk(rWalk, true);
     runLo = mk(rRun, false); runUp = mk(rRun, true);
     gunUp = mk(rGun, true); // only the upper half of the gun stance — legs come from locomotion
+    const rDance = clipsOf(RICK_DANCE)[0]; if (rDance) dance = mixer.clipAction(rDance); // full-body Salsa for the deploy screen
     hand = inst.bones.rightHand; handL = inst.bones.leftHand;
-    for (const a of [idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp]) if (a) { a.play(); a.setEffectiveWeight(0); }
+    for (const a of [idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp, dance]) if (a) { a.play(); a.setEffectiveWeight(0); }
     if (idleLo) idleLo.setEffectiveWeight(1); if (idleUp) idleUp.setEffectiveWeight(1);
   } else {
     buildProcedural(group, (l, r, al, ar) => { legL = l; legR = r; armL = al; armR = ar; });
@@ -53,10 +54,12 @@ export function makeRick() {
   // IRON-MAN hand jets: no jetpack — while flying, fire streams down out of both palms (thrusters tracked to the hands)
   const thruster = makeThruster(); thruster.points.frustumCulled = false; group.add(thruster.points);
 
-  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, gunPitch = 0, restDown = 0;
+  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, gunPitch = 0, restDown = 0, dW = 0;
+  let dancing = false;
   const _muzzleV = new THREE.Vector3(), _hp = new THREE.Vector3();
   return {
     group, setWeapon,
+    setDancing(on) { dancing = !!on; }, // deploy screen: Rick does the Salsa (weaponless)
     getMuzzle() { if (!gun) return null; gun.updateWorldMatrix(true, false); return gun.localToWorld(_muzzleV.set(0, 0, 0.7)); }, // barrel tip in world space
     fireKick() { fT = 0.3; }, // firing → blend in the Gunplay clip for a moment
     _weights: () => ({ idleLo: idleLo ? +idleLo.getEffectiveWeight().toFixed(2) : 0, walkLo: walkLo ? +walkLo.getEffectiveWeight().toFixed(2) : 0, runLo: runLo ? +runLo.getEffectiveWeight().toFixed(2) : 0, walkUp: walkUp ? +walkUp.getEffectiveWeight().toFixed(2) : 0, gunUp: gunUp ? +gunUp.getEffectiveWeight().toFixed(2) : 0, gunRotX: gun ? +gun.rotation.x.toFixed(2) : 0 }), // debug: legs vs arms
@@ -71,25 +74,28 @@ export function makeRick() {
         mW += ((moving ? 1 : 0) - mW) * Math.min(1, dt * 10);                     // idle↔move blend
         sW += (((moving && speed > 1.5) ? 1 : 0) - sW) * Math.min(1, dt * 8);     // walk↔run blend
         fW += (((fT > 0) ? 1 : 0) - fW) * Math.min(1, dt * 14);                   // gunplay (arm) blend
+        dW += (((dancing && dance) ? 1 : 0) - dW) * Math.min(1, dt * 8);           // deploy-screen Salsa (full body)
         const jW = jetting ? 1 : 0;                                                // flying → idle hover (Iron-Man), gun stowed
-        const m = mW * (1 - jW), f = fW * (1 - jW);
-        // LEGS (lower body): always locomotion — idle / walk / run — independent of firing
-        if (idleLo) idleLo.setEffectiveWeight(Math.max(1 - m, jW));
-        if (walkLo) walkLo.setEffectiveWeight(m * (1 - sW));
-        if (runLo) runLo.setEffectiveWeight(m * sW);
+        const m = mW * (1 - jW), f = fW * (1 - jW), g2 = 1 - dW;                    // g2: everything else fades out under the dance
+        if (dance) dance.setEffectiveWeight(dW);
+        // LEGS (lower body): always locomotion — idle / walk / run — independent of firing (all scaled down while dancing)
+        if (idleLo) idleLo.setEffectiveWeight(Math.max(1 - m, jW) * g2);
+        if (walkLo) walkLo.setEffectiveWeight(m * (1 - sW) * g2);
+        if (runLo) runLo.setEffectiveWeight(m * sW * g2);
         // TORSO + ARMS (upper body): locomotion swing when idle, Gunplay aim stance while firing → run-and-gun
-        if (gunUp) gunUp.setEffectiveWeight(f);
-        if (idleUp) idleUp.setEffectiveWeight(Math.max((1 - m) * (1 - f), jW));
-        if (walkUp) walkUp.setEffectiveWeight(m * (1 - sW) * (1 - f));
-        if (runUp) runUp.setEffectiveWeight(m * sW * (1 - f));
+        if (gunUp) gunUp.setEffectiveWeight(f * g2);
+        if (idleUp) idleUp.setEffectiveWeight(Math.max((1 - m) * (1 - f), jW) * g2);
+        if (walkUp) walkUp.setEffectiveWeight(m * (1 - sW) * (1 - f) * g2);
+        if (runUp) runUp.setEffectiveWeight(m * sW * (1 - f) * g2);
       } else if (legL) { // procedural fallback walk
         phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
         else { legL.rotation.x *= 0.85; legR.rotation.x *= 0.85; }
       }
       restDown += (((!moving && fT <= 0 && !jetting) ? 1 : 0) - restDown) * Math.min(1, dt * 8); // lower the barrel when standing idle
-      if (gun) gun.visible = !jetting;                           // stow the gun while flying (fire from bare hands)
-      if (!jetting) trackGun();                                  // keep the weapon in-hand + pointing forward/down
+      const stow = jetting || dancing;                           // gun hidden while flying (bare-hand jets) or dancing (weaponless)
+      if (gun) gun.visible = !stow;
+      if (!stow) trackGun();                                     // keep the weapon in-hand + pointing forward/down
     },
   };
 }

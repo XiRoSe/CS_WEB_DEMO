@@ -234,6 +234,7 @@ class Game {
   _beginIntro() {
     if (this.state === "intro" || this._introDone) return;
     this._menuLightsOff(); // drop the deploy-screen fill once we commit to the mission
+    if (this.playerModel && this.playerModel.setDancing) this.playerModel.setDancing(false); // stop the Salsa, time to fight
     trackStart(); // count a play (the moment they commit to the mission)
     if (!this.cfg.intro.enabled) { this._introDone = true; this._startPlay(); return; }
     this.state = "intro";
@@ -283,6 +284,7 @@ class Game {
   }
   _startPlay() {
     this._menuLightsOff(); // deploy-screen fill is gone once play begins
+    if (this.playerModel && this.playerModel.setDancing) this.playerModel.setDancing(false); // no dancing in combat
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
@@ -420,10 +422,10 @@ class Game {
     const pm = this.playerModel, sp = this.level.playerSpawn;
     const gy = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
     pm.group.visible = true;                                    // shown on the deploy screen (hidden during the drop)
-    pm.setWeapon("launcher");                                   // bazooka in hand
+    pm.setDancing(true);                                        // Rick busts out the Salsa (weaponless) — it's cool 🙂
     pm.group.position.set(sp.x, gy, sp.z);
-    pm.group.rotation.y = Math.sin(t * 0.5) * (Math.PI / 6);   // sway ±30° (60° front arc) facing the camera
-    pm.update(dt, false, 1);                                    // idle "weapon up" stance + gun snaps to the hand
+    pm.group.rotation.y = Math.sin(t * 0.4) * (Math.PI / 8);   // gentle sway so the dance is seen from a few angles
+    pm.update(dt, false, 1);                                    // full-body dance clip takes over
     this.camera.position.set(sp.x, gy + 1.6, sp.z + 3.6);      // centered in front (not off to the side)
     this.camera.lookAt(sp.x, gy + 1.15, sp.z);
     if (Math.abs(this.camera.fov - 42) > 0.01) { this.camera.fov = 42; this.camera.updateProjectionMatrix(); }
