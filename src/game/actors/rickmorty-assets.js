@@ -5,9 +5,9 @@ import { preloadGunModels } from "./gunmodels.js";
 // animations authored for that exact mesh (no retargeting): rick.glb = mesh + Idle; walk/run/gun are
 // tiny animation-only clips that bind onto it by bone name. "hand_r" = right hand (holds the gun).
 export const RICK_MODEL = new RiggedAsset("/models/rick.glb?v=mixamo2", 1.95); // mesh + Idle clip (re-textured)
-export const RICK_WALK = new RiggedAsset("/models/rick_walk.glb?v=mixamo", 1.95);
-export const RICK_RUN = new RiggedAsset("/models/rick_run.glb?v=mixamo", 1.95);
-export const RICK_GUN = new RiggedAsset("/models/rick_gun.glb?v=mixamo", 1.95);
+export const RICK_WALK = new RiggedAsset("/models/rick_walk.glb?v=v2", 1.95); // v2 = root motion stripped (in-place)
+export const RICK_RUN = new RiggedAsset("/models/rick_run.glb?v=v2", 1.95);
+export const RICK_GUN = new RiggedAsset("/models/rick_gun.glb?v=v2", 1.95);
 export const MEESEEKS_MODEL = new RiggedAsset("/models/meeseeks.glb", 2.0);
 export const RM_HAND_BONE = "hand_r";
 

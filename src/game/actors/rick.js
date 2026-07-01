@@ -38,18 +38,19 @@ export function makeRick() {
   const trackGun = () => {
     if (!hand || !gun) return;
     hand.updateWorldMatrix(true, false); hand.getWorldPosition(_tmp); group.worldToLocal(_tmp);
-    gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(gunPitch, 0, 0); // pitch barrel to match the vertical aim
+    gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(gunPitch + restDown * 1.1, 0, 0); // aim pitch + lowered (barrel down) while standing idle
   };
 
   // IRON-MAN hand jets: no jetpack — while flying, fire streams down out of both palms (thrusters tracked to the hands)
   const thruster = makeThruster(); thruster.points.frustumCulled = false; group.add(thruster.points);
 
-  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, gunPitch = 0;
+  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, gunPitch = 0, restDown = 0;
   const _muzzleV = new THREE.Vector3(), _hp = new THREE.Vector3();
   return {
     group, setWeapon,
     getMuzzle() { if (!gun) return null; gun.updateWorldMatrix(true, false); return gun.localToWorld(_muzzleV.set(0, 0, 0.7)); }, // barrel tip in world space
     fireKick() { fT = 0.3; }, // firing → blend in the Gunplay clip for a moment
+    _weights: () => ({ idle: idle ? +idle.getEffectiveWeight().toFixed(2) : 0, walk: walk ? +walk.getEffectiveWeight().toFixed(2) : 0, run: run ? +run.getEffectiveWeight().toFixed(2) : 0, gun: gunA ? +gunA.getEffectiveWeight().toFixed(2) : 0, gunRotX: gun ? +gun.rotation.x.toFixed(2) : 0 }), // debug
     update(dt, moving, speed = 1, jetting = false, aimPitch = 0) {
       gunPitch = aimPitch;                                       // barrel follows the vertical aim
       const pts = [];                                            // hand-jet emit points (group-local) while flying
@@ -62,18 +63,20 @@ export function makeRick() {
         sW += (((moving && speed > 1.5) ? 1 : 0) - sW) * Math.min(1, dt * 8);     // walk↔run blend
         fW += (((fT > 0) ? 1 : 0) - fW) * Math.min(1, dt * 14);                   // gunplay blend
         const jW = jetting ? 1 : 0;                                                // flying → force the standing idle (Iron-Man hover)
-        const g = (1 - fW) * (1 - jW);
-        if (idle) idle.setEffectiveWeight(Math.max((1 - mW) * g, jW));
-        if (walk) walk.setEffectiveWeight(mW * (1 - sW) * g);
-        if (run) run.setEffectiveWeight(mW * sW * g);
-        if (gunA) gunA.setEffectiveWeight(fW * (1 - jW));
+        const gunW = fW * (1 - mW) * (1 - jW);                                     // gunplay POSE only when standing still — while moving you run-and-gun (legs keep going, gun still fires)
+        const loco = (1 - gunW) * (1 - jW);
+        if (idle) idle.setEffectiveWeight(Math.max((1 - mW) * loco, jW));
+        if (walk) walk.setEffectiveWeight(mW * (1 - sW) * loco);
+        if (run) run.setEffectiveWeight(mW * sW * loco);
+        if (gunA) gunA.setEffectiveWeight(gunW);
       } else if (legL) { // procedural fallback walk
         phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
         else { legL.rotation.x *= 0.85; legR.rotation.x *= 0.85; }
       }
+      restDown += (((!moving && fT <= 0 && !jetting) ? 1 : 0) - restDown) * Math.min(1, dt * 8); // lower the barrel when standing idle
       if (gun) gun.visible = !jetting;                           // stow the gun while flying (fire from bare hands)
-      if (!jetting) trackGun();                                  // keep the weapon in-hand + pointing forward
+      if (!jetting) trackGun();                                  // keep the weapon in-hand + pointing forward/down
     },
   };
 }

@@ -15,12 +15,12 @@ export class Meeseeks {
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.hp = spawn.hp || (this.huge ? 510 : 135); // 3x tankier — Meeseeks take longer to put down
     this.speed = spawn.speed || (this.huge ? 4.2 + Math.random() : 6.5 + Math.random() * 1.5);
-    this.melee = this.huge ? 18 : 8;
+    this.melee = this.huge ? 26 : 8;
     this.reach = this.weapon === "rocket" ? 22 : this.weapon === "gun" ? 14 : (this.huge ? 3.4 : 2.2);
     this.dead = false; this.counted = false; this.removable = false;
     this.aggro = false; this.aggroRange = spawn.aggro || (this.huge ? 46 : 34);
     this.yaw = 0; this._atkCd = Math.random() * 1.5; this._t = Math.random() * 6; this._walkW = 0;
-    this.sc = this.huge ? 3.8 : 1.0; // huge Meeseeks are 2x bigger (towering)
+    this.sc = this.huge ? 7.6 : 1.0; // huge Meeseeks are giant kaiju (2x bigger again)
 
     this.group = new THREE.Group(); this.group.position.copy(this.pos); scene.add(this.group);
     this._invScale = 1;
@@ -94,7 +94,7 @@ export class Meeseeks {
         this._atkCd = this.weapon === "rocket" ? (2.4 + Math.random() * 0.9) : (0.8 + Math.random() * 0.5);
         if (!ctx.airborne && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z)) {
           const fx = this.pos.x + (dx / d) * 0.9, fz = this.pos.z + (dz / d) * 0.9, my = gy + 1.3 * this.sc;
-          ctx.enemyFire?.({ from: { x: fx, y: my, z: fz }, to: { x: playerPos.x, y: playerPos.y, z: playerPos.z }, kind: this.weapon, dmg: this.weapon === "rocket" ? (this.huge ? 42 : 28) : (this.huge ? 11 : 7) });
+          ctx.enemyFire?.({ from: { x: fx, y: my, z: fz }, to: { x: playerPos.x, y: playerPos.y, z: playerPos.z }, kind: this.weapon, dmg: this.weapon === "rocket" ? (this.huge ? 60 : 28) : (this.huge ? 18 : 7) });
         }
       } else { this._atkCd = 0.9; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 4)); ctx.audio?.creature?.(); }
     }
