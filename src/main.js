@@ -233,6 +233,7 @@ class Game {
   // Fast-rope insertion cinematic, then hand control to the player.
   _beginIntro() {
     if (this.state === "intro" || this._introDone) return;
+    this._menuLightsOff(); // drop the deploy-screen fill once we commit to the mission
     trackStart(); // count a play (the moment they commit to the mission)
     if (!this.cfg.intro.enabled) { this._introDone = true; this._startPlay(); return; }
     this.state = "intro";
@@ -281,6 +282,7 @@ class Game {
     else this.controller.lock();
   }
   _startPlay() {
+    this._menuLightsOff(); // deploy-screen fill is gone once play begins
     this.audio.resume();
     this.hud.hideOverlay();
     this.hud.setCombatVisible(true);
@@ -425,7 +427,17 @@ class Game {
     this.camera.position.set(sp.x, gy + 1.6, sp.z + 3.6);      // centered in front (not off to the side)
     this.camera.lookAt(sp.x, gy + 1.15, sp.z);
     if (Math.abs(this.camera.fov - 42) > 0.01) { this.camera.fov = 42; this.camera.updateProjectionMatrix(); }
+    // The deploy screen faces Rick's front toward the camera, but the level sun rakes him from behind → he reads
+    // dark/muddy. Add a warm front key + soft sky fill (start-screen only) so his colours pop. Disabled on deploy.
+    if (!this._menuKey) {
+      this._menuKey = new THREE.DirectionalLight(0xffe8cc, 2.8);
+      this._menuKey.position.set(sp.x + 1.4, gy + 3.4, sp.z + 4.5); this._menuKey.target.position.set(sp.x, gy + 1.1, sp.z);
+      this._menuFill = new THREE.HemisphereLight(0xcfe0ff, 0x40323a, 1.1); this._menuFill.position.set(sp.x, gy + 2.5, sp.z);
+      this.scene.add(this._menuKey, this._menuKey.target, this._menuFill);
+    }
+    this._menuKey.visible = this._menuFill.visible = true;
   }
+  _menuLightsOff() { if (this._menuKey) this._menuKey.visible = this._menuFill.visible = false; }
 
   // a ranged enemy (e.g. a gun/rocket Meeseeks) fires at the player. o = { from:{x,y,z}, to:{x,y,z}, kind, dmg }
   _enemyFire(o) {
