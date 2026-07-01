@@ -162,8 +162,16 @@ export class Controller {
     this._jumpWas = jp;
 
     // JETPACK (hold E) — strong, fast; 5s of fuel that recharges when you land
-    this.jetting = input.isDown("e") && !this.swimming && this._jetFuel > 0;
+    const firing = input.mouseDown || (tc && tc.fire);
+    const wantJet = input.isDown("e") && !this.swimming && this._jetFuel > 0;
+    const handJets = this.view === "third";               // Rick fires his palm-jets — can't full-thrust AND shoot
+    this.jetting = wantJet && !(handJets && firing);
     if (this.jetting) { this.vy = this.jetForce; this.onGround = false; this._jetFuel = Math.max(0, this._jetFuel - dt); }
+    // REDUCED-THRUST GLIDE (Rick): airborne + falling → small palm flames cushion the descent (slow-fall). Kicks in
+    // when you shoot mid-air (full thrust cut) or coast down still holding E. Caps the fall speed and sips fuel.
+    this.gliding = handJets && !this.onGround && !this.swimming && this.vy < 0 && (wantJet || firing) && this._jetFuel > 0;
+    if (this.gliding) { this.vy = Math.max(this.vy, -3.4); this.onGround = false; this._jetFuel = Math.max(0, this._jetFuel - dt * 0.4); }
+    this.thrust = this.jetting ? 1 : (this.gliding ? 0.42 : 0); // palm-flame intensity for the avatar (full vs small)
 
     // vertical physics against the surface beneath us (lets you land on crates/platforms)
     this.feetY += this.vy * dt;

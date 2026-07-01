@@ -63,11 +63,12 @@ export function makeRick() {
     getMuzzle() { if (!gun) return null; gun.updateWorldMatrix(true, false); return gun.localToWorld(_muzzleV.set(0, 0, 0.7)); }, // barrel tip in world space
     fireKick() { fT = 0.3; }, // firing → blend in the Gunplay clip for a moment
     _weights: () => ({ idleLo: idleLo ? +idleLo.getEffectiveWeight().toFixed(2) : 0, walkLo: walkLo ? +walkLo.getEffectiveWeight().toFixed(2) : 0, runLo: runLo ? +runLo.getEffectiveWeight().toFixed(2) : 0, walkUp: walkUp ? +walkUp.getEffectiveWeight().toFixed(2) : 0, gunUp: gunUp ? +gunUp.getEffectiveWeight().toFixed(2) : 0, gunRotX: gun ? +gun.rotation.x.toFixed(2) : 0 }), // debug: legs vs arms
-    update(dt, moving, speed = 1, jetting = false, aimPitch = 0) {
+    update(dt, moving, speed = 1, thrust = 0, aimPitch = 0) {
+      const jetting = thrust > 0;                                // any palm-thrust (full lift OR small slow-fall glide)
       gunPitch = aimPitch;                                       // barrel follows the vertical aim
       const pts = [];                                            // hand-jet emit points (group-local) while flying
       if (jetting && hand && handL) for (const hb of [hand, handL]) { hb.updateWorldMatrix(true, false); hb.getWorldPosition(_hp); group.worldToLocal(_hp); pts.push(_hp.x, _hp.y, _hp.z); }
-      thruster.update(dt, jetting, pts);
+      thruster.update(dt, thrust, pts);
       if (mixer) {
         mixer.update(dt);
         fT = Math.max(0, fT - dt);
@@ -143,7 +144,7 @@ function makeSoftTex() {
 function makeThruster() {
   const N = 130, NOZ = [[-0.13, -0.36], [0.13, -0.36]];
   const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), siz = new Float32Array(N), alp = new Float32Array(N);
-  const vel = new Float32Array(N * 3), age = new Float32Array(N).fill(99), life = new Float32Array(N);
+  const vel = new Float32Array(N * 3), age = new Float32Array(N).fill(99), life = new Float32Array(N), pscl = new Float32Array(N).fill(1);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
@@ -162,13 +163,15 @@ function makeThruster() {
   let acc = 0;
   return {
     points,
-    update(dt, jetting, pts) {
-      if (jetting && pts && pts.length) { acc += dt; while (acc > 0.0028) { acc -= 0.0028; // dense emission from the palms while flying
+    update(dt, thrust, pts) {
+      thrust = thrust || 0;                                       // 1 = full lift, ~0.42 = slow-fall glide (small flames), 0 = off
+      if (thrust > 0 && pts && pts.length) { acc += dt; const rate = 0.0028 / Math.max(0.25, thrust); while (acc > rate) { acc -= rate; // sparser emission at low thrust
         for (let i = 0; i < N; i++) if (age[i] >= life[i]) {
           const h = ((Math.random() * pts.length / 3) | 0) * 3; // pick one of the emit points (hands)
           pos[i * 3] = pts[h] + (Math.random() - 0.5) * 0.05; pos[i * 3 + 1] = pts[h + 1]; pos[i * 3 + 2] = pts[h + 2] + (Math.random() - 0.5) * 0.05;
-          vel[i * 3] = (Math.random() - 0.5) * 0.5; vel[i * 3 + 1] = -(2.6 + Math.random() * 2.0); vel[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
-          age[i] = 0; life[i] = 0.22 + Math.random() * 0.2; break;
+          const sp = 0.45 + 0.55 * thrust;                        // shorter, slower plume when gliding
+          vel[i * 3] = (Math.random() - 0.5) * 0.5 * sp; vel[i * 3 + 1] = -(2.6 + Math.random() * 2.0) * sp; vel[i * 3 + 2] = (Math.random() - 0.5) * 0.5 * sp;
+          age[i] = 0; life[i] = (0.22 + Math.random() * 0.2) * (0.6 + 0.4 * thrust); pscl[i] = thrust; break;
         }
       } }
       for (let i = 0; i < N; i++) {
@@ -177,7 +180,7 @@ function makeThruster() {
         pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
         const c = ramp(tn); col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
         alp[i] = Math.min(1, tn * 6) * (1 - tn) * 1.3;          // fade in fast, fade out toward the tail
-        siz[i] = 0.3 + 0.4 * tn;                                 // grows along the plume
+        siz[i] = (0.3 + 0.4 * tn) * (0.45 + 0.55 * pscl[i]);     // grows along the plume; smaller flames at low thrust (glide)
       }
       geo.attributes.position.needsUpdate = geo.attributes.aColor.needsUpdate = geo.attributes.aSize.needsUpdate = geo.attributes.aAlpha.needsUpdate = true;
     },
