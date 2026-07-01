@@ -412,7 +412,8 @@ class Game {
     this.playerModel.group.position.set(c.pos.x, c.feetY, c.pos.z);
     this.playerModel.group.rotation.y = Math.atan2(fwd.x, fwd.z); // face the look dir (we see Rick's back)
     const aimPitch = -Math.asin(Math.max(-1, Math.min(1, fwd.y))); // barrel pitches with the camera's vertical aim
-    this.playerModel.update(dt, c.moving && c.onGround, this.input.isDown("shift") ? 2 : 1, c.thrust, aimPitch); // sprint → 2x; thrust 0..1 → palm flames (1=full lift, ~0.4=slow-fall glide)
+    const grounded = c.onGround || (c._airT || 0) < 0.18; // tolerate 1-frame onGround flickers on bumpy terrain → no walk-anim stutter
+    this.playerModel.update(dt, c.moving && grounded, this.input.isDown("shift") ? 2 : 1, c.thrust, aimPitch); // sprint → 2x; thrust 0..1 → palm flames (1=full lift, ~0.4=slow-fall glide)
     if (c.jetting && this.vfx.dustBurst && Math.random() < 0.7) this.vfx.dustBurst(new THREE.Vector3(c.pos.x + (Math.random() - 0.5) * 0.5, c.feetY + 0.25, c.pos.z + (Math.random() - 0.5) * 0.5)); // exhaust/smoke kicked up below
     if (this.input.mouseDown && this.weapon.mode !== "sword") this.playerModel.fireKick(); // recoil while shooting
   }
@@ -421,13 +422,14 @@ class Game {
   _rickMenuPose(dt, t) {
     const pm = this.playerModel, sp = this.level.playerSpawn;
     const gy = this.level.terrainHeight ? this.level.terrainHeight(sp.x, sp.z) : 0;
+    const lift = 0.6;                                           // float Rick a bit off the ground while he dances
     pm.group.visible = true;                                    // shown on the deploy screen (hidden during the drop)
     pm.setDancing(true);                                        // Rick busts out the Salsa (weaponless) — it's cool 🙂
-    pm.group.position.set(sp.x, gy, sp.z);
+    pm.group.position.set(sp.x, gy + lift, sp.z);
     pm.group.rotation.y = Math.sin(t * 0.4) * (Math.PI / 8);   // gentle sway so the dance is seen from a few angles
     pm.update(dt, false, 1);                                    // full-body dance clip takes over
-    this.camera.position.set(sp.x, gy + 1.6, sp.z + 3.6);      // centered in front (not off to the side)
-    this.camera.lookAt(sp.x, gy + 1.15, sp.z);
+    this.camera.position.set(sp.x, gy + 1.6 + lift, sp.z + 3.6); // camera rises with him so the framing holds
+    this.camera.lookAt(sp.x, gy + 1.15 + lift, sp.z);
     if (Math.abs(this.camera.fov - 42) > 0.01) { this.camera.fov = 42; this.camera.updateProjectionMatrix(); }
     // The deploy screen faces Rick's front toward the camera, but the level sun rakes him from behind → he reads
     // dark/muddy. Add a warm front key + soft sky fill (start-screen only) so his colours pop. Disabled on deploy.

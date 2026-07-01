@@ -26,7 +26,7 @@ export function makeRick() {
     walkLo = mk(rWalk, false); walkUp = mk(rWalk, true);
     runLo = mk(rRun, false); runUp = mk(rRun, true);
     gunUp = mk(rGun, true); // only the upper half of the gun stance — legs come from locomotion
-    const rDance = clipsOf(RICK_DANCE)[0]; if (rDance) dance = mixer.clipAction(rDance); // full-body Salsa for the deploy screen
+    const rDance = clipsOf(RICK_DANCE)[0]; if (rDance) { dance = mixer.clipAction(rDance); dance.setEffectiveTimeScale(0.7); } // full-body Salsa for the deploy screen (a touch slower)
     hand = inst.bones.rightHand; handL = inst.bones.leftHand;
     for (const a of [idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp, dance]) if (a) { a.play(); a.setEffectiveWeight(0); }
     if (idleLo) idleLo.setEffectiveWeight(1); if (idleUp) idleUp.setEffectiveWeight(1);
@@ -76,25 +76,27 @@ export function makeRick() {
         sW += (((moving && speed > 1.5) ? 1 : 0) - sW) * Math.min(1, dt * 8);     // walk↔run blend
         fW += (((fT > 0) ? 1 : 0) - fW) * Math.min(1, dt * 14);                   // gunplay (arm) blend
         dW += (((dancing && dance) ? 1 : 0) - dW) * Math.min(1, dt * 8);           // deploy-screen Salsa (full body)
-        const jW = jetting ? 1 : 0;                                                // flying → idle hover (Iron-Man), gun stowed
-        const m = mW * (1 - jW), f = fW * (1 - jW), g2 = 1 - dW;                    // g2: everything else fades out under the dance
+        const airPose = jetting ? 1 : 0;                                           // hovering/gliding → dangling idle body (unless aiming)
+        const aim = fW;                                                            // firing → gun-aim upper body, OVERRIDES the hover pose
+        const m = mW * (1 - airPose), g2 = 1 - dW;                                  // locomotion only on the ground; g2 fades everything under the dance
         if (dance) dance.setEffectiveWeight(dW);
-        // LEGS (lower body): always locomotion — idle / walk / run — independent of firing (all scaled down while dancing)
-        if (idleLo) idleLo.setEffectiveWeight(Math.max(1 - m, jW) * g2);
+        // LEGS (lower body): hover-idle when airborne, otherwise locomotion (idle / walk / run)
+        if (idleLo) idleLo.setEffectiveWeight(Math.max(1 - m, airPose) * g2);
         if (walkLo) walkLo.setEffectiveWeight(m * (1 - sW) * g2);
         if (runLo) runLo.setEffectiveWeight(m * sW * g2);
-        // TORSO + ARMS (upper body): locomotion swing when idle, Gunplay aim stance while firing → run-and-gun
-        if (gunUp) gunUp.setEffectiveWeight(f * g2);
-        if (idleUp) idleUp.setEffectiveWeight(Math.max((1 - m) * (1 - f), jW) * g2);
-        if (walkUp) walkUp.setEffectiveWeight(m * (1 - sW) * (1 - f) * g2);
-        if (runUp) runUp.setEffectiveWeight(m * sW * (1 - f) * g2);
+        // TORSO + ARMS (upper body): Gunplay aim while firing takes PRIORITY over hover + locomotion → keeps the
+        // shooting animation even mid-air/while landing; otherwise hover-idle when airborne, else locomotion swing.
+        if (gunUp) gunUp.setEffectiveWeight(aim * g2);
+        if (idleUp) idleUp.setEffectiveWeight((1 - aim) * Math.max(1 - m, airPose) * g2);
+        if (walkUp) walkUp.setEffectiveWeight((1 - aim) * m * (1 - sW) * g2);
+        if (runUp) runUp.setEffectiveWeight((1 - aim) * m * sW * g2);
       } else if (legL) { // procedural fallback walk
         phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
         else { legL.rotation.x *= 0.85; legR.rotation.x *= 0.85; }
       }
       restDown += (((!moving && fT <= 0 && !jetting) ? 1 : 0) - restDown) * Math.min(1, dt * 8); // lower the barrel when standing idle
-      const stow = jetting || dancing;                           // gun hidden while flying (bare-hand jets) or dancing (weaponless)
+      const stow = dancing || (jetting && fW < 0.35);            // gun stowed while flying/gliding — UNLESS actively firing (then it's in hand, aiming)
       if (gun) gun.visible = !stow;
       if (!stow) trackGun();                                     // keep the weapon in-hand + pointing forward/down
     },

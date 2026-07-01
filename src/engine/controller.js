@@ -167,9 +167,11 @@ export class Controller {
     const handJets = this.view === "third";               // Rick fires his palm-jets — can't full-thrust AND shoot
     this.jetting = wantJet && !(handJets && firing);
     if (this.jetting) { this.vy = this.jetForce; this.onGround = false; this._jetFuel = Math.max(0, this._jetFuel - dt); }
-    // REDUCED-THRUST GLIDE (Rick): airborne + falling → small palm flames cushion the descent (slow-fall). Kicks in
-    // when you shoot mid-air (full thrust cut) or coast down still holding E. Caps the fall speed and sips fuel.
-    this.gliding = handJets && !this.onGround && !this.swimming && this.vy < 0 && (wantJet || firing) && this._jetFuel > 0;
+    // REDUCED-THRUST GLIDE (Rick): whenever he's descending from a height, small palm flames cushion the fall
+    // (slow-fall). This is the "landing fire" — it shows on ANY real drop (from flight or the sky), not just when
+    // shooting. Caps the fall speed and sips fuel. Gated by height so tiny hops near the ground don't trigger it.
+    const heightAG = this.feetY - this._groundUnder(this.pos.x, this.pos.z);
+    this.gliding = handJets && !this.onGround && !this.swimming && this.vy < 0 && heightAG > 2.5 && this._jetFuel > 0;
     if (this.gliding) { this.vy = Math.max(this.vy, -3.4); this.onGround = false; this._jetFuel = Math.max(0, this._jetFuel - dt * 0.4); }
     this.thrust = this.jetting ? 1 : (this.gliding ? 0.42 : 0); // palm-flame intensity for the avatar (full vs small)
 
