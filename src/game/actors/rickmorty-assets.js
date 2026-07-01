@@ -4,7 +4,7 @@ import { preloadGunModels } from "./gunmodels.js";
 // Rigged model pack for the Rick & Morty level. Rick is a clean UE4-skeleton mesh with REAL Mixamo
 // animations authored for that exact mesh (no retargeting): rick.glb = mesh + Idle; walk/run/gun are
 // tiny animation-only clips that bind onto it by bone name. "hand_r" = right hand (holds the gun).
-export const RICK_MODEL = new RiggedAsset("/models/rick.glb?v=mixamo2", 1.95); // mesh + Idle clip (re-textured)
+export const RICK_MODEL = new RiggedAsset("/models/rick.glb?v=mixamo3", 1.95); // mesh + Idle clip (UVs re-synced to fix garbled texture)
 export const RICK_WALK = new RiggedAsset("/models/rick_walk.glb?v=v2", 1.95); // v2 = root motion stripped (in-place)
 export const RICK_RUN = new RiggedAsset("/models/rick_run.glb?v=v2", 1.95);
 export const RICK_GUN = new RiggedAsset("/models/rick_gun.glb?v=v2", 1.95);
