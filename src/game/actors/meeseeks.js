@@ -15,7 +15,6 @@ export class Meeseeks {
     this.pos = new THREE.Vector3(spawn.x, 0, spawn.z);
     this.hp = spawn.hp || (this.huge ? 510 : 135); // 3x tankier — Meeseeks take longer to put down
     this.speed = spawn.speed || (this.huge ? 4.2 + Math.random() : 6.5 + Math.random() * 1.5);
-    this.melee = this.huge ? 26 : 8;
     this.reach = this.weapon === "rocket" ? 22 : this.weapon === "gun" ? 14 : (this.huge ? 3.4 : 2.2);
     this.dead = false; this.counted = false; this.removable = false;
     this.aggro = false; this.aggroRange = spawn.aggro || (this.huge ? 46 : 34);
@@ -68,7 +67,7 @@ export class Meeseeks {
       const p = this.group.position, n = this.huge ? 18 : 10;
       for (let i = 0; i < n; i++) this._ctx.vfx?.dustBurst?.(new THREE.Vector3(p.x + (Math.random() - 0.5) * 1.6 * this.sc, p.y + (0.6 + Math.random() * 1.6) * this.sc, p.z + (Math.random() - 0.5) * 1.6 * this.sc));
       this._ctx.vfx?._flash?.(new THREE.Vector3(p.x, p.y + this.sc, p.z), 1.6 * this.sc, 0x6fd0ff);
-      this._ctx.audio?.creature?.();
+      // no voice on death — a silent blue poof. The Meeseeks voice line plays ONLY when they fall from the sky (see main._dropReinforcement)
     }
     this.group.visible = false; // poof = gone
   }
@@ -82,7 +81,6 @@ export class Meeseeks {
     let moving = false;
     if (!this.aggro) { if (d <= this.aggroRange) this.aggro = true; else { this._anim(gy, false); return; } }
     this.yaw = Math.atan2(dx, dz); this.group.rotation.y = this.yaw;
-    const ranged = this.weapon !== "melee";
     if (d > this.reach) {
       const step = this.speed * dt;
       const nx = this.pos.x + (dx / d) * step, nz = this.pos.z + (dz / d) * step;
@@ -90,13 +88,12 @@ export class Meeseeks {
       if (!this._blocked(this.pos.x, nz)) this.pos.z = nz;
       moving = true;
     } else if ((this._atkCd -= dt) <= 0) {
-      if (ranged) {
-        this._atkCd = this.weapon === "rocket" ? (2.4 + Math.random() * 0.9) : (0.8 + Math.random() * 0.5);
-        if (!ctx.airborne && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z)) {
-          const fx = this.pos.x + (dx / d) * 0.9, fz = this.pos.z + (dz / d) * 0.9, my = gy + 1.3 * this.sc;
-          ctx.enemyFire?.({ from: { x: fx, y: my, z: fz }, to: { x: playerPos.x, y: playerPos.y, z: playerPos.z }, kind: this.weapon, dmg: this.weapon === "rocket" ? (this.huge ? 60 : 28) : (this.huge ? 18 : 7) });
-        }
-      } else { this._atkCd = 0.9; ctx.onPlayerHit?.(this.melee + Math.floor(Math.random() * 4)); ctx.audio?.creature?.(); }
+      // Meeseeks are ranged only — they never melee, they shoot from `reach` away
+      this._atkCd = this.weapon === "rocket" ? (2.4 + Math.random() * 0.9) : (0.8 + Math.random() * 0.5);
+      if (!ctx.airborne && !this.level.segmentBlocked(this.pos.x, this.pos.z, playerPos.x, playerPos.z)) {
+        const fx = this.pos.x + (dx / d) * 0.9, fz = this.pos.z + (dz / d) * 0.9, my = gy + 1.3 * this.sc;
+        ctx.enemyFire?.({ from: { x: fx, y: my, z: fz }, to: { x: playerPos.x, y: playerPos.y, z: playerPos.z }, kind: this.weapon, dmg: this.weapon === "rocket" ? (this.huge ? 60 : 28) : (this.huge ? 18 : 7) });
+      }
     }
     this._anim(gy, moving);
   }

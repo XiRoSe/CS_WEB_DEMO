@@ -194,13 +194,19 @@ export class VFX {
     }
   }
 
-  // enemy hit (crimson)
+  // enemy hit. Rick level (`_badass`) gets a punchy energy impact; the military levels keep the crimson puff.
   hitPuff(point) {
-    this._flash(point, 1.0, 0xffffff);           // hot white core
-    this._flash(point, 1.8, 0xff8a3a);           // orange energy bloom
-    this._embers(point, 0xffc24a, 18, 10);       // spark burst
-    this._shockwave && this._shockwave(point);   // expanding shock ring
-    this._dustPuff(point, 0x5a1410, 0.45);
+    if (this._badass) {
+      this._flash(point, 1.0, 0xffffff);           // hot white core
+      this._flash(point, 1.8, 0xff8a3a);           // orange energy bloom
+      this._embers(point, 0xffc24a, 18, 10);       // spark burst
+      this._shockwave && this._shockwave(point);   // expanding shock ring
+      this._dustPuff(point, 0x5a1410, 0.45);
+      return;
+    }
+    this._flash(point, 0.5, 0xff6a52);
+    this._embers(point, 0xd03a2a, 9, 5.5);
+    this._dustPuff(point, 0x5a1410, 0.32);
   }
 
   // rocket exhaust: a little fire + a puff of smoke, left behind each frame in flight
@@ -218,12 +224,13 @@ export class VFX {
   // a proper energy LASER: a thick glowing cyan beam (lingering cylinder) + a hot white core + end flashes
   laserBeam(a, b, color = 0x34ffd6) {
     this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;
+    const bad = this._badass; // Rick level: fatter, brighter bolt with double muzzle+impact flashes
     const beam = this._next(this.enemyBeams);
-    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(0.95, len, 0.95);
-    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = 0.95; beam.life = beam.max = 0.11;
+    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(bad ? 0.95 : 0.55, len, bad ? 0.95 : 0.55);
+    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = bad ? 0.95 : 0.85; beam.life = beam.max = bad ? 0.11 : 0.1;
     this.tracer(a, b); // bright white-hot core down the centre
-    this._flash(a, 0.7, 0xffffff); this._flash(a, 1.15, color);   // punchy muzzle flash
-    this._flash(b, 1.0, 0xffffff); this._flash(b, 1.7, color);    // bright impact bloom
+    if (bad) { this._flash(a, 0.7, 0xffffff); this._flash(a, 1.15, color); this._flash(b, 1.0, 0xffffff); this._flash(b, 1.7, color); }
+    else { this._flash(a, 0.4, 0xffffff); this._flash(b, 0.75, color); }
   }
 
   // sci-fi plasma detonation: a blue/cyan energy fireball + shockwave + sparks
