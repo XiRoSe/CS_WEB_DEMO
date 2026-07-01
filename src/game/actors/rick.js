@@ -8,16 +8,16 @@ import { makeGunModel } from "./gunmodels.js";
 // weapon rides the right-hand bone. Falls back to a procedural homage if the rig isn't present.
 export function makeRick() {
   const group = new THREE.Group();
-  let mixer = null, idle = null, walk = null, run = null, gunA = null, hand = null;
+  let mixer = null, idle = null, walk = null, run = null, gunA = null, hand = null, handL = null;
   let legL, legR, armL, armR; // procedural fallback handles
 
   if (RICK_MODEL.ready) {
-    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE });
+    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE, leftHand: "hand_l" });
     group.add(inst.model);
     mixer = new THREE.AnimationMixer(inst.model);
     const act = (asset) => { const c = clipsOf(asset)[0]; return c ? mixer.clipAction(c) : null; };
     idle = act(RICK_MODEL); walk = act(RICK_WALK); run = act(RICK_RUN); gunA = act(RICK_GUN); // Mixamo clips, one per file
-    hand = inst.bones.rightHand;
+    hand = inst.bones.rightHand; handL = inst.bones.leftHand;
     for (const a of [idle, walk, run, gunA]) if (a) { a.play(); a.setEffectiveWeight(0); }
     if (idle) idle.setEffectiveWeight(1);
   } else {
@@ -41,48 +41,39 @@ export function makeRick() {
     gun.position.copy(_tmp); gun.position.z += 0.15; gun.rotation.set(gunPitch, 0, 0); // pitch barrel to match the vertical aim
   };
 
-  // JETPACK on Rick's back (back = -z local, which the 3rd-person camera sees) — rounded tank build (not boxy),
-  // with layered additive thruster flames (blue-white core → yellow → orange tail) that flicker while flying.
-  const jetpack = new THREE.Group(); jetpack.position.set(0, 1.34, -0.26); group.add(jetpack);
-  const JM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.6, roughness: 0.4, flatShading: true, ...o });
-  const spine = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.34, 6, 10), JM(0x3a3f47)); spine.position.set(0, 0, 0.05); jetpack.add(spine); // slim central spine
-  for (const sx of [-0.13, 0.13]) {                            // two rounded fuel tanks + red caps + nozzles
-    const tank = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.32, 6, 12), JM(0x59636f)); tank.position.set(sx, 0, 0); jetpack.add(tank);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), JM(0xb0432a)); cap.position.set(sx, 0.26, 0); jetpack.add(cap);
-    const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.085, 0.14, 10), JM(0x14161a)); noz.position.set(sx, -0.3, 0); jetpack.add(noz);
-  }
-  jetpack.traverse((o) => { if (o.isMesh && o.material.metalness !== undefined) o.castShadow = true; });
-  const thruster = makeThruster();                             // additive particle plume from the two nozzles
-  jetpack.add(thruster.points);
+  // IRON-MAN hand jets: no jetpack — while flying, fire streams down out of both palms (thrusters tracked to the hands)
+  const thruster = makeThruster(); thruster.points.frustumCulled = false; group.add(thruster.points);
 
-  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, jetSway = 0, gunPitch = 0;
-  const _muzzleV = new THREE.Vector3();
+  let phase = 0, mW = 0, sW = 0, fW = 0, fT = 0, gunPitch = 0;
+  const _muzzleV = new THREE.Vector3(), _hp = new THREE.Vector3();
   return {
     group, setWeapon,
     getMuzzle() { if (!gun) return null; gun.updateWorldMatrix(true, false); return gun.localToWorld(_muzzleV.set(0, 0, 0.7)); }, // barrel tip in world space
     fireKick() { fT = 0.3; }, // firing → blend in the Gunplay clip for a moment
     update(dt, moving, speed = 1, jetting = false, aimPitch = 0) {
       gunPitch = aimPitch;                                       // barrel follows the vertical aim
-      thruster.update(dt, jetting);                              // jetpack particle plume
-      jetSway += dt * (moving ? 16 * speed : 2.5);
-      jetpack.rotation.z = Math.sin(jetSway) * (moving ? 0.05 : 0.012);
+      const pts = [];                                            // hand-jet emit points (group-local) while flying
+      if (jetting && hand && handL) for (const hb of [hand, handL]) { hb.updateWorldMatrix(true, false); hb.getWorldPosition(_hp); group.worldToLocal(_hp); pts.push(_hp.x, _hp.y, _hp.z); }
+      thruster.update(dt, jetting, pts);
       if (mixer) {
         mixer.update(dt);
         fT = Math.max(0, fT - dt);
         mW += ((moving ? 1 : 0) - mW) * Math.min(1, dt * 10);                     // idle↔move blend
         sW += (((moving && speed > 1.5) ? 1 : 0) - sW) * Math.min(1, dt * 8);     // walk↔run blend
         fW += (((fT > 0) ? 1 : 0) - fW) * Math.min(1, dt * 14);                   // gunplay blend
-        const g = 1 - fW;                                                          // locomotion dips under gunplay
-        if (idle) idle.setEffectiveWeight((1 - mW) * g);
+        const jW = jetting ? 1 : 0;                                                // flying → force the standing idle (Iron-Man hover)
+        const g = (1 - fW) * (1 - jW);
+        if (idle) idle.setEffectiveWeight(Math.max((1 - mW) * g, jW));
         if (walk) walk.setEffectiveWeight(mW * (1 - sW) * g);
         if (run) run.setEffectiveWeight(mW * sW * g);
-        if (gunA) gunA.setEffectiveWeight(fW);
+        if (gunA) gunA.setEffectiveWeight(fW * (1 - jW));
       } else if (legL) { // procedural fallback walk
         phase += dt * (moving ? 8.5 * speed : 2); const sw = Math.sin(phase);
         if (moving) { legL.rotation.x = sw * 0.7; legR.rotation.x = -sw * 0.7; armL.rotation.x = -sw * 0.6; armR.rotation.x = sw * 0.6; }
         else { legL.rotation.x *= 0.85; legR.rotation.x *= 0.85; }
       }
-      trackGun(); // keep the weapon in-hand + pointing forward
+      if (gun) gun.visible = !jetting;                           // stow the gun while flying (fire from bare hands)
+      if (!jetting) trackGun();                                  // keep the weapon in-hand + pointing forward
     },
   };
 }
@@ -139,11 +130,11 @@ function makeThruster() {
   let acc = 0;
   return {
     points,
-    update(dt, jetting) {
-      if (jetting) { acc += dt; while (acc > 0.0035) { acc -= 0.0035; // dense emission while flying
+    update(dt, jetting, pts) {
+      if (jetting && pts && pts.length) { acc += dt; while (acc > 0.0028) { acc -= 0.0028; // dense emission from the palms while flying
         for (let i = 0; i < N; i++) if (age[i] >= life[i]) {
-          const n = NOZ[(Math.random() * 2) | 0];
-          pos[i * 3] = n[0] + (Math.random() - 0.5) * 0.05; pos[i * 3 + 1] = n[1]; pos[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
+          const h = ((Math.random() * pts.length / 3) | 0) * 3; // pick one of the emit points (hands)
+          pos[i * 3] = pts[h] + (Math.random() - 0.5) * 0.05; pos[i * 3 + 1] = pts[h + 1]; pos[i * 3 + 2] = pts[h + 2] + (Math.random() - 0.5) * 0.05;
           vel[i * 3] = (Math.random() - 0.5) * 0.5; vel[i * 3 + 1] = -(2.6 + Math.random() * 2.0); vel[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
           age[i] = 0; life[i] = 0.22 + Math.random() * 0.2; break;
         }

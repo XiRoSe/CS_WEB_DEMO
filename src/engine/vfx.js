@@ -196,9 +196,11 @@ export class VFX {
 
   // enemy hit (crimson)
   hitPuff(point) {
-    this._flash(point, 0.5, 0xff6a52);
-    this._embers(point, 0xd03a2a, 9, 5.5);
-    this._dustPuff(point, 0x5a1410, 0.32);
+    this._flash(point, 1.0, 0xffffff);           // hot white core
+    this._flash(point, 1.8, 0xff8a3a);           // orange energy bloom
+    this._embers(point, 0xffc24a, 18, 10);       // spark burst
+    this._shockwave && this._shockwave(point);   // expanding shock ring
+    this._dustPuff(point, 0x5a1410, 0.45);
   }
 
   // rocket exhaust: a little fire + a puff of smoke, left behind each frame in flight
@@ -217,10 +219,11 @@ export class VFX {
   laserBeam(a, b, color = 0x34ffd6) {
     this._dir.subVectors(b, a); const len = this._dir.length(); if (len < 0.1) return;
     const beam = this._next(this.enemyBeams);
-    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(0.55, len, 0.55);
-    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = 0.85; beam.life = beam.max = 0.1;
+    beam.mesh.position.copy(a); beam.mesh.quaternion.setFromUnitVectors(this._up, this._dir.normalize()); beam.mesh.scale.set(0.95, len, 0.95);
+    beam.mesh.material.color.setHex(color); beam.mesh.visible = true; beam.mesh.material.opacity = 0.95; beam.life = beam.max = 0.11;
     this.tracer(a, b); // bright white-hot core down the centre
-    this._flash(a, 0.4, 0xffffff); this._flash(b, 0.75, color);
+    this._flash(a, 0.7, 0xffffff); this._flash(a, 1.15, color);   // punchy muzzle flash
+    this._flash(b, 1.0, 0xffffff); this._flash(b, 1.7, color);    // bright impact bloom
   }
 
   // sci-fi plasma detonation: a blue/cyan energy fireball + shockwave + sparks

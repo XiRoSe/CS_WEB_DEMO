@@ -381,7 +381,7 @@ class Game {
   _fireRocket(t) {
     this.weapon.fireRocket(t);
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
-    const pos = this.camera.position.clone().addScaledVector(dir, 0.8);
+    const pos = this._thirdPerson ? this.weapon.muzzleWorld.clone() : this.camera.position.clone().addScaledVector(dir, 0.8); // rocket leaves the gun in 3rd-person
     const vel = dir.clone().multiplyScalar(50); // fast, flat trajectory
     const mesh = makeMissileMesh(0x4b5320, 0x8a2b1a);             // olive body + red nose + fins
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()); // point along flight
@@ -450,7 +450,7 @@ class Game {
   _firePlasma(t) {
     this.weapon.firePlasma(t);
     const dir = new THREE.Vector3(); this.camera.getWorldDirection(dir);
-    const pos = this.camera.position.clone().addScaledVector(dir, 0.9);
+    const pos = this._thirdPerson ? this.weapon.muzzleWorld.clone() : this.camera.position.clone().addScaledVector(dir, 0.9); // plasma bolt leaves the gun in 3rd-person
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10),
       new THREE.MeshStandardMaterial({ color: 0xbfeaff, emissive: 0x2a8cff, emissiveIntensity: 3 }));
     mesh.material.userData.outlineParameters = { visible: false };
@@ -526,7 +526,7 @@ class Game {
         if (r) { end = r.point.clone(); if (r.enemy) { r.enemy.takeDamage(this._falloff(g.dmg, r.dist)); this.vfx.hitPuff(end); } }
       }
       if (g.pierce) { this.vfx.enemyLaser ? this.vfx.enemyLaser(start, end, g.beam) : this.vfx.tracer(start, end); this.vfx._flash && this.vfx._flash(end, 1.4, g.beam); this.vfx._flash && this.vfx._flash(start, 1.0, g.beam); } // railgun: a bold blue beam + flashes
-      else if (p === 0 || g.pellets <= 3) { if (this.weapon._energyBeam) this.vfx.laserBeam(start, end, g.ecolor || 0x66ff44); else this.vfx.tracer(start, end); }
+      else if (p === 0 || g.pellets <= 3) { if (this.weapon._energyBeam) this.vfx.laserBeam(this.weapon.muzzleWorld.clone(), end, g.ecolor || 0x66ff44); else this.vfx.tracer(start, end); } // beam leaves the gun muzzle, not the camera
     }
     this._fovKick = Math.min(this._fovKick + g.kick * 8, 6);
   }
