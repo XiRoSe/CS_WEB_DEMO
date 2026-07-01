@@ -8,13 +8,13 @@ import { makeGunModel } from "./gunmodels.js";
 // weapon rides the right-hand bone. Falls back to a procedural homage if the rig isn't present.
 export function makeRick() {
   const group = new THREE.Group();
-  let mixer = null, hand = null, handL = null;
+  let mixer = null, hand = null, handL = null, footR = null, footL = null;
   // Upper/lower-body split actions: legs run the locomotion clip, torso+arms crossfade to the Gunplay pose.
   let idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp, dance;
   let legL, legR, armL, armR; // procedural fallback handles
 
   if (RICK_MODEL.ready) {
-    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE, leftHand: "hand_l" });
+    const inst = RICK_MODEL.make({ rightHand: RM_HAND_BONE, leftHand: "hand_l", rightFoot: "foot_r", leftFoot: "foot_l" });
     group.add(inst.model);
     mixer = new THREE.AnimationMixer(inst.model);
     // Each Mixamo clip is split into an upper half (torso/arms/head/hands) and a lower half (pelvis/legs/feet). The
@@ -25,9 +25,9 @@ export function makeRick() {
     idleLo = mk(rIdle, false); idleUp = mk(rIdle, true);
     walkLo = mk(rWalk, false); walkUp = mk(rWalk, true);
     runLo = mk(rRun, false); runUp = mk(rRun, true);
-    gunUp = mk(rGun, true); // only the upper half of the gun stance — legs come from locomotion
+    gunUp = mk(rGun, true); // upper half of the gun stance (torso+arms); legs come from locomotion
     const rDance = clipsOf(RICK_DANCE)[0]; if (rDance) { dance = mixer.clipAction(rDance); dance.setEffectiveTimeScale(0.7); } // full-body Salsa for the deploy screen (a touch slower)
-    hand = inst.bones.rightHand; handL = inst.bones.leftHand;
+    hand = inst.bones.rightHand; handL = inst.bones.leftHand; footR = inst.bones.rightFoot; footL = inst.bones.leftFoot;
     for (const a of [idleLo, idleUp, walkLo, walkUp, runLo, runUp, gunUp, dance]) if (a) { a.play(); a.setEffectiveWeight(0); }
     if (idleLo) idleLo.setEffectiveWeight(1); if (idleUp) idleUp.setEffectiveWeight(1);
   } else {
@@ -64,10 +64,14 @@ export function makeRick() {
     fireKick() { fT = 0.3; }, // firing → blend in the Gunplay clip for a moment
     _weights: () => ({ idleLo: idleLo ? +idleLo.getEffectiveWeight().toFixed(2) : 0, walkLo: walkLo ? +walkLo.getEffectiveWeight().toFixed(2) : 0, runLo: runLo ? +runLo.getEffectiveWeight().toFixed(2) : 0, walkUp: walkUp ? +walkUp.getEffectiveWeight().toFixed(2) : 0, gunUp: gunUp ? +gunUp.getEffectiveWeight().toFixed(2) : 0, gunRotX: gun ? +gun.rotation.x.toFixed(2) : 0 }), // debug: legs vs arms
     update(dt, moving, speed = 1, thrust = 0, aimPitch = 0) {
-      const jetting = thrust > 0;                                // any palm-thrust (full lift OR small slow-fall glide)
+      const jetting = thrust > 0;                                // any palm/boot-thrust (full lift OR slow-fall glide)
       gunPitch = aimPitch;                                       // barrel follows the vertical aim
-      const pts = [];                                            // hand-jet emit points (group-local) while flying
-      if (jetting && hand && handL) for (const hb of [hand, handL]) { hb.updateWorldMatrix(true, false); hb.getWorldPosition(_hp); group.worldToLocal(_hp); pts.push(_hp.x, _hp.y, _hp.z); }
+      const pts = [];                                            // jet emit points (group-local): feet always, hands only when NOT shooting
+      if (jetting) {
+        const firingNow = fW > 0.5;                              // hands busy on the gun → thrust from the boots only
+        const emitters = firingNow ? [footR, footL] : [hand, handL, footR, footL];
+        for (const b of emitters) if (b) { b.updateWorldMatrix(true, false); b.getWorldPosition(_hp); group.worldToLocal(_hp); pts.push(_hp.x, _hp.y, _hp.z); }
+      }
       thruster.update(dt, thrust, pts);
       if (mixer) {
         mixer.update(dt);
@@ -105,7 +109,9 @@ export function makeRick() {
 
 // Split a Mixamo/UE4 clip into upper-body (torso/arms/head/hands) vs lower-body (pelvis/legs/feet) track sets, so
 // legs and arms can be driven from different clips. A bone is "upper" by name; everything else (incl. pelvis) is lower.
-const UPPER_RE = /spine|neck|head|clavicle|shoulder|upperarm|lowerarm|forearm|hand|thumb|index|middle|ring|pinky|finger/i;
+// pelvis + root live in the UPPER set so the gun-aim clip drives the whole torso orientation (without it, the gun's
+// spine gets grafted onto the idle pelvis and the arms splay out to the side). Only the actual leg bones are "lower".
+const UPPER_RE = /pelvis|root|spine|neck|head|clavicle|shoulder|upperarm|lowerarm|forearm|hand|thumb|index|middle|ring|pinky|finger/i;
 function boneOf(trackName) { const dot = trackName.lastIndexOf("."); const path = dot >= 0 ? trackName.slice(0, dot) : trackName; return path.slice(path.lastIndexOf("/") + 1).split(":").pop(); }
 function maskClip(clip, wantUpper) {
   if (!clip) return null;
